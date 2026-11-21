@@ -1020,8 +1020,12 @@ function rendreAccueil() {
       const cp = p && p.categories ? p.categories.find(x => x.key === c.key) : null;
       let who, val = '—', cls = 'br';
       if (!cp) { who = 'En attente'; cls += ' vide'; }
-      else if (cp.titre) { who = esc(cp.titre.nom) + '<small>' + esc(cp.titre.mat) + (p.type === 'Final' ? ' · lauréat' : ' · en tête') + '</small>'; val = fV(c.kind, cp.titre.val); }
-      else { who = cp.statut === 'Non attribué' ? 'Non attribué (égalité parfaite)' : 'Aucun joueur éligible'; cls += ' vide'; }
+      else if (cp.laureats && cp.laureats.length) {
+        const co = cp.laureats.length > 1;
+        who = cp.laureats.map(x => esc(x.nom)).join(', ') + '<small>' + esc(cp.laureats.map(x => x.mat).join(', ')) + (co ? ' · co-lauréats' : p.type === 'Final' ? ' · lauréat' : ' · en tête') + '</small>';
+        val = fV(c.kind, cp.laureats[0].val);
+      }
+      else { who = 'Aucun joueur éligible'; cls += ' vide'; }
       h += '<div class="' + cls + '"><div class="cat">' + esc(k === 'SURV' ? 'Survivor' : famille(c)) + '</div><div class="who">' + who + '</div><div class="val num">' + val + '</div></div>';
     });
   });
@@ -1029,11 +1033,15 @@ function rendreAccueil() {
   $('#home-board').innerHTML = h;
   $('#home-cal').innerHTML = calHtml();
 }
+function reglesSite() { try { return L.regles(PARAM); } catch (e) { return null; } }
+function heureTxt(h) { return String(h).replace(':', ' h ').replace(/ h 00$/, ' h'); }
 function calHtml() {
-  const s = PUB && PUB.saison;
-  if (!s) return '<dl class="kv"><dt>Matchs officiels</dt><dd>mercredi et samedi à 16 h</dd><dt>Classement provisoire</dt><dd>le dimanche, tous les 14 jours</dd><dt>Coupure</dt><dd>samedi à 17 h</dd><dt>Fin de saison</dt><dd>7 derniers jours réservés à l’audit</dd></dl><p class="mute small">Les dates de la saison seront annoncées par l’organisation.</p>';
-  const prochaine = L.publicationsPrevues(s, now().slice(0, 10), 1)[0];
-  return '<dl class="kv"><dt>Saison</dt><dd>' + esc(s.nom) + ' · ' + esc(s.statut || '') + '</dd><dt>Dates</dt><dd>du ' + fD(s.debut) + ' au ' + fD(s.fin) + '</dd><dt>Matchs officiels</dt><dd>mercredi et samedi à 16 h</dd><dt>Prochain classement</dt><dd>' + (prochaine ? fD(prochaine) : '—') + '</dd><dt>Coupure</dt><dd>la veille, samedi à ' + esc(String(s.coupure_heure || '17:00').replace(':', ' h ')) + '</dd><dt>Dernier jour des matchs</dt><dd>' + fD(s.limite) + '</dd><dt>Fin de saison</dt><dd>audit et réclamations, puis classement final</dd></dl>';
+  const R = reglesSite(), s = PUB && PUB.saison;
+  if (!R) return '<p class="mute small">Le calendrier s’affichera dès que les réglages de la ligue seront chargés.</p>';
+  const base = '<dt>Matchs de Katana</dt><dd>en général le mercredi et le samedi à 16 h</dd><dt>Classement provisoire</dt><dd>le ' + JOURS[R.publication_jour] + ', tous les ' + R.periodicite_jours + ' jours</dd><dt>Coupure</dt><dd>le ' + JOURS[R.coupure_jour] + ' qui précède, à ' + heureTxt(R.coupure_heure) + ', selon l’heure d’envoi de la capture</dd><dt>Classement final</dt><dd>dans les ' + R.classement_final_jours + ' jours après la fin de la saison</dd>';
+  if (!s) return '<dl class="kv">' + base + '</dl><p class="mute small">Les dates de la saison seront annoncées par l’organisation.</p>';
+  const prochaine = L.publicationsPrevues(s, now().slice(0, 10), 1, R)[0];
+  return '<dl class="kv"><dt>Saison</dt><dd>' + esc(s.nom) + '</dd><dt>Dates</dt><dd>du ' + fD(s.debut) + ' au ' + fD(s.fin) + '</dd><dt>Prochain classement</dt><dd>' + (prochaine ? fD(prochaine) : '—') + '</dd>' + base + '</dl>';
 }
 function pubAffichee() {
   if (UI.archive) { const a = S.publications.find(p => p.id === UI.archive); if (a) return a; }
@@ -1046,13 +1054,14 @@ function defCat(c, p) {
 }
 function carteCl(c, p, toutes) {
   const lignes = toutes ? c.lignes : c.lignes.slice(0, 10);
-  const tete = c.titre ? '' : '<p class="mute small" style="margin:0">' + (c.statut === 'Non attribué' ? 'Égalité parfaite en tête : distinction non attribuée.' : 'Aucun joueur éligible.') + '</p>';
-  let h = '<div class="cl-card"><header><div><h3>' + esc(c.label) + '</h3><p class="def">' + esc(defCat(c, p)) + '</p></div>' + (c.titre ? badge(p.type === 'Final' ? 'Lauréat' : 'En tête', 'g') : badge(c.statut, 'o')) + '</header>';
+  const nbL = (c.laureats || []).length;
+  const tete = !nbL ? '<p class="mute small" style="margin:0">Aucun joueur éligible.</p>' : nbL > 1 ? '<p class="mute small" style="margin:0">Égalité parfaite en tête : ' + nbL + ' co-lauréats, titre partagé.</p>' : '';
+  let h = '<div class="cl-card"><header><div><h3>' + esc(c.label) + '</h3><p class="def">' + esc(defCat(c, p)) + '</p></div>' + (nbL > 1 ? badge('Co-lauréats', 'g') : nbL ? badge(p.type === 'Final' ? 'Lauréat' : 'En tête', 'g') : badge(c.statut, 'o')) + '</header>';
   if (!lignes.length) return h + '<div class="vide-cl">' + tete + '</div></div>';
   h += (tete ? '<div style="padding:8px 14px">' + tete + '</div>' : '') + '<div class="scroll"><table><thead><tr><th>Rang</th><th>Joueur</th><th class="r">' + (c.kind === 'MOST' ? 'Total' : 'Moyenne') + '</th><th class="r">Matchs</th></tr></thead><tbody>';
   lignes.forEach(l => {
     const ps = (l.pseudos || []).filter(x => x && x !== l.nom);
-    h += '<tr class="' + (l.rang === 1 && c.titre ? 'lead1' : '') + '"><td><span class="rk">' + l.rang + (l.egal ? '=' : '') + '</span></td><td><b>' + esc(l.nom) + '</b><div class="dim small">' + esc(l.mat) + (ps.length ? ' · ' + esc(ps.join(', ')) : '') + '</div></td><td class="num">' + fV(c.kind, l.val) + '</td><td class="num">' + l.n + '</td></tr>';
+    h += '<tr class="' + (l.rang === 1 && nbL ? 'lead1' : '') + '"><td><span class="rk">' + l.rang + (l.egal ? '=' : '') + '</span></td><td><b>' + esc(l.nom) + '</b><div class="dim small">' + esc(l.mat) + (ps.length ? ' · ' + esc(ps.join(', ')) : '') + '</div></td><td class="num">' + fV(c.kind, l.val) + '</td><td class="num">' + l.n + '</td></tr>';
   });
   return h + '</tbody></table></div></div>';
 }
@@ -1931,7 +1940,7 @@ TAB.classements = {
     h += '<p class="mute">Aperçu du classement ' + UI.clType.toLowerCase() + (UI.clType === 'Provisoire' ? ' n°' + n : '') + ' : matchs validés de ' + esc(s.nom) + ' terminés avant le ' + fDT(coupure) + '.</p>';
     h += '<div class="panel"><h3>Contrôle final automatique</h3><ul class="chk">' + controleFinal(s, coupure, cl).map(([ok, t]) => '<li class="' + (ok === true ? 'o' : ok === null ? 'w' : 'b') + '">' + esc(t) + '</li>').join('') + '</ul></div>';
     const pseudo = { type: UI.clType, seuil: cl.seuil, q1: cl.q1 };
-    h += '<div class="cl-grid">' + cl.cats.map(c => carteCl({ key: c.key, kind: c.kind, label: c.label, statut: c.statut, titre: c.titre, lignes: c.lignes.map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomJoueur(l.j.mat), pseudos: pseudosJoueur(l.j.mat), val: l.val, n: l.j.n })) }, pseudo, true)).join('') + '</div>';
+    h += '<div class="cl-grid">' + cl.cats.map(c => carteCl({ key: c.key, kind: c.kind, label: c.label, statut: c.statut, laureats: c.laureats, lignes: c.lignes.map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomJoueur(l.j.mat), pseudos: pseudosJoueur(l.j.mat), val: l.val, n: l.j.n })) }, pseudo, true)).join('') + '</div>';
     return h;
   }
 };
@@ -1956,7 +1965,7 @@ function instantane(calc, type) {
   return {
     saison: { id: s.id, nom: s.nom, debut: s.debut, fin: s.fin }, type, numero: numeroP, publie_le: t, coupure,
     recours_jusqu: L.addMinutes(t, L.regles(s).recours_h * 60), nb_matchs: agg.nbMatchs, nb_joueurs: cl.pop.length, seuil: cl.seuil, q1: cl.q1,
-    categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut, titre: c.titre ? { mat: c.titre.mat, nom: nomJoueur(c.titre.mat), val: L.valeur(c, c.titre) } : null, lignes: c.lignes.slice(0, 10).map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomJoueur(l.j.mat), pseudos: pseudosJoueur(l.j.mat), val: l.val, n: l.j.n })) }))
+    categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut, laureats: c.laureats.map(j => ({ mat: j.mat, nom: nomJoueur(j.mat), val: L.valeur(c, j) })), lignes: c.lignes.slice(0, 10).map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomJoueur(l.j.mat), pseudos: pseudosJoueur(l.j.mat), val: l.val, n: l.j.n })) }))
   };
 }
 async function publierClassement() {
@@ -1976,7 +1985,7 @@ async function publierClassement() {
 }
 function texteFacebook(p) {
   const l = ['LEAGUE UV · ' + (p.type === 'Final' ? 'CLASSEMENT FINAL' : 'CLASSEMENT PROVISOIRE N°' + p.numero), (p.saison ? p.saison.nom + ' · ' : '') + 'matchs terminés avant le ' + fDT(p.coupure), ''];
-  p.categories.forEach(c => { l.push(c.label + ' : ' + (c.titre ? c.titre.nom + ' (' + fV(c.kind, c.titre.val) + ')' : c.statut === 'Non attribué' ? 'non attribué (égalité parfaite)' : 'aucun joueur éligible')); });
+  p.categories.forEach(c => { l.push(c.label + ' : ' + (c.laureats.length ? c.laureats.map(x => x.nom).join(' et ') + ' (' + fV(c.kind, c.laureats[0].val) + ')' + (c.laureats.length > 1 ? ', co-lauréats' : '') : 'aucun joueur éligible')); });
   l.push('', p.type === 'Final' ? 'Félicitations à tous les participants.' : 'Réclamations en message privé jusqu’au ' + fDT(p.recours_jusqu) + '.', '', '#DeltaForceMobile #DeltaForceMadagascar #LeagueUV #MadagascarGaming');
   return l.join('\n');
 }
