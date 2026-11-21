@@ -1221,7 +1221,7 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'acces', 'sauvegarde'];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'saison', 'acces', 'sauvegarde'];
 const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
@@ -1230,7 +1230,7 @@ function compteurTab(k) {
   if (k === 'acces') return ADM.vsAlerte ? 1 : 0;
   if (k === 'demandes') return ADM.nbDem || 0;
   if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
-  if (k === 'matchs') return S.matchs.filter(m => m.statut === 'Brouillon').length;
+  if (k === 'matchs') return ADM.nbMatchs || 0;
   return 0;
 }
 function rendreAdmin() {
@@ -1730,157 +1730,6 @@ function saisirCreneau() {
 }
 
 /* ----- Matchs ----- */
-TAB.matchs = {
-  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="ma-s">Saison</label><select id="ma-s"><option value="">Toutes</option>' + optSaisons(UI.matchSaison) + '</select></div><button class="btn" type="button" data-act="m-nouveau">Nouveau match</button></div>',
-  body: () => {
-    const cx = ctx();
-    const l = S.matchs.filter(m => !UI.matchSaison || m.saison_id === UI.matchSaison).sort((a, b) => String(b.fin).localeCompare(String(a.fin)));
-    if (!S.saisons.length) return note('Créez d’abord une saison (onglet Saison).', 'a');
-    if (!l.length) return note('Aucun match enregistré. Cliquez sur « Nouveau match » après chaque rencontre.');
-    return '<div class="scroll"><table><thead><tr><th>Match</th><th>Type</th><th>Fin</th><th>Carte</th><th class="r">HAAVK–GTI</th><th class="r">Membres</th><th>Statut</th><th>Contrôles</th><th></th></tr></thead><tbody>' + l.map(m => {
-      const c = L.controlesMatch(m, cx, saisonPar(m.saison_id));
-      return '<tr><td class="nowrap"><b>' + esc(m.id) + '</b></td><td>' + esc(m.type) + (m.creneau_id ? '<div class="dim small">' + esc(m.creneau_id) + '</div>' : '') + '</td><td class="nowrap">' + fDT(m.fin) + '</td><td>' + esc(m.carte || '—') + '</td><td class="num">' + c.h + '–' + c.g + '</td><td class="num">' + c.membres + '/' + c.total + '</td><td>' + badgeStatut(m.statut) + '</td><td class="small">' + (c.bloquants.length ? '<span class="err">' + c.bloquants.length + ' bloquant(s)</span>' : '<span class="res auto">OK</span>') + (c.alertes.length ? ' · ' + c.alertes.length + ' alerte(s)' : '') + '</td><td><button class="btn sm ghost" type="button" data-act="m-ouvrir" data-id="' + esc(m.id) + '">Ouvrir</button></td></tr>';
-    }).join('') + '</tbody></table></div>';
-  }
-};
-const PROMPT_IA = 'Tu lis une ou plusieurs captures d’écran du tableau de fin de match de Delta Force Mobile (mode Victory Unite / Warfare), avec les factions HAAVK et GTI.\nExtrais :\n- "carte" : le nom de la carte affiché dans l’en-tête, ou null ;\n- "mode" : le mode affiché, ou null ;\n- "fin" : la date et l’heure affichées, au format AAAA-MM-JJTHH:MM, ou null si elles ne sont pas visibles ;\n- "lignes" : un objet par joueur visible, avec "faction" ("HAAVK" ou "GTI", selon le côté du tableau où il apparaît), "pseudo" (recopié exactement : majuscules, chiffres et symboles), puis les 8 colonnes chiffrées dans l’ordre de gauche à droite : "score", "elim" (éliminations), "morts", "assist" (assistances), "med" (contribution médicale), "ing" (contribution ingénieur), "obj" (contribution aux objectifs), "tac" (contribution tactique).\nRègles : n’invente rien ; si une valeur est illisible, mets null. Ignore les médailles et les badges. Si plusieurs captures montrent le même joueur, ne le répète pas.\nRéponds uniquement avec un objet JSON de la forme {"carte":…,"mode":…,"fin":…,"lignes":[…]}.';
-function resoudreLigne(l) {
-  if (l.res === 'manuel' || l.res === 'non inscrit confirmé') return;
-  const r = L.resoudre(l, S.comptes, L.validDT(ED && ED.fin) ? ED.fin : now());
-  l.mat = r.mat; l.cpt = r.cpt; l.res = r.res; l.sugg = r.sugg || []; l.note = r.note || '';
-}
-function ouvrirEditeur(id) {
-  const src = id ? S.matchs.find(m => m.id === id) : null, s = saisonActive();
-  if (!src && !s) { toast('Créez d’abord une saison.', true); return; }
-  ED = src ? JSON.parse(JSON.stringify(src)) : { id: '', saison_id: s.id, type: 'Officiel', creneau_id: '', carte: '', fin: '', recu: '', resp_haavk: '', resp_gti: '', notes: '', captures: [], lignes: [], statut: 'Brouillon', cree_le: now() };
-  if (ED.statut === 'Brouillon') ED.lignes.forEach(resoudreLigne);
-  const lock = ED.statut !== 'Brouillon';
-  const btns = [{ label: 'Fermer', cls: 'ghost' }];
-  if (lock) btns.push({ label: 'Repasser en brouillon', cls: 'ghost', onClick: () => changerStatutMatch('Brouillon') });
-  else {
-    if (ED.id) btns.push({ label: 'Supprimer le brouillon', cls: 'ghost', id: 'ed-suppr', onClick: el => supprimerBrouillon(el) });
-    btns.push({ label: 'Invalider', cls: 'danger', onClick: () => changerStatutMatch('Invalidé') });
-    btns.push({ label: 'Enregistrer', cls: 'ghost', onClick: async () => { const ok = await agir(async () => { await sauverMatch(); await noter('Match', ED.id, 'Match enregistré en brouillon', ''); }, 'Brouillon enregistré.'); if (ok) majTitreEditeur(); return false; } });
-    btns.push({ label: 'Valider le match', id: 'ed-valider', onClick: validerMatch });
-  }
-  modal('', editeurHtml(lock), btns, { large: true, mode: 'editeur' });
-  majTitreEditeur(); majControles();
-  cap('sample').then(x => { const b = $('#ed-ia'); if (b && x && !lock) b.hidden = false; });
-  cap('assets').then(x => { const b = $('#ed-arch'); if (b && x && !lock) b.hidden = false; });
-}
-function majTitreEditeur() { $('#modal-t').textContent = (ED.id ? 'Match ' + ED.id : 'Nouveau match') + ' · ' + ED.statut; }
-function editeurHtml(lock) {
-  const d = lock ? ' disabled' : '';
-  const crs = S.creneaux.filter(c => c.statut === 'Accepté' || c.id === ED.creneau_id).sort((a, b) => String(b.date).localeCompare(String(a.date)));
-  let h = (ED.statut !== 'Brouillon' ? note('Match ' + ED.statut.toLowerCase() + (ED.valide_le ? ' le ' + fDT(ED.valide_le) : '') + (ED.motif ? '. Motif : ' + esc(ED.motif) : '') + '. Pour le modifier, repassez-le en brouillon.', ED.statut === 'Validé' ? '' : 'r') : '');
-  h += '<div class="grid-f"><div><label class="lab" for="e-saison">Saison</label><select id="e-saison"' + d + '>' + optSaisons(ED.saison_id) + '</select></div>';
-  h += '<div><label class="lab">Type</label><div class="choix"><label><input type="radio" name="e-type" value="Officiel"' + (ED.type !== 'Libre' ? ' checked' : '') + d + '> Officiel</label><label><input type="radio" name="e-type" value="Libre"' + (ED.type === 'Libre' ? ' checked' : '') + d + '> Libre</label></div></div>';
-  h += '<div data-libre><label class="lab" for="e-creneau">Créneau accepté</label><select id="e-creneau"' + d + '><option value="">Choisir…</option>' + crs.map(c => '<option value="' + esc(c.id) + '"' + (c.id === ED.creneau_id ? ' selected' : '') + '>' + esc(c.id + ' · ' + fDc(c.date) + ' ' + c.debut + '–' + (c.fin || '') + ' · ' + c.demandeur) + '</option>').join('') + '</select></div>';
-  h += '<div><label class="lab" for="e-carte">Carte</label><select id="e-carte"' + d + '><option value="">Choisir…</option>' + L.CARTES.concat(['Autre']).map(c => '<option' + (c === ED.carte ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>';
-  h += '<div><label class="lab" for="e-fin">Fin du match (heure lue sur la capture)</label><input type="datetime-local" id="e-fin" value="' + esc(ED.fin) + '"' + d + '></div>';
-  h += '<div data-libre><label class="lab" for="e-recu">Capture reçue à</label><input type="datetime-local" id="e-recu" value="' + esc(ED.recu) + '"' + d + '></div>';
-  h += '<div><label class="lab" for="e-rh">Responsable HAAVK</label><input type="text" id="e-rh" value="' + esc(ED.resp_haavk) + '"' + d + '></div><div><label class="lab" for="e-rg">Responsable GTI</label><input type="text" id="e-rg" value="' + esc(ED.resp_gti) + '"' + d + '></div></div>';
-  h += '<label class="lab" for="e-notes">Notes</label><textarea id="e-notes" rows="2"' + d + '>' + esc(ED.notes) + '</textarea>';
-  h += '<h3 style="margin-top:16px">Captures</h3>' + (lock ? '' : '<input type="file" id="e-files" accept="image/*" multiple><div class="row-btns"><button class="btn sm" type="button" data-act="ed-ia" id="ed-ia" hidden>Lire avec l’IA</button><button class="btn sm ghost" type="button" data-act="ed-archiver" id="ed-arch" hidden>Archiver comme preuve</button></div><p class="dim small" id="ed-info">Au-delà de 8 joueurs par faction, ajoutez les deux captures (haut et bas). La lecture IA remplit le tableau ; vous vérifiez chaque valeur avant de valider.</p>') + '<div class="thumbs" id="ed-thumbs">' + thumbs() + '</div>';
-  h += '<h3 style="margin-top:16px">Participants</h3>';
-  if (!lock) h += '<details><summary>Coller des lignes (OCR, tableur ou saisie)</summary><p class="dim small">Une ligne par joueur : la faction (ou une ligne « HAAVK » puis sa liste), le pseudo, puis les 8 nombres dans l’ordre de la capture : score, éliminations, morts, assistances, médicale, ingénieur, objectif, tactique. Séparateurs acceptés : espace, tabulation ou point-virgule.</p><textarea id="e-coller" rows="5" placeholder="HAAVK&#10;Rakoto99 2450 12 5 3 0 450 120 300&#10;GTI;Zebu Rouge;2100;8;6;4;150;0;90;45"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="ed-coller">Ajouter ces lignes</button></div></details>';
-  h += '<div class="scroll"><table class="lignes-t" id="ed-table">' + tableLignes(lock) + '</table></div>';
-  if (!lock) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-ajout-ligne">Ajouter une ligne</button><button class="btn sm ghost" type="button" data-act="ed-vider">Effacer toutes les lignes</button></div>';
-  h += '<label class="lab" for="e-motif">Motif (obligatoire pour invalider ou repasser en brouillon)</label><textarea id="e-motif" rows="2"></textarea>';
-  h += '<div class="ctrl-box" id="ed-ctrl" aria-live="polite"></div>';
-  return h;
-}
-function thumbs() { return (ED.captures || []).map(id => '<a href="/_blob/' + encodeURIComponent(id) + '" target="_blank" rel="noopener"><img src="/_blob/' + encodeURIComponent(id) + '" alt="Capture archivée" loading="lazy"></a>').join(''); }
-function resCell(l, lock) {
-  const lab = l.res === 'auto' ? '<span class="res auto">' + esc(l.mat) + '</span>' : l.res === 'manuel' ? '<span class="res auto">' + esc(l.mat) + ' (choisi)</span>' : l.res === 'à identifier' ? '<span class="res aid" title="' + esc(l.note || '') + '">À identifier</span>' : l.res === 'non inscrit confirmé' ? '<span class="res ni">Non inscrit (confirmé)</span>' : '<span class="res ni">Non inscrit</span>';
-  if (lock) return lab;
-  const sg = (l.sugg || []).map(compte).filter(Boolean);
-  const tous = S.comptes.filter(c => c.statut !== 'Remplacé').sort((a, b) => String(a.pseudo).localeCompare(String(b.pseudo)));
-  const o = (c, sel) => '<option value="' + esc(c.id) + '"' + (sel ? ' selected' : '') + '>' + esc(c.pseudo + ' · ' + c.matricule) + '</option>';
-  return lab + '<br><select data-f="lien" aria-label="Rattacher la ligne"><option value="">' + (l.res === 'auto' ? 'Automatique' : 'Choisir…') + '</option>' + (sg.length ? '<optgroup label="Suggestions">' + sg.map(c => o(c, false)).join('') + '</optgroup>' : '') + '<optgroup label="Tous les comptes">' + tous.map(c => o(c, l.res === 'manuel' && l.cpt === c.id)).join('') + '</optgroup><option value="__ni"' + (l.res === 'non inscrit confirmé' ? ' selected' : '') + '>Non inscrit (confirmer)</option></select>';
-}
-function tableLignes(lock) {
-  const d = lock ? ' disabled' : '';
-  let h = '<thead><tr><th>#</th><th>Faction</th><th>Pseudo</th>' + L.STATS.map(s => '<th title="' + esc(s.label) + '">' + esc(s.court) + '</th>').join('') + '<th>Joueur</th><th></th></tr></thead><tbody>';
-  ED.lignes.forEach((l, i) => {
-    h += '<tr data-i="' + i + '"><td class="dim">' + (i + 1) + '</td><td><select data-f="faction"' + d + ' aria-label="Faction ligne ' + (i + 1) + '"><option value=""></option><option' + (l.faction === 'HAAVK' ? ' selected' : '') + '>HAAVK</option><option' + (l.faction === 'GTI' ? ' selected' : '') + '>GTI</option></select></td><td><input class="ps" type="text" data-f="pseudo" value="' + esc(l.pseudo) + '"' + d + ' aria-label="Pseudo ligne ' + (i + 1) + '"></td>' + L.STATS.map(s => '<td><input type="number" inputmode="decimal" min="0" step="any" data-f="' + s.k + '" value="' + esc(l[s.k]) + '"' + d + ' aria-label="' + esc(s.label) + ' ligne ' + (i + 1) + '"></td>').join('') + '<td id="res-' + i + '">' + resCell(l, lock) + '</td><td>' + (lock ? '' : '<button type="button" class="lien" data-act="ed-suppr-ligne" data-i="' + i + '" aria-label="Supprimer la ligne ' + (i + 1) + '">✕</button>') + '</td></tr>';
-  });
-  if (!ED.lignes.length) h += '<tr><td colspan="14" class="dim">Aucune ligne. Collez les lignes de la capture ou utilisez la lecture IA.</td></tr>';
-  return h + '</tbody>';
-}
-function docMatch() {
-  return {
-    saison_id: ED.saison_id, type: ED.type, creneau_id: ED.type === 'Libre' ? ED.creneau_id : '', carte: ED.carte, fin: ED.fin, recu: ED.type === 'Libre' ? ED.recu : '',
-    resp_haavk: ED.resp_haavk, resp_gti: ED.resp_gti, notes: ED.notes, captures: ED.captures || [],
-    lignes: ED.lignes.map(l => { const o = { faction: l.faction || '', pseudo: String(l.pseudo || '').trim(), mat: l.mat || '', cpt: l.cpt || '', res: l.res || '' }; L.STATS.forEach(s => { o[s.k] = l[s.k] === '' || l[s.k] == null ? '' : Number(l[s.k]); }); return o; }),
-    statut: ED.statut, motif: ED.motif || '', valide_le: ED.valide_le || '', cree_le: ED.cree_le || now(), modifie_le: now()
-  };
-}
-function majControles() {
-  const box = $('#ed-ctrl'); if (!box || !ED) return;
-  const d = Object.assign(docMatch(), { id: ED.id || '(nouveau)' });
-  const c = L.controlesMatch(d, ctx(), saisonPar(ED.saison_id));
-  box.innerHTML = '<b>' + c.total + ' participant(s)</b> · HAAVK ' + c.h + ' · GTI ' + c.g + ' · membres ' + c.membres + ' (minimum ' + c.requis + ')' + (c.bloquants.length || c.alertes.length ? chk({ B: c.bloquants, W: c.alertes }) : '<ul class="chk"><li class="o">Tous les contrôles automatiques sont passés. Vérifiez la capture puis validez.</li></ul>');
-  const b = $('#ed-valider'); if (b) b.disabled = !!c.bloquants.length;
-  $$('#modal-b [data-libre]').forEach(x => { x.hidden = ED.type !== 'Libre'; });
-}
-function surSaisieEditeur(e) {
-  const el = e.target, tr = el.closest('tr[data-i]');
-  if (tr && el.dataset.f) {
-    const i = +tr.dataset.i, l = ED.lignes[i], f = el.dataset.f;
-    if (f === 'lien') {
-      if (e.type !== 'change') return;
-      if (el.value === '__ni') { l.res = 'non inscrit confirmé'; l.mat = ''; l.cpt = ''; }
-      else if (el.value) { const c = compte(el.value); l.res = 'manuel'; l.mat = c.matricule; l.cpt = c.id; }
-      else { l.res = ''; resoudreLigne(l); }
-      $('#res-' + i).innerHTML = resCell(l, false);
-    } else if (f === 'pseudo') { l.pseudo = el.value; if (l.res !== 'manuel' && l.res !== 'non inscrit confirmé') { resoudreLigne(l); $('#res-' + i).innerHTML = resCell(l, false); } }
-    else if (f === 'faction') l.faction = el.value;
-    else l[f] = el.value === '' ? '' : Number(el.value);
-    majControles(); return;
-  }
-  const id = el.id;
-  if (id === 'e-fin') { ED.fin = L.normDT(el.value); ED.lignes.forEach((l, i) => { resoudreLigne(l); const td = $('#res-' + i); if (td) td.innerHTML = resCell(l, false); }); }
-  else if (id === 'e-recu') ED.recu = L.normDT(el.value);
-  else if (id === 'e-saison') ED.saison_id = el.value;
-  else if (id === 'e-creneau') ED.creneau_id = el.value;
-  else if (id === 'e-carte') ED.carte = el.value;
-  else if (id === 'e-rh') ED.resp_haavk = el.value;
-  else if (id === 'e-rg') ED.resp_gti = el.value;
-  else if (id === 'e-notes') ED.notes = el.value;
-  else if (el.name === 'e-type') ED.type = el.value;
-  else return;
-  majControles();
-}
-function redessinerLignes() { $('#ed-table').innerHTML = tableLignes(false); majControles(); }
-async function sauverMatch() {
-  if (!ED.id) { const n = prochainMatch(); ED.id = 'M-' + String(n).padStart(4, '0'); await majSys({ compteur_match: n }); }
-  await ecrire('matchs', ED.id, docMatch());
-}
-async function validerMatch() {
-  const d = Object.assign(docMatch(), { id: ED.id || '(nouveau)' });
-  const c = L.controlesMatch(d, ctx(), saisonPar(ED.saison_id));
-  if (c.bloquants.length) { toast('Validation impossible : ' + c.bloquants[0], true); return false; }
-  const avant = ED.statut;
-  ED.statut = 'Validé'; ED.valide_le = now(); ED.motif = '';
-  const ok = await agir(async () => { await sauverMatch(); await noter('Match', ED.id, 'Match validé : ' + c.total + ' participants, ' + c.membres + ' membres' + (c.alertes.length ? ', ' + c.alertes.length + ' alerte(s)' : ''), ''); }, 'Match validé.');
-  if (!ok) { ED.statut = avant; return false; }
-  return true;
-}
-async function changerStatutMatch(statut) {
-  const motif = v('e-motif');
-  if (!motif) { toast('Écrivez le motif dans le champ « Motif » en bas du formulaire.', true); const m = $('#e-motif'); if (m) m.focus(); return false; }
-  const avant = ED.statut;
-  ED.statut = statut; ED.motif = motif; if (statut === 'Brouillon') ED.valide_le = '';
-  const ok = await agir(async () => { await sauverMatch(); await noter('Match', ED.id, statut === 'Invalidé' ? 'Match invalidé (statistiques retirées pour tous)' : 'Match repassé en brouillon (' + avant + ' avant)', motif); }, statut === 'Invalidé' ? 'Match invalidé.' : 'Match repassé en brouillon.');
-  if (!ok) { ED.statut = avant; return false; }
-  return true;
-}
-async function supprimerBrouillon(el) {
-  if (!el.dataset.ok) { el.dataset.ok = '1'; el.textContent = 'Confirmer la suppression'; return false; }
-  const id = ED.id;
-  return agir(async () => { await supprimer('matchs', id); await noter('Match', id, 'Brouillon supprimé', ''); }, 'Brouillon supprimé.');
-}
 function reduireImage(file, max, q) {
   return new Promise((res, rej) => {
     const url = URL.createObjectURL(file), img = new Image();
@@ -1895,46 +1744,6 @@ function reduireImage(file, max, q) {
   });
 }
 function extraireJSON(t) { const a = String(t).indexOf('{'), b = String(t).lastIndexOf('}'); return a >= 0 && b > a ? String(t).slice(a, b + 1) : t; }
-async function lireIA() {
-  const files = Array.from(($('#e-files') || {}).files || []);
-  if (!files.length) { toast('Choisissez d’abord une ou plusieurs captures.', true); return; }
-  const sp = await cap('sample'); if (!sp) { toast('La lecture IA n’est pas disponible ici.', true); return; }
-  const info = $('#ed-info'); info.textContent = 'Lecture des captures en cours…';
-  try {
-    if (typeof sp.limits === 'function') { const lim = await sp.limits(); if (lim && lim.images === false) throw new Error('lecture d’images indisponible pour ce compte'); }
-    const images = []; for (const f of files) images.push(await reduireImage(f, 2000, 0.86));
-    let r = typeof sp.json === 'function' ? await sp.json(PROMPT_IA, { images, modelTier: 'default' }) : await sp(PROMPT_IA, { images, modelTier: 'default' });
-    if (r && typeof r.text === 'string' && !r.lignes) r = r.text;
-    if (typeof r === 'string') r = JSON.parse(extraireJSON(r));
-    const val = x => (x === null || x === undefined || x === '' || isNaN(Number(x))) ? '' : Number(x);
-    let n = 0;
-    (r && r.lignes || []).forEach(x => {
-      const l = { faction: /gti/i.test(x.faction) ? 'GTI' : /haavk/i.test(x.faction) ? 'HAAVK' : '', pseudo: String(x.pseudo || '').trim() };
-      if (!l.pseudo) return;
-      L.STATS.forEach(s => { l[s.k] = val(x[s.k]); });
-      if (ED.lignes.some(e => L.normPseudo(e.pseudo) === L.normPseudo(l.pseudo) && e.faction === l.faction)) return;
-      resoudreLigne(l); ED.lignes.push(l); n++;
-    });
-    const fin = L.normDT(r && r.fin || '');
-    if (!ED.fin && L.validDT(fin)) { ED.fin = fin; $('#e-fin').value = fin; ED.lignes.forEach(resoudreLigne); }
-    if (!ED.carte && r && r.carte) { const c = L.CARTES.find(x => L.normPseudo(x) === L.normPseudo(r.carte)); if (c) { ED.carte = c; $('#e-carte').value = c; } }
-    redessinerLignes();
-    info.textContent = n + ' ligne(s) lue(s)' + (r && r.carte ? ', carte lue : ' + r.carte : '') + (fin ? ', fin lue : ' + fDT(fin) : '') + '. Vérifiez chaque valeur avec la capture avant de valider.';
-  } catch (e) {
-    info.textContent = 'Lecture IA impossible (' + ((e && (e.message || e.code)) || 'erreur') + '). Collez les lignes à la place.';
-  }
-}
-async function archiverCaptures() {
-  const files = Array.from(($('#e-files') || {}).files || []);
-  if (!files.length) { toast('Choisissez d’abord les captures à archiver.', true); return; }
-  const as = await cap('assets'); if (!as) { toast('Archivage indisponible ici.', true); return; }
-  const info = $('#ed-info'); info.textContent = 'Archivage en cours…';
-  try {
-    for (const f of files) { const b = await reduireImage(f, 1800, 0.82); const r = await as.upload(b); if (r && r.id) ED.captures.push(r.id); }
-    $('#ed-thumbs').innerHTML = thumbs(); majControles();
-    info.textContent = files.length + ' capture(s) archivée(s). Enregistrez le match pour les rattacher.';
-  } catch (e) { info.textContent = 'Archivage impossible : ' + ((e && e.message) || 'erreur') + '.'; }
-}
 
 /* ----- Classements (calcul, contrôle final, publication) ----- */
 function coupureParDefaut(s, type) {
@@ -2053,42 +1862,6 @@ TAB.journal = {
   }
 };
 
-/* ----- Saison ----- */
-const CHAMPS_SAISON = [
-  ['nom', 'Nom de la saison', 'text'], ['debut', 'Premier jour', 'date'], ['fin', 'Dernier jour', 'date'], ['premier_provisoire', 'Premier classement provisoire (un dimanche)', 'date'],
-  ['periodicite', 'Jours entre deux provisoires', 'number'], ['coupure_heure', 'Heure de coupure du samedi', 'time'], ['audit_jours', 'Jours d’audit en fin de saison', 'number'],
-  ['min_participants', 'Participants minimum par match', 'number'], ['ecart_max', 'Écart maximum entre factions', 'number'], ['pct_membres', 'Part minimum de membres inscrits (%)', 'number'],
-  ['delai_capture', 'Délai d’envoi des captures, match libre (min)', 'number'], ['duree_creneau_h', 'Durée d’un créneau sans heure de fin (h)', 'number'], ['recours_h', 'Délai de réclamation (h)', 'number'], ['canal', 'Canal de contact affiché aux joueurs', 'text']
-];
-TAB.saison = {
-  shell: () => '<div class="row-btns" style="margin:0 0 12px"><button class="btn" type="button" data-act="sa-nouvelle">Nouvelle saison</button><button class="btn ghost" type="button" data-act="cl-page">Mettre à jour la page publique</button></div>',
-  body: () => {
-    if (!S.saisons.length) return note('Aucune saison. Créez la première : nom, dates, date du premier classement provisoire. Les règles par défaut (16 joueurs, écart 1, 30 %, 30 min, samedi 17 h, 14 jours, 7 jours d’audit, 48 h) sont pré-remplies.');
-    const act = saisonActive();
-    return S.saisons.slice().sort((a, b) => String(b.debut).localeCompare(String(a.debut))).map(s => {
-      const R = L.regles(s), pr = L.publicationsPrevues(s, now().slice(0, 10), 3);
-      return '<div class="card-l"><div class="t"><div><b>' + esc(s.nom) + '</b> ' + (act && act.id === s.id ? badge('Saison active', 'g') : '') + '<div class="small dim">du ' + fD(s.debut) + ' au ' + fD(s.fin) + ' · ' + esc(s.statut || '') + '</div></div><div class="row-btns" style="margin:0"><button class="btn sm ghost" type="button" data-act="sa-modifier" data-id="' + esc(s.id) + '">Modifier</button>' + (act && act.id === s.id ? '' : '<button class="btn sm ghost" type="button" data-act="sa-activer" data-id="' + esc(s.id) + '">Rendre active</button>') + '</div></div><dl class="kv"><dt>Date limite des matchs</dt><dd>' + fD(L.finCompetition(s)) + '</dd><dt>Prochains provisoires</dt><dd>' + (pr.length ? pr.map(fDc).join(', ') : '—') + '</dd><dt>Règles</dt><dd>' + R.min_participants + ' joueurs minimum, écart ' + R.ecart_max + ', ' + R.pct_membres + ' % de membres, capture sous ' + R.delai_capture + ' min, coupure samedi ' + R.coupure_heure + ', ' + R.periodicite + ' jours, ' + R.audit_jours + ' jours d’audit, réclamation ' + R.recours_h + ' h</dd><dt>Canal de contact</dt><dd>' + esc(s.canal || '—') + '</dd></dl></div>';
-    }).join('');
-  }
-};
-function modifierSaison(id) {
-  const s = id ? saisonPar(id) : null, R = L.regles(s);
-  const val = k => s && s[k] !== undefined ? s[k] : (R[k] !== undefined ? R[k] : (k === 'canal' ? 'Message privé à Katana' : ''));
-  const h = '<div class="grid-f">' + CHAMPS_SAISON.map(([k, l, t]) => '<div><label class="lab" for="s-' + k + '">' + esc(l) + '</label><input type="' + t + '" id="s-' + k + '" value="' + esc(val(k)) + '"' + (t === 'number' ? ' min="0" step="1"' : '') + '></div>').join('') + '<div><label class="lab" for="s-statut">Statut</label><select id="s-statut">' + ['Préparation', 'En cours', 'Clôture', 'Terminée'].map(x => '<option' + ((s ? s.statut : 'Préparation') === x ? ' selected' : '') + '>' + x + '</option>').join('') + '</select></div></div><div id="a-err" class="err"></div>';
-  modal(s ? 'Modifier ' + s.nom : 'Nouvelle saison', h, [{ label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', onClick: async () => {
-    const o = {}; CHAMPS_SAISON.forEach(([k, , t]) => { const x = v('s-' + k); o[k] = t === 'number' ? (x === '' ? '' : Number(x)) : x; }); o.statut = v('s-statut');
-    if (!o.nom) return erreurA('Le nom est obligatoire.');
-    if (!L.validD(o.debut) || !L.validD(o.fin) || o.fin <= o.debut) return erreurA('Dates invalides : le dernier jour doit suivre le premier.');
-    if (o.premier_provisoire && L.dow(o.premier_provisoire) !== 0) return erreurA('Le premier classement provisoire doit tomber un dimanche.');
-    const nid2 = s ? s.id : 'S' + (Math.max(0, ...S.saisons.map(x => numero(x.id))) + 1);
-    return agir(async () => {
-      await ecrire('saisons', nid2, Object.assign({}, s || { lots: {} }, o));
-      if (!sys().saison_active) await majSys({ saison_active: nid2 });
-      await noter('Saison', nid2, s ? 'Saison modifiée' : 'Saison créée : ' + o.nom, '');
-    }, 'Saison enregistrée. Pensez à mettre à jour la page publique.');
-  } }]);
-}
-
 /* ----- Sauvegarde ----- */
 TAB.sauvegarde = {
   body: () => {
@@ -2133,19 +1906,6 @@ const ACTIONS = {
   'mb-retour': () => { UI.membre = ''; rendreAdmin(); },
   'cr-saisir': () => saisirCreneau(),
   'cr-decider': b => deciderCreneau(b.dataset.id),
-  'm-nouveau': () => ouvrirEditeur(''),
-  'm-ouvrir': b => ouvrirEditeur(b.dataset.id),
-  'ed-ia': () => lireIA(),
-  'ed-archiver': () => archiverCaptures(),
-  'ed-coller': () => {
-    const r = L.parseLignes(v('e-coller'), '');
-    r.lignes.forEach(l => { resoudreLigne(l); ED.lignes.push(l); });
-    redessinerLignes(); $('#e-coller').value = '';
-    toast(r.lignes.length + ' ligne(s) ajoutée(s)' + (r.erreurs.length ? ', ' + r.erreurs.length + ' ignorée(s) : ' + r.erreurs[0] : '.'), !!r.erreurs.length);
-  },
-  'ed-ajout-ligne': () => { const l = { faction: '', pseudo: '' }; L.STATS.forEach(s => { l[s.k] = ''; }); resoudreLigne(l); ED.lignes.push(l); redessinerLignes(); },
-  'ed-vider': b => { if (!b.dataset.ok) { b.dataset.ok = '1'; b.textContent = 'Confirmer : tout effacer'; return; } ED.lignes = []; redessinerLignes(); b.dataset.ok = ''; b.textContent = 'Effacer toutes les lignes'; },
-  'ed-suppr-ligne': b => { ED.lignes.splice(+b.dataset.i, 1); redessinerLignes(); },
   'cl-publier': () => publierClassement(),
   'cl-facebook': () => { if (UI.calc && UI.calc.agg.nbMatchs) modalTexte('Texte pour Facebook', 'Aperçu du classement calculé (publiez-le d’abord pour qu’il soit officiel).', texteFacebook(instantane(UI.calc, UI.clType))); else toast('Aucun classement à résumer.', true); },
   'cl-page': () => agir(async () => { await publierPage(null); }, 'Page publique mise à jour : elle se recharge.'),
@@ -2154,9 +1914,6 @@ const ACTIONS = {
   'param-enregistrer': b => enregistrerParam(b.dataset.k),
   'lien-creer': b => creerLien(b),
   'lien-copier': () => copier($('#l-lien')),
-  'sa-nouvelle': () => modifierSaison(''),
-  'sa-modifier': b => modifierSaison(b.dataset.id),
-  'sa-activer': b => agir(async () => { await majSys({ saison_active: b.dataset.id }); await noter('Saison', b.dataset.id, 'Saison rendue active', ''); }, 'Saison active changée.'),
   'sv-json': () => agir(async () => { await telecharger('DFMM_LeagueUV_sauvegarde_' + now().slice(0, 10) + '.json', sauvegardeJSON(), 'application/json'); await majSys({ derniere_sauvegarde: now() }); await noter('Sauvegarde', '', 'Sauvegarde complète téléchargée', ''); }, 'Sauvegarde téléchargée.'),
   'sv-copier': () => { modalTexte('Sauvegarde complète', 'Copiez ce texte et collez-le dans un fichier ou un document de votre Drive.', sauvegardeJSON()); agir(async () => { await majSys({ derniere_sauvegarde: now() }); }); },
   'sv-csv': b => agir(async () => { await telecharger('DFMM_' + b.dataset.k + '_' + now().slice(0, 10) + '.csv', tableCSV(b.dataset.k), 'text/csv'); }, 'Fichier téléchargé.')
@@ -2367,12 +2124,14 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c, vs] = await Promise.all([
+  const [a, b, c, vs, mt] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
     SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
-    SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString())
+    SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString()),
+    SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente'])
   ]);
+  ADM.nbMatchs = mt.count || 0;
   ADM.nbInsc = a.count || 0;
   ADM.nbDem = c.count || 0;
   ADM.vsJour = vs.count || 0;
@@ -2755,7 +2514,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -2791,6 +2550,377 @@ async function telechargerSauvegarde(b) {
 }
 ACTIONS['ins-decider'] = b => deciderInscriptionSB(b);
 ACTIONS['sv2-json'] = b => telechargerSauvegarde(b);
+
+/* ----- Lot 3A : saisons et matchs de Katana (Supabase) ----- */
+let SA = [], CX = null, MA = [];
+const ST_MATCH = { brouillon: 'Brouillon', valide: 'Validé', attente: 'En attente', refuse: 'Refusé', annule: 'Annulé' };
+const RES_DB = { auto: 'auto', manuel: 'manuel', a_identifier: 'à identifier', non_inscrit: 'non inscrit', non_inscrit_confirme: 'non inscrit confirmé' };
+const RES_JS = { 'auto': 'auto', 'manuel': 'manuel', 'à identifier': 'a_identifier', 'non inscrit': 'non_inscrit', 'non inscrit confirmé': 'non_inscrit_confirme', '': 'non_inscrit' };
+const TYPES_REG = { match_declare: 'Match enregistré', capture_recue: 'Capture reçue', capture_acceptee: 'Capture acceptée', capture_refusee: 'Capture refusée', match_en_attente: 'Match en attente', litige_ouvert: 'Litige ouvert', decision: 'Décision', sanction: 'Sanction' };
+const STATUTS_SA = { preparation: 'En préparation', en_cours: 'En cours', cloture: 'Clôturée (vérification)', terminee: 'Terminée' };
+const locISO = s => L.validDT(s) ? s + ':00+03:00' : null;          // heure de Madagascar → instant
+const isoLoc = iso => iso ? L.versLocal(iso) : '';                  // instant → heure de Madagascar
+const saisonSB = id => SA.find(s => String(s.id) === String(id)) || null;
+const saisonActiveSB = () => SA.find(s => s.active) || null;
+const saisonJS = s => s ? { id: s.id, nom: s.nom, debut: s.debut, fin: s.fin, premier_provisoire: s.premier_provisoire || '' } : null;
+function optSaisonsSB(sel) { return SA.map(s => '<option value="' + esc(s.id) + '"' + (String(s.id) === String(sel) ? ' selected' : '') + '>' + esc(s.nom) + (s.active ? ' (active)' : '') + '</option>').join(''); }
+async function chargerSaisons() {
+  const { data, error } = await SB.from('saisons').select('*').order('debut', { ascending: false });
+  if (error) throw new Error(error.message);
+  SA = data || []; return SA;
+}
+
+/* Saisons */
+TAB.saison = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px"><button class="btn" type="button" data-act="sa-nouvelle">Nouvelle saison</button></div><div id="sa-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherSaisons
+};
+async function afficherSaisons() {
+  const z = $('#sa-liste'); if (!z) return;
+  try { await chargerSaisons(); } catch (e) { z.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+  const R = reglesSite();
+  if (!SA.length) { z.innerHTML = note('Aucune saison. Créez la première avec le nom de la saison du jeu (par exemple « Aurora ») et ses dates.'); return; }
+  z.innerHTML = SA.map(s => {
+    const S0 = saisonJS(s), pr = R ? L.publicationsPrevues(S0, now().slice(0, 10), 3, R) : [];
+    const verif = R ? L.finVerificationFinale(S0, R) : null, pub = R ? L.publicationFinale(S0, R) : null;
+    return '<div class="card-l"><div class="t"><div><b>' + esc(s.nom) + '</b> ' + (s.active ? badge('Saison active', 'g') : '') + '<div class="small dim">du ' + fD(s.debut) + ' au ' + fD(s.fin) + ' · ' + esc(STATUTS_SA[s.statut] || s.statut) + '</div></div>'
+      + '<div class="row-btns" style="margin:0"><button class="btn sm ghost" type="button" data-act="sa-modifier" data-id="' + esc(s.id) + '">Modifier</button>' + (s.active ? '' : '<button class="btn sm ghost" type="button" data-act="sa-activer" data-id="' + esc(s.id) + '">Rendre active</button>') + '</div></div>'
+      + (s.fin_confirmee ? '' : note('Date de fin <b>estimée</b> : corrigez-la dès que le jeu annonce la fin officielle. Un match terminé après cette date est refusé.', 'a'))
+      + '<dl class="kv"><dt>Les matchs comptent jusqu’au</dt><dd>' + fD(s.fin) + ' inclus</dd><dt>Vérification de fin de saison</dt><dd>jusqu’au ' + (verif ? fDT(verif) : '—') + '</dd><dt>Classement final</dt><dd>' + (pub ? fD(pub) : '—') + '</dd>'
+      + '<dt>Prochains provisoires</dt><dd>' + (pr.length ? pr.map(fDc).join(', ') : (s.premier_provisoire ? '—' : 'date du premier provisoire à renseigner')) + '</dd></dl></div>';
+  }).join('');
+}
+function modifierSaisonSB(id) {
+  const s = id ? saisonSB(id) : null;
+  const val = k => s && s[k] != null ? s[k] : '';
+  const h = '<div class="grid-f"><div><label class="lab" for="s-nom">Nom (celui de la saison du jeu)</label><input type="text" id="s-nom" value="' + esc(val('nom')) + '" placeholder="Aurora"></div>'
+    + '<div><label class="lab" for="s-debut">Premier jour</label><input type="date" id="s-debut" value="' + esc(val('debut')) + '"></div>'
+    + '<div><label class="lab" for="s-fin">Dernier jour (fin officielle)</label><input type="date" id="s-fin" value="' + esc(val('fin')) + '"></div>'
+    + '<div><label class="lab" for="s-pp">Premier classement provisoire (un dimanche)</label><input type="date" id="s-pp" value="' + esc(val('premier_provisoire')) + '"></div>'
+    + '<div><label class="lab" for="s-statut">État</label><select id="s-statut">' + Object.keys(STATUTS_SA).map(k => '<option value="' + k + '"' + ((s ? s.statut : 'preparation') === k ? ' selected' : '') + '>' + STATUTS_SA[k] + '</option>').join('') + '</select></div></div>'
+    + '<label class="coche"><input type="checkbox" id="s-confirmee"' + (s && s.fin_confirmee ? ' checked' : '') + '><span>La date de fin est annoncée officiellement par le jeu (sinon : estimation).</span></label><div id="a-err" class="err" role="alert"></div>';
+  modal(s ? 'Modifier ' + s.nom : 'Nouvelle saison', h, [{ label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', onClick: async () => {
+    const o = { nom: v('s-nom'), debut: v('s-debut'), fin: v('s-fin'), premier_provisoire: v('s-pp') || null, statut: v('s-statut'), fin_confirmee: coche('s-confirmee') };
+    const R = reglesSite();
+    if (!o.nom) return erreurA('Le nom est obligatoire.');
+    if (!L.validD(o.debut) || !L.validD(o.fin) || o.fin <= o.debut) return erreurA('Dates invalides : le dernier jour doit suivre le premier.');
+    if (o.premier_provisoire && R && L.dow(o.premier_provisoire) !== R.publication_jour) return erreurA('Le premier classement provisoire doit tomber un ' + JOURS[R.publication_jour].toLowerCase() + '.');
+    const r = s ? await SB.from('saisons').update(o).eq('id', s.id).select() : await SB.from('saisons').insert(o).select();
+    if (r.error) return erreurA('Enregistrement impossible : ' + r.error.message);
+    const nouv = r.data && r.data[0];
+    await SB.from('journal').insert({ type: 'Saison', objet: o.nom, decision: s ? 'Saison modifiée (du ' + o.debut + ' au ' + o.fin + (o.fin_confirmee ? ', fin officielle' : ', fin estimée') + ')' : 'Saison créée (du ' + o.debut + ' au ' + o.fin + ')' });
+    if (!s && nouv && !saisonActiveSB()) await SB.rpc('activer_saison', { p_saison: nouv.id });
+    toast('Saison enregistrée.'); afficherSaisons(); return true;
+  } }]);
+}
+async function activerSaisonSB(id) {
+  const { error } = await SB.rpc('activer_saison', { p_saison: Number(id) });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Saison active changée.'); afficherSaisons();
+}
+ACTIONS['sa-nouvelle'] = () => modifierSaisonSB('');
+ACTIONS['sa-modifier'] = b => modifierSaisonSB(b.dataset.id);
+ACTIONS['sa-activer'] = b => activerSaisonSB(b.dataset.id);
+
+/* Contexte des règles : membres, comptes et matchs de la saison, en heure de Madagascar */
+async function chargerContexte(saisonId) {
+  const [a, b, c] = await Promise.all([
+    SB.from('membres').select('id, matricule, nom_gamer, statut, periodes(debut, fin)').not('matricule', 'is', null),
+    SB.from('comptes_jeu').select('id, membre_id, uid, pseudo, statut, comptes_periodes(debut, fin), pseudos_historique(pseudo, debut, fin)'),
+    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, statut, motif, notes, valide_le, attente_decide_le, match_lignes(*), captures(id, envoyee_le, statut)').eq('saison_id', saisonId) : Promise.resolve({ data: [] })
+  ]);
+  const err = a.error || b.error || c.error; if (err) throw new Error(err.message);
+  const per = l => (l || []).map(p => ({ debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' }));
+  const membres = {}, parId = {}, comptes = {};
+  (a.data || []).forEach(m => { const mat = matTxt(m.matricule); parId[m.id] = mat; membres[mat] = { matricule: mat, id: m.id, nom_gamer: m.nom_gamer, statut: m.statut, periodes: per(m.periodes), suspensions: [] }; });
+  (b.data || []).forEach(x => { if (!parId[x.membre_id]) return; comptes[String(x.id)] = { id: String(x.id), matricule: parId[x.membre_id], uid: x.uid, pseudo: x.pseudo, statut: x.statut, periodes: per(x.comptes_periodes), pseudos: (x.pseudos_historique || []).map(p => ({ pseudo: p.pseudo, debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' })) }; });
+  CX = { membres, comptes, parId, comptesList: Object.values(comptes), creneaux: {}, matchsList: [] };
+  CX.matchsList = (c.data || []).map(matchJS);
+  return CX;
+}
+function ligneJS(l) {
+  const o = { id: l.id, faction: l.faction || '', pseudo: l.pseudo || '', cpt: l.compte_id ? String(l.compte_id) : '', mat: l.membre_id ? (CX.parId[l.membre_id] || '') : '', res: RES_DB[l.resolution] || 'non inscrit', identifie_le: isoLoc(l.identifie_le) };
+  L.STATS.forEach(s => { o[s.k] = l[s.k] == null ? '' : Number(l[s.k]); });
+  return o;
+}
+function matchJS(m) {
+  const caps = (m.captures || []).filter(x => x.statut !== 'refusee' && x.statut !== 'ecartee').map(x => x.envoyee_le).sort();
+  return { id: 'M-' + m.id, dbid: m.id, saison_id: m.saison_id, type: m.type === 'libre' ? 'Libre' : 'Katana', demarrage: !!m.demarrage, carte: m.carte || '', mode: m.mode || '', notes: m.notes || '',
+    fin: isoLoc(m.fin), envoi: caps.length ? isoLoc(caps[0]) : '', statut: ST_MATCH[m.statut] || m.statut, statut_db: m.statut, motif: m.motif || '', valide_le: isoLoc(m.valide_le), attente_decide_le: isoLoc(m.attente_decide_le),
+    captures: (m.captures || []).filter(x => x.statut !== 'refusee' && x.statut !== 'ecartee').map(x => x.id),
+    lignes: (m.match_lignes || []).slice().sort((x, y) => x.rang - y.rang).map(ligneJS) };
+}
+
+/* Liste des matchs */
+TAB.matchs = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="ma-s">Saison</label><select id="ma-s"></select></div><button class="btn" type="button" data-act="m-nouveau">Nouveau match de Katana</button></div><div id="ma-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherMatchs
+};
+async function afficherMatchs() {
+  const z = $('#ma-liste'); if (!z) return;
+  try {
+    await chargerSaisons();
+    if (!UI.matchSaison || !saisonSB(UI.matchSaison)) UI.matchSaison = (saisonActiveSB() || SA[0] || {}).id || '';
+    const sel = $('#ma-s'); if (sel) sel.innerHTML = optSaisonsSB(UI.matchSaison);
+    if (!SA.length) { z.innerHTML = note('Créez d’abord la saison dans l’onglet « Saison ».', 'a'); return; }
+    await chargerContexte(UI.matchSaison);
+  } catch (e) { z.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+  const R = reglesSite(), s = saisonJS(saisonSB(UI.matchSaison));
+  MA = CX.matchsList.slice().sort((a, b) => String(b.fin || '9').localeCompare(String(a.fin || '9')) || b.dbid - a.dbid);
+  if (!MA.length) { z.innerHTML = note('Aucun match pour cette saison. Cliquez sur « Nouveau match de Katana » pour saisir un match avec sa capture.'); return; }
+  z.innerHTML = '<p class="mute small">' + MA.length + ' match(s) · ' + MA.filter(m => m.statut === 'Validé').length + ' validé(s)</p><div class="scroll"><table><thead><tr><th>Match</th><th>Fin</th><th>Carte</th><th class="r">HAAVK–GTI</th><th class="r">Membres</th><th>Statut</th><th>Contrôles</th><th></th></tr></thead><tbody>' + MA.map(m => {
+    const c = R ? L.controlesMatch(m, CX, s, R) : { bloquants: [], alertes: [], h: 0, g: 0, membres: 0, total: 0 };
+    const aid = m.lignes.filter(l => l.res === 'à identifier').length;
+    return '<tr><td class="nowrap"><b>' + esc(m.id) + '</b>' + (m.demarrage ? '<div class="dim small">démarrage</div>' : '') + '</td><td class="nowrap">' + fDT(m.fin) + '</td><td>' + esc(m.carte || '—') + '</td><td class="num">' + c.h + '–' + c.g + '</td><td class="num">' + c.membres + '/' + c.total + '</td><td>' + badgeStatut(m.statut) + '</td>'
+      + '<td class="small">' + (m.statut === 'Brouillon' || m.statut === 'En attente' ? (c.bloquants.length ? '<span class="err">' + c.bloquants.length + ' bloquant(s)</span>' : '<span class="res auto">prêt</span>') : '') + (aid ? ' <span class="res aid">' + aid + ' à identifier</span>' : '') + '</td>'
+      + '<td><button class="btn sm ghost" type="button" data-act="m-ouvrir" data-id="' + m.dbid + '">Ouvrir</button></td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+
+/* Éditeur d'un match */
+const PROMPT_CLAUDE = 'Tu lis une ou plusieurs captures d’écran du tableau de fin de match de Delta Force Mobile, avec les factions HAAVK et GTI.\nExtrais :\n- "carte" : le nom de la carte affiché dans l’en-tête, ou null ;\n- "mode" : le mode affiché, ou null ;\n- "fin" : la date et l’heure de fin affichées, au format AAAA-MM-JJTHH:MM, ou null si elles ne sont pas visibles ;\n- "lignes" : un objet par joueur visible, avec "faction" ("HAAVK" ou "GTI", selon le côté du tableau où il apparaît), "pseudo" (recopié exactement, caractère par caractère : majuscules, chiffres, symboles et tags de clan comme ¬ ou 么), puis les 8 colonnes chiffrées dans l’ordre de gauche à droite : "score", "elim" (éliminations), "morts", "assist" (assistances), "med" (contribution médicale), "ing" (contribution ingénieur), "obj" (contribution aux objectifs), "tac" (contribution tactique).\nRègles : n’invente rien ; si une valeur est illisible, mets null. Ignore les médailles et les badges. Si deux captures montrent le même joueur (haut et bas du tableau), ne le répète pas.\nRéponds uniquement avec un objet JSON de la forme {"carte":…,"mode":…,"fin":…,"lignes":[…]}, sans aucun texte autour.';
+function resoudreLigne(l) {
+  if (!CX || l.res === 'manuel' || l.res === 'non inscrit confirmé') return;
+  const r = L.resoudre(l, CX.comptesList, L.validDT(ED && ED.fin) ? ED.fin : now());
+  l.mat = r.mat; l.cpt = r.cpt ? String(r.cpt) : ''; l.res = r.res; l.sugg = r.sugg || []; l.note = r.note || '';
+}
+function optComptesCX(sel) {
+  return CX.comptesList.filter(c => c.statut !== 'remplace').sort((a, b) => String(a.pseudo).localeCompare(String(b.pseudo))).map(c => '<option value="' + esc(c.id) + '"' + (String(sel) === c.id ? ' selected' : '') + '>' + esc(c.pseudo + ' · ' + c.matricule) + '</option>').join('');
+}
+function resCell(l, lock) {
+  const lab = l.res === 'auto' ? '<span class="res auto">' + esc(l.mat) + '</span>' : l.res === 'manuel' ? '<span class="res auto">' + esc(l.mat) + ' (choisi)</span>' : l.res === 'à identifier' ? '<span class="res aid" title="' + esc(l.note || '') + '">À identifier</span>' : l.res === 'non inscrit confirmé' ? '<span class="res ni">Non inscrit (confirmé)</span>' : '<span class="res ni">Non inscrit</span>';
+  const i = ED.lignes.indexOf(l);
+  if (lock) {
+    if (ED.statut === 'Validé' && l.res === 'à identifier' && l.id) return lab + '<br><select id="idf-' + i + '" aria-label="Compte de la ligne ' + (i + 1) + '"><option value="">Choisir…</option>' + optComptesCX('') + '<option value="__ni">Non inscrit (confirmer)</option></select> <button class="btn sm" type="button" data-act="ed-identifier" data-i="' + i + '">Identifier</button>';
+    return lab + (l.identifie_le ? '<div class="dim small">identifiée le ' + fDT(l.identifie_le) + '</div>' : '');
+  }
+  const sg = (l.sugg || []).map(x => CX.comptes[String(x)]).filter(Boolean);
+  const o = c => '<option value="' + esc(c.id) + '">' + esc(c.pseudo + ' · ' + c.matricule) + '</option>';
+  return lab + '<br><select data-f="lien" aria-label="Rattacher la ligne ' + (i + 1) + '"><option value="">' + (l.res === 'auto' ? 'Automatique' : 'Choisir…') + '</option>' + (sg.length ? '<optgroup label="Suggestions">' + sg.map(o).join('') + '</optgroup>' : '') + '<optgroup label="Tous les comptes">' + optComptesCX(l.res === 'manuel' ? l.cpt : '') + '</optgroup><option value="__ni"' + (l.res === 'non inscrit confirmé' ? ' selected' : '') + '>Non inscrit (confirmer)</option></select>';
+}
+function tableLignes(lock) {
+  const d = lock ? ' disabled' : '';
+  let h = '<thead><tr><th>#</th><th>Faction</th><th>Pseudo</th>' + L.STATS.map(s => '<th title="' + esc(s.label) + '">' + esc(s.court) + '</th>').join('') + '<th>Joueur</th><th></th></tr></thead><tbody>';
+  ED.lignes.forEach((l, i) => {
+    h += '<tr data-i="' + i + '"><td class="dim">' + (i + 1) + '</td><td><select data-f="faction"' + d + ' aria-label="Faction ligne ' + (i + 1) + '"><option value=""></option><option' + (l.faction === 'HAAVK' ? ' selected' : '') + '>HAAVK</option><option' + (l.faction === 'GTI' ? ' selected' : '') + '>GTI</option></select></td>'
+      + '<td><input class="ps" type="text" data-f="pseudo" value="' + esc(l.pseudo) + '"' + d + ' aria-label="Pseudo ligne ' + (i + 1) + '"></td>'
+      + L.STATS.map(s => '<td><input type="number" inputmode="decimal" min="0" step="any" data-f="' + s.k + '" value="' + esc(l[s.k]) + '"' + d + ' aria-label="' + esc(s.label) + ' ligne ' + (i + 1) + '"></td>').join('')
+      + '<td id="res-' + i + '">' + resCell(l, lock) + '</td><td>' + (lock ? '' : '<button type="button" class="lien" data-act="ed-suppr-ligne" data-i="' + i + '" aria-label="Supprimer la ligne ' + (i + 1) + '">✕</button>') + '</td></tr>';
+  });
+  if (!ED.lignes.length) h += '<tr><td colspan="14" class="dim">Aucune ligne. Collez la réponse de claude.ai ci-dessus, ou ajoutez les lignes à la main.</td></tr>';
+  return h + '</tbody>';
+}
+function docMatchSB() {
+  return { id: ED.dbid || null, saison_id: Number(ED.saison_id), carte: ED.carte, mode: ED.mode, fin: locISO(ED.fin), notes: ED.notes,
+    lignes: ED.lignes.map(l => { const o = { faction: l.faction || '', pseudo: String(l.pseudo || '').trim(), compte_id: l.cpt ? Number(l.cpt) : null, resolution: RES_JS[l.res] || 'non_inscrit' }; L.STATS.forEach(s => { o[s.k] = l[s.k] === '' || l[s.k] == null ? null : Number(l[s.k]); }); return o; }) };
+}
+function matchCourant() {
+  return Object.assign({}, ED, { id: ED.dbid ? 'M-' + ED.dbid : '(nouveau)', type: 'Katana', demarrage: ED.demarrage, envoi: ED.envoi, captures: ED.caps.filter(c => c.statut !== 'refusee' && c.statut !== 'ecartee').map(c => c.id) });
+}
+function majControles() {
+  const box = $('#ed-ctrl'); if (!box || !ED) return;
+  const R = reglesSite(); if (!R) { box.innerHTML = note('Réglages de la ligue non chargés.', 'r'); return; }
+  const c = L.controlesMatch(matchCourant(), CX, saisonJS(saisonSB(ED.saison_id)), R);
+  box.innerHTML = '<b>' + c.total + ' participant(s)</b> · HAAVK ' + c.h + ' · GTI ' + c.g + ' · membres confirmés ' + c.membres + ' (minimum ' + c.requis + ')'
+    + (c.bloquants.length || c.alertes.length || c.attente.length ? chk({ B: c.bloquants.concat(c.attente), W: c.alertes }) : '<ul class="chk"><li class="o">Tous les contrôles automatiques sont passés. Vérifiez la capture, puis validez.</li></ul>');
+  const b = $('#ed-valider'); if (b) b.disabled = !!(c.bloquants.length || c.attente.length);
+}
+function redessinerLignes() { const t = $('#ed-table'); if (t) t.innerHTML = tableLignes(ED.lock); majControles(); }
+function surSaisieEditeur(e) {
+  const el = e.target, tr = el.closest('tr[data-i]');
+  if (ED.lock) return;
+  if (tr && el.dataset.f) {
+    const i = +tr.dataset.i, l = ED.lignes[i], f = el.dataset.f;
+    if (f === 'lien') {
+      if (e.type !== 'change') return;
+      if (el.value === '__ni') { l.res = 'non inscrit confirmé'; l.mat = ''; l.cpt = ''; }
+      else if (el.value) { const c = CX.comptes[el.value]; l.res = 'manuel'; l.mat = c.matricule; l.cpt = c.id; }
+      else { l.res = ''; resoudreLigne(l); }
+      $('#res-' + i).innerHTML = resCell(l, false);
+    } else if (f === 'pseudo') { l.pseudo = el.value; if (l.res !== 'manuel' && l.res !== 'non inscrit confirmé') { resoudreLigne(l); $('#res-' + i).innerHTML = resCell(l, false); } }
+    else if (f === 'faction') l.faction = el.value;
+    else l[f] = el.value === '' ? '' : Number(el.value);
+    ED.modifie = true; majControles(); return;
+  }
+  const id = el.id;
+  if (id === 'e-fin') { ED.fin = L.normDT(el.value); ED.lignes.forEach((l, i) => { resoudreLigne(l); const td = $('#res-' + i); if (td) td.innerHTML = resCell(l, false); }); }
+  else if (id === 'e-saison') ED.saison_id = el.value;
+  else if (id === 'e-carte') ED.carte = el.value;
+  else if (id === 'e-mode') ED.mode = el.value;
+  else if (id === 'e-notes') ED.notes = el.value;
+  else return;
+  ED.modifie = true; majControles();
+}
+async function ouvrirMatch(id) {
+  try {
+    await chargerSaisons();
+    const s = saisonActiveSB();
+    if (!id && !s) { toast('Créez d’abord la saison (onglet « Saison ») et rendez-la active.', true); return; }
+    let m = null, reg = [];
+    if (id) {
+      const [a, b] = await Promise.all([
+        SB.from('matchs').select('*, match_lignes(*), captures(*)').eq('id', id).single(),
+        SB.from('registre').select('date, type, detail').eq('match_id', id).order('date')
+      ]);
+      if (a.error) throw new Error(a.error.message);
+      m = a.data; reg = b.data || [];
+    }
+    await chargerContexte(m ? m.saison_id : s.id);
+    const j = m ? matchJS(m) : null;
+    ED = j ? Object.assign(j, { caps: (m.captures || []).sort((x, y) => String(x.envoyee_le).localeCompare(String(y.envoyee_le))), reg })
+           : { dbid: null, saison_id: s.id, carte: '', mode: '', fin: '', notes: '', statut: 'Brouillon', motif: '', demarrage: PARAM.phase_demarrage === true, envoi: '', caps: [], reg: [], lignes: [] };
+    ED.lock = !(ED.statut === 'Brouillon' || ED.statut === 'En attente');
+    if (!ED.lock) ED.lignes.forEach(resoudreLigne);
+  } catch (e) { toast('Ouverture impossible : ' + e.message, true); return; }
+  rendreEditeur();
+}
+function rendreEditeur() {
+  const btns = [{ label: 'Fermer', cls: 'ghost', onClick: async () => { if (ED && ED.modifie && !confirm('Fermer sans enregistrer les changements ?')) return false; await afficherMatchs(); return true; } }];
+  if (ED.lock) {
+    btns.push({ label: 'Repasser en brouillon', cls: 'ghost', onClick: () => deciderMatchSB('brouillon') });
+    if (ED.statut !== 'Annulé') btns.push({ label: 'Annuler le match', cls: 'danger', onClick: () => deciderMatchSB('annuler') });
+  } else {
+    btns.push({ label: 'Enregistrer', cls: 'ghost', onClick: async () => { await sauverMatchSB(true); return false; } });
+    if (ED.statut === 'Brouillon' && ED.dbid) btns.push({ label: 'Mettre en attente', cls: 'ghost', onClick: () => deciderMatchSB('attente') });
+    if (ED.dbid) btns.push({ label: 'Refuser', cls: 'danger', onClick: () => deciderMatchSB('refuser') });
+    btns.push({ label: 'Valider le match', id: 'ed-valider', onClick: () => deciderMatchSB('valider') });
+  }
+  modal((ED.dbid ? 'Match M-' + ED.dbid : 'Nouveau match de Katana') + ' · ' + ED.statut, editeurHtmlSB(), btns, { large: true, mode: 'editeur' });
+  majControles(); afficherCaptures();
+}
+function editeurHtmlSB() {
+  const d = ED.lock ? ' disabled' : '';
+  let h = (ED.statut !== 'Brouillon' ? note('Match ' + ED.statut.toLowerCase() + (ED.valide_le ? ' le ' + fDT(ED.valide_le) : '') + (ED.motif ? '. Motif : ' + esc(ED.motif) : '') + (ED.lock ? '. Pour le modifier, repassez-le en brouillon.' : '.'), ED.statut === 'Validé' ? '' : 'a') : '');
+  if (ED.demarrage) h += note('<b>Saisie de démarrage</b> : votre seule capture suffit, sans délai de 10 minutes. Les autres règles s’appliquent.');
+  h += '<div class="grid-f"><div><label class="lab" for="e-saison">Saison</label><select id="e-saison"' + d + '>' + optSaisonsSB(ED.saison_id) + '</select></div>'
+    + '<div><label class="lab" for="e-carte">Carte</label><select id="e-carte"' + d + '><option value="">Choisir…</option>' + L.CARTES.concat(ED.carte && L.CARTES.indexOf(ED.carte) < 0 ? [ED.carte] : []).concat(['Autre']).map(c => '<option' + (c === ED.carte ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>'
+    + '<div><label class="lab" for="e-mode">Mode</label><input type="text" id="e-mode" value="' + esc(ED.mode) + '"' + d + '></div>'
+    + '<div><label class="lab" for="e-fin">Fin du match (heure lue sur la capture, heure de Madagascar)</label><input type="datetime-local" id="e-fin" value="' + esc(ED.fin) + '"' + d + '></div></div>'
+    + '<label class="lab" for="e-notes">Notes</label><textarea id="e-notes" rows="2"' + d + '>' + esc(ED.notes) + '</textarea>';
+  h += '<h3 style="margin-top:16px">1. Captures</h3><div class="thumbs" id="ed-thumbs"></div>'
+    + (ED.lock ? '' : '<input type="file" id="e-files" accept="image/*" multiple><div class="row-btns"><button class="btn sm" type="button" data-act="ed-envoyer">Envoyer la ou les captures</button></div><p class="dim small" id="ed-info">Au-delà de 8 joueurs par faction, envoyez les deux captures (haut puis bas). L’heure d’envoi est notée par le serveur.</p>');
+  if (!ED.lock) h += '<h3 style="margin-top:16px">2. Lecture par claude.ai</h3><ol class="small"><li>Copiez le texte de consigne.</li><li>Dans claude.ai, nouvelle conversation : joignez la ou les captures, collez la consigne, envoyez.</li><li>Copiez toute la réponse de claude.ai et collez-la ci-dessous.</li></ol>'
+    + '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-consigne">Copier la consigne pour claude.ai</button></div><textarea id="e-consigne" rows="5" readonly hidden></textarea>'
+    + '<label class="lab" for="e-coller">Réponse de claude.ai (ou lignes : faction, pseudo, puis 8 nombres)</label><textarea id="e-coller" rows="5" placeholder="{&quot;carte&quot;: …, &quot;lignes&quot;: […]}"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="ed-coller">Lire la réponse</button></div>';
+  h += '<h3 style="margin-top:16px">' + (ED.lock ? 'Participants' : '3. Vérifier chaque ligne avec la capture') + '</h3><div class="scroll"><table class="lignes-t" id="ed-table">' + tableLignes(ED.lock) + '</table></div>';
+  if (!ED.lock) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-ajout-ligne">Ajouter une ligne</button><button class="btn sm ghost" type="button" data-act="ed-vider">Effacer toutes les lignes</button></div>';
+  h += '<div class="ctrl-box" id="ed-ctrl" aria-live="polite"></div>';
+  h += '<label class="lab" for="e-motif">Motif (obligatoire pour mettre en attente, refuser, annuler ou repasser en brouillon)</label><textarea id="e-motif" rows="2"></textarea><div id="ed-err" class="err" role="alert"></div>';
+  if (ED.reg.length) h += '<h3 style="margin-top:16px">Registre</h3><ul class="taches">' + ED.reg.map(r => '<li><span>' + esc(TYPES_REG[r.type] || r.type) + (r.detail ? ' : ' + esc(r.detail) : '') + '</span><span class="dim small nowrap">' + dateLoc(r.date) + '</span></li>').join('') + '</ul>';
+  return h;
+}
+async function afficherCaptures() {
+  const z = $('#ed-thumbs'); if (!z || !ED) return;
+  if (!ED.caps.length) { z.innerHTML = '<p class="mute small">Aucune capture pour l’instant.</p>'; return; }
+  const ST_C = { recue: 'reçue', retenue: 'retenue', refusee: 'refusée', ecartee: 'écartée' };
+  z.innerHTML = ED.caps.map(c => '<figure style="margin:0"><a hidden target="_blank" rel="noopener" id="capl-' + c.id + '"><img id="capi-' + c.id + '" alt="Capture du match" style="width:220px;height:auto;max-height:none"></a><figcaption class="small dim">' + esc(ST_C[c.statut] || c.statut) + ' · envoyée le ' + dateLoc(c.envoyee_le) + '</figcaption></figure>').join('');
+  for (const c of ED.caps) {
+    const { data } = await SB.storage.from('captures').createSignedUrl(c.chemin, 600);
+    const a = $('#capl-' + c.id), i = $('#capi-' + c.id);
+    if (data && data.signedUrl && a && i) { a.href = data.signedUrl; i.src = data.signedUrl; a.hidden = false; }
+  }
+}
+async function sauverMatchSB(avecMessage) {
+  const err = $('#ed-err'); if (err) err.textContent = '';
+  const { data, error } = await SB.rpc('enregistrer_match', { p: docMatchSB() });
+  if (error) { if (err) err.textContent = erreurRpc(error); else toast(erreurRpc(error), true); return false; }
+  const neuf = !ED.dbid; ED.dbid = data; ED.modifie = false;
+  if (neuf) $('#modal-t').textContent = 'Match M-' + ED.dbid + ' · ' + ED.statut;
+  if (avecMessage) toast('Brouillon enregistré.');
+  return true;
+}
+async function envoyerCaptures() {
+  const files = Array.from(($('#e-files') || {}).files || []);
+  const info = $('#ed-info');
+  if (!files.length) { toast('Choisissez d’abord la ou les captures.', true); return; }
+  if (!ED.dbid && !(await sauverMatchSB(false))) return;
+  info.textContent = 'Envoi en cours…';
+  let n = 0;
+  for (const f of files) {
+    try {
+      const img = await reduireImage(f, 2000, 0.88);
+      const chemin = ED.dbid + '/' + Date.now() + '-' + n + '.jpg';
+      const up = await SB.storage.from('captures').upload(chemin, img, { contentType: 'image/jpeg' });
+      if (up.error) throw new Error(up.error.message);
+      const r = await SB.from('captures').insert({ match_id: ED.dbid, chemin }).select().single();
+      if (r.error) throw new Error(r.error.message);
+      ED.caps.push(r.data); n++;
+    } catch (e) { info.textContent = 'Envoi impossible : ' + e.message; break; }
+  }
+  if (n) {
+    const premiers = ED.caps.filter(c => c.statut !== 'refusee' && c.statut !== 'ecartee').map(c => c.envoyee_le).sort();
+    ED.envoi = premiers.length ? isoLoc(premiers[0]) : '';
+    info.textContent = n + ' capture(s) envoyée(s). Faites-les lire par claude.ai (étape 2).';
+    $('#e-files').value = '';
+    afficherCaptures(); majControles();
+  }
+}
+function lireReponseClaude() {
+  const t = v('e-coller'); if (!t) { toast('Collez d’abord la réponse de claude.ai.', true); return; }
+  let r = null;
+  try { r = JSON.parse(extraireJSON(t)); } catch (e) { r = null; }
+  const val = x => (x === null || x === undefined || x === '' || isNaN(Number(x))) ? '' : Number(x);
+  let n = 0, ign = [];
+  if (r && Array.isArray(r.lignes)) {
+    r.lignes.forEach(x => {
+      const l = { faction: /gti/i.test(x.faction) ? 'GTI' : /haavk/i.test(x.faction) ? 'HAAVK' : '', pseudo: String(x.pseudo || '').trim() };
+      if (!l.pseudo) return;
+      L.STATS.forEach(s => { l[s.k] = val(x[s.k]); });
+      if (ED.lignes.some(e => L.normPseudo(e.pseudo) === L.normPseudo(l.pseudo) && e.faction === l.faction)) return;
+      ED.lignes.push(l); n++;
+    });
+    const fin = L.normDT(r.fin || '');
+    if (!ED.fin && L.validDT(fin)) { ED.fin = fin; $('#e-fin').value = fin; }
+    if (!ED.carte && r.carte) { const c = L.CARTES.find(x => L.normPseudo(x) === L.normPseudo(r.carte)); ED.carte = c || String(r.carte); $('#e-carte').innerHTML = $('#e-carte').innerHTML + (c ? '' : '<option>' + esc(r.carte) + '</option>'); $('#e-carte').value = ED.carte; }
+    if (!ED.mode && r.mode) { ED.mode = String(r.mode); $('#e-mode').value = ED.mode; }
+  } else {
+    const p = L.parseLignes(t, '');
+    p.lignes.forEach(l => { ED.lignes.push(l); n++; }); ign = p.erreurs;
+  }
+  ED.lignes.forEach(resoudreLigne);
+  ED.modifie = true; redessinerLignes(); $('#e-coller').value = '';
+  toast(n + ' ligne(s) ajoutée(s)' + (ign.length ? ', ' + ign.length + ' ignorée(s) : ' + ign[0] : '. Vérifiez chaque valeur avec la capture.'), !!ign.length || !n);
+}
+async function deciderMatchSB(decision) {
+  const err = $('#ed-err'); if (err) err.textContent = '';
+  const motif = v('e-motif');
+  if (decision !== 'valider' && !motif) { if (err) err.textContent = 'Écrivez le motif dans le champ « Motif ».'; const m = $('#e-motif'); if (m) m.focus(); return false; }
+  if (decision === 'valider') {
+    const R = reglesSite(), c = L.controlesMatch(matchCourant(), CX, saisonJS(saisonSB(ED.saison_id)), R);
+    if (c.bloquants.length || c.attente.length) { err.textContent = 'Validation impossible : ' + (c.bloquants[0] || c.attente[0]); return false; }
+  }
+  if (decision === 'annuler' && !confirm('Annuler ce match pour tous les joueurs ? Ses statistiques ne compteront plus.')) return false;
+  if (!ED.lock && !(await sauverMatchSB(false))) return false;
+  const { error } = await SB.rpc('decider_match', { p_match: ED.dbid, p_decision: decision, p_motif: motif || null });
+  if (error) { if (err) err.textContent = erreurRpc(error); return false; }
+  toast({ valider: 'Match validé.', attente: 'Match mis en attente.', refuser: 'Match refusé (gardé avec le motif).', annuler: 'Match annulé.', brouillon: 'Match repassé en brouillon.' }[decision]);
+  chargerCompteursAdmin();
+  const id = ED.dbid; ED.modifie = false; await ouvrirMatch(id);
+  return false;
+}
+async function identifierLigneSB(i) {
+  const l = ED.lignes[i], x = v('idf-' + i);
+  if (!x) { toast('Choisissez le compte, ou « Non inscrit ».', true); return; }
+  const { error } = await SB.rpc('identifier_ligne', { p_ligne: l.id, p_compte: x === '__ni' ? null : Number(x) });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Ligne identifiée : elle comptera pour les classements suivants.'); await ouvrirMatch(ED.dbid);
+}
+ACTIONS['m-nouveau'] = () => ouvrirMatch(null);
+ACTIONS['m-ouvrir'] = b => ouvrirMatch(Number(b.dataset.id));
+ACTIONS['ed-envoyer'] = () => envoyerCaptures();
+ACTIONS['ed-consigne'] = () => modalConsigne();
+ACTIONS['ed-coller'] = () => lireReponseClaude();
+ACTIONS['ed-identifier'] = b => identifierLigneSB(+b.dataset.i);
+ACTIONS['ed-ajout-ligne'] = () => { const l = { faction: '', pseudo: '' }; L.STATS.forEach(s => { l[s.k] = ''; }); resoudreLigne(l); ED.lignes.push(l); ED.modifie = true; redessinerLignes(); };
+ACTIONS['ed-vider'] = b => { if (!b.dataset.ok) { b.dataset.ok = '1'; b.textContent = 'Confirmer : tout effacer'; return; } ED.lignes = []; ED.modifie = true; redessinerLignes(); b.dataset.ok = ''; b.textContent = 'Effacer toutes les lignes'; };
+ACTIONS['ed-suppr-ligne'] = b => { ED.lignes.splice(+b.dataset.i, 1); ED.modifie = true; redessinerLignes(); };
+async function modalConsigne() {
+  try { await navigator.clipboard.writeText(PROMPT_CLAUDE); toast('Consigne copiée : collez-la dans claude.ai avec la capture.'); }
+  catch (e) { const z = $('#e-consigne'); if (z) { z.value = PROMPT_CLAUDE; z.hidden = false; z.focus(); z.select(); } toast('Copie automatique refusée : le texte est sélectionné sous le bouton, copiez-le à la main.', true); }
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'ma-s') { UI.matchSaison = e.target.value; afficherMatchs(); } });
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
