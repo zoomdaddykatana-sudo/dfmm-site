@@ -159,10 +159,12 @@ begin
   exception when raise_exception then insert into resultats (test, ok, detail) values ('A : nouveau changement avant 7 jours refusé', true, sqlerrm); end;
   select count(*) into n from public.notifications;
   insert into resultats (test, ok, detail) values ('A : reçoit ses notifications', n >= 2, n || ' notification(s)');
-  update public.notifications set lu = true;
+  update public.notifications set lu = true
+    where membre_id in (select id from public.membres where user_id = '00000000-0000-4000-8000-0000000004a1');
   get diagnostics nb = row_count;
   insert into resultats (test, ok, detail) values ('A : marque ses notifications comme lues', nb = n, nb || ' ligne(s)');
-  begin update public.notifications set texte = 'modifié';
+  begin update public.notifications set texte = 'modifié'
+    where membre_id in (select id from public.membres where user_id = '00000000-0000-4000-8000-0000000004a1');
     insert into resultats (test, ok, detail) values ('A : ne réécrit pas une notification', false, 'permis');
   exception when insufficient_privilege then insert into resultats (test, ok, detail) values ('A : ne réécrit pas une notification', true, 'refusé'); end;
   -- Retrait automatique
