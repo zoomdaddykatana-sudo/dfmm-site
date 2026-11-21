@@ -362,6 +362,17 @@ var L = (function () {
     return { pop: pop, seuil: seuil, q1: q1, cats: cats };
   }
 
+  // Classement figé d'une publication (contenu enregistré) → même forme que classer(), pour attribuerLots.
+  function classementDepuisPublication(contenu) {
+    var cats = ((contenu && contenu.categories) || []).map(function (c) {
+      var def = CATS.filter(function (x) { return x.key === c.key; })[0] || {};
+      return { key: c.key, kind: c.kind || def.kind, fam: def.fam, label: c.label || def.label, prio: def.prio, statut: c.statut,
+        laureats: (c.laureats || []).map(function (x) { return { mat: x.mat }; }),
+        lignes: (c.lignes || []).map(function (l) { return { j: { mat: l.mat }, rang: l.rang, val: l.val, egal: !!l.egal }; }) };
+    });
+    return { cats: cats, seuil: contenu && contenu.seuil, q1: contenu && contenu.q1 };
+  }
+
   // ---------- Lots : un seul par joueur, priorité des 11 catégories, redistribution ----------
   function attribuerLots(cl, lotsDispo) {
     var loti = {}, res = [];
@@ -500,7 +511,7 @@ var L = (function () {
     normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte, membresRequis: membresRequis,
     bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, alertesPerformance: alertesPerformance,
     matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,
-    agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots,
+    agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots, classementDepuisPublication: classementDepuisPublication,
     coupurePour: coupurePour, coupureFinale: coupureFinale, finVerificationFinale: finVerificationFinale, publicationFinale: publicationFinale,
     publicationsPrevues: publicationsPrevues,
     encodeMsg: encodeMsg, decodeMsg: decodeMsg, parseLignes: parseLignes, nombre: nombre
