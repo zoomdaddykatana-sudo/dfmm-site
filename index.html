@@ -2174,6 +2174,8 @@ function router() {
   $$('#nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === vue));
   rendre();
   if (chg) window.scrollTo(0, 0);
+  // Page Inscription : relit les réglages à chaque ouverture (jamais de copie périmée).
+  if (chg && vue === 'inscription' && SB && PRET) chargerParametres().then(() => { rendreBandeau(); if (UI.vue === 'inscription') rendreInscription(); });
 }
 function lierEvenements() {
   window.addEventListener('hashchange', router);

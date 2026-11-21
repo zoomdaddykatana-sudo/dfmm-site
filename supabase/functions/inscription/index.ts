@@ -60,8 +60,9 @@ Deno.serve(async (req) => {
   let userId = '', chemin = '';
   try {
     // 1. Inscriptions ouvertes ?
-    const { data: p } = await sb.from('parametres').select('valeur').eq('cle', 'inscriptions_ouvertes').single();
-    if (!p || p.valeur !== true) return reponse({ erreur: 'Les inscriptions sont fermées pour le moment.' }, 403);
+    const { data: p, error: ep } = await sb.from('parametres').select('valeur').eq('cle', 'inscriptions_ouvertes').single();
+    if (ep || !p) return reponse({ erreur: 'Lecture des réglages impossible (' + (ep ? ep.message : 'réglage introuvable') + '). Prévenez Katana.' }, 500);
+    if (p.valeur !== true) return reponse({ erreur: 'Les inscriptions sont fermées pour le moment.' }, 403);
 
     // 2. Lecture et contrôle du formulaire
     const form = await req.formData();
