@@ -1221,8 +1221,8 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'sanctions', 'saison', 'acces', 'sauvegarde'];
-const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
@@ -1232,6 +1232,7 @@ function compteurTab(k) {
   if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
   if (k === 'matchs') return ADM.nbMatchs || 0;
   if (k === 'sanctions') return ADM.nbContest || 0;
+  if (k === 'litiges') return ADM.nbDossiers || 0;
   return 0;
 }
 function rendreAdmin() {
@@ -2034,14 +2035,16 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c, vs, mt, ct] = await Promise.all([
+  const [a, b, c, vs, mt, ct, li] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
     SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
     SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString()),
     SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente']),
-    SB.from('sanctions').select('id', { count: 'exact', head: true }).not('conteste_le', 'is', null).is('decision_recours', null).eq('statut', 'active')
+    SB.from('sanctions').select('id', { count: 'exact', head: true }).not('conteste_le', 'is', null).is('decision_recours', null).eq('statut', 'active'),
+    SB.from('dossiers').select('id', { count: 'exact', head: true }).eq('statut', 'ouvert')
   ]);
+  ADM.nbDossiers = (li && li.count) || 0;
   ADM.nbMatchs = mt.count || 0;
   ADM.nbContest = (ct && ct.count) || 0;
   ADM.nbInsc = a.count || 0;
@@ -2148,10 +2151,10 @@ async function chargerMonDossier() {
   if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
   h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
-  h += '<div id="mes-sanctions"></div>';
+  h += '<div id="mes-sanctions"></div><div id="mes-convocations"></div>';
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
   z.innerHTML = h;
-  afficherMesSanctions();
+  afficherMesSanctions(); afficherMesConvocations();
 }
 function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
 function moiCompte2() {
@@ -2428,7 +2431,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -3039,7 +3042,8 @@ async function afficherSanctions() {
     + (s.statut === 'active' ? '<div class="row-btns">' + (s.conteste_le && !s.decision_recours ? '<button class="btn sm" type="button" data-act="sa2-trancher" data-id="' + s.id + '">Trancher la contestation</button>' : '') + '<button class="btn sm ghost" type="button" data-act="sa2-lever" data-id="' + s.id + '">Lever la sanction</button></div>' : '')
     + '</div>').join('');
 }
-async function nouvelleSanction() {
+async function nouvelleSanction(opts) {
+  opts = opts || {};
   const { data, error } = await SB.from('membres').select('id, matricule, nom_gamer, statut').not('matricule', 'is', null).order('matricule');
   if (error) { toast('Lecture impossible : ' + error.message, true); return; }
   const R = reglesSite(), auj = now().slice(0, 10), max = R ? L.addDays(auj, R.suspension_max_jours) : '';
@@ -3058,8 +3062,9 @@ async function nouvelleSanction() {
     if (type === 'suspension') { p.fin_jour = v('sn-fin'); if (!L.validD(p.fin_jour)) return erreurA('Indiquez le dernier jour de la suspension.'); }
     if (type === 'retrait_statistiques') { p.match_id = Number(v('sn-mid')); if (!p.match_id) return erreurA('Indiquez le numéro du match.'); }
     if (!confirm('Appliquer cette décision maintenant ?')) return false;
-    const { error: e } = await SB.rpc('sanctionner', { p });
+    const { data: sid, error: e } = await SB.rpc('sanctionner', { p });
     if (e) return erreurA(erreurRpc(e));
+    if (opts.dossier) { await SB.rpc('sanctionner_dossier', { p_sanction: sid, p_dossier: opts.dossier }); toast('Décision appliquée et liée au dossier n° ' + opts.dossier + '.'); chargerCompteursAdmin(); setTimeout(() => ouvrirDossier(opts.dossier), 0); return true; }
     toast('Décision appliquée. Le joueur est averti.'); chargerCompteursAdmin(); afficherSanctions(); return true;
   } }]);
   const maj = () => { const t = v('sn-type'); $('#sn-susp').hidden = t !== 'suspension'; $('#sn-match').hidden = t !== 'retrait_statistiques'; };
@@ -3103,6 +3108,179 @@ function contesterUI(id) {
     } }]);
 }
 ACTIONS['moi-contester'] = b => contesterUI(b.dataset.id);
+
+/* ----- Lot 4B : matchs en attente et litiges (confidentiel : Katana et les convoqués) ----- */
+const ROLES_LIT = { organisateur: 'Organisateur', responsable: 'Responsable', joueur: 'Joueur concerné', temoin: 'Témoin' };
+const DECISIONS_LIT = { capture_retenue: 'Vraie capture retenue, match validé', match_refuse: 'Match refusé (gardé, non compté)', match_annule: 'Match annulé pour tous' };
+const ST_DOS = { ouvert: 'En cours', tranche: 'Tranché', archive: 'Archivé' };
+const PROMPT_SYNTHESE = 'Tu rédiges la synthèse d’un dossier de litige de la LEAGUE UV (ligue communautaire de Delta Force Mobile, Madagascar). Le dossier complet suit.\nUtilise uniquement ce qui est écrit dans le dossier : n’invente rien, ne juge pas, garde les matricules (DFMM-…) et les heures.\nPlan, en français simple :\n1. Faits constatés.\n2. Témoignages : qui a dit quoi, avec l’heure du message d’origine.\n3. Participants consultés.\n4. Décision et motif.\n5. Sanction éventuelle et motif.\n6. Délai de recours et suppression des captures écartées.\nRéponds seulement avec la synthèse, en texte simple, sans tableau.';
+let DOSS = [], DL = null;
+TAB.litiges = {
+  shell: () => note('Un dossier s’ouvre tout seul quand un match passe « en attente ». Tout est confidentiel : seuls vous et les personnes convoquées voyez un dossier.') + '<div id="li-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherDossiers
+};
+async function afficherDossiers() {
+  const z = $('#li-liste'); if (!z) return;
+  const { data, error } = await SB.from('dossiers').select('*, matchs(id, fin, carte, statut, motif), convocations(id, confirme_le)').order('ouvert_le', { ascending: false });
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  DOSS = data || [];
+  const R = reglesSite();
+  if (!DOSS.length) { z.innerHTML = note('Aucun dossier. Un dossier s’ouvre quand vous mettez un match « en attente ».'); return; }
+  z.innerHTML = '<div class="scroll"><table><thead><tr><th>Dossier</th><th>Match</th><th>Ouvert le</th><th>À trancher avant</th><th>Convocations</th><th>État</th><th></th></tr></thead><tbody>' + DOSS.map(d => {
+    const lim = d.matchs && d.matchs.fin && R ? new Date(new Date(d.matchs.fin).getTime() + R.attente_h * 3600000).toISOString() : null;
+    const conv = d.convocations || [], conf = conv.filter(c => c.confirme_le).length;
+    return '<tr><td class="nowrap"><b>n° ' + d.id + '</b>' + (d.est_litige ? '<div class="small err">litige</div>' : d.est_litige === false ? '<div class="small dim">sans litige</div>' : '<div class="small dim">à qualifier</div>') + '</td><td class="nowrap">M-' + d.match_id + '</td><td class="nowrap small">' + dateLoc(d.ouvert_le) + '</td>'
+      + '<td class="nowrap small' + (d.statut === 'ouvert' && lim && new Date(lim) < new Date() ? ' err' : '') + '">' + (d.statut === 'ouvert' && lim ? dateLoc(lim) : '—') + '</td><td class="num">' + conf + '/' + conv.length + '</td><td>' + badge(ST_DOS[d.statut], d.statut === 'ouvert' ? 'a' : d.statut === 'tranche' ? 'g' : 'o') + '</td>'
+      + '<td><button class="btn sm ghost" type="button" data-act="li-ouvrir" data-id="' + d.id + '">Ouvrir</button></td></tr>';
+  }).join('') + '</tbody></table></div>';
+}
+async function chargerDossier(id) {
+  const [a, b] = await Promise.all([
+    SB.from('dossiers').select('*, matchs(*), convocations(*, membres(matricule, nom_gamer)), messages_litige(*, membres(matricule, nom_gamer))').eq('id', id).single(),
+    SB.from('sanctions').select('*, membres(matricule, nom_gamer)').eq('dossier_id', id)
+  ]);
+  if (a.error) throw new Error(a.error.message);
+  const d = a.data;
+  const caps = await SB.from('captures').select('*').eq('match_id', d.match_id).order('envoyee_le');
+  return { d, sanctions: (b.data || []), caps: caps.data || [] };
+}
+function auteurMsg(x, moi) {
+  if (!x.membre_id) return 'Katana';
+  if (moi && x.membre_id === moi) return 'Vous';
+  return x.membres ? matTxt(x.membres.matricule) + ' ' + (x.membres.nom_gamer || '') : 'Participant convoqué';
+}
+async function ouvrirDossier(id) {
+  try { DL = await chargerDossier(id); } catch (e) { toast('Ouverture impossible : ' + e.message, true); return; }
+  rendreDossier();
+}
+function rendreDossier() {
+  const { d, sanctions, caps } = DL, R = reglesSite(), ouvert = d.statut === 'ouvert';
+  const m = d.matchs || {};
+  const lim = m.fin && R ? new Date(new Date(m.fin).getTime() + R.attente_h * 3600000).toISOString() : null;
+  let h = '<dl class="kv"><dt>Ouvert le</dt><dd>' + dateLoc(d.ouvert_le) + '</dd><dt>Match</dt><dd>M-' + d.match_id + ' · fin ' + dateLoc(m.fin) + ' · ' + esc(m.carte || '—') + ' · ' + esc(ST_MATCH[m.statut] || m.statut || '') + (m.motif ? ' · ' + esc(m.motif) : '') + '</dd>'
+    + (ouvert && lim ? '<dt>À trancher avant</dt><dd>' + dateLoc(lim) + '</dd>' : '') + '<dt>État</dt><dd>' + esc(ST_DOS[d.statut]) + '</dd></dl>'
+    + (ouvert ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-match" data-id="' + d.match_id + '">Ouvrir le match (corriger les lignes)</button></div>' : '');
+  // Qualification et faits
+  h += '<h3 style="margin-top:14px">Qualification</h3>' + (ouvert
+    ? '<div class="choix"><label><input type="radio" name="li-q" value="oui"' + (d.est_litige === true ? ' checked' : '') + '> Litige (capture contradictoire ou falsifiée, fraude)</label><label><input type="radio" name="li-q" value="non"' + (d.est_litige === false ? ' checked' : '') + '> Pas un litige (simple problème)</label></div>'
+      + '<label class="lab" for="li-faits">Faits constatés</label><textarea id="li-faits" rows="3">' + esc(d.faits || '') + '</textarea><div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-qualifier">Enregistrer</button></div>'
+    : '<p>' + (d.est_litige ? 'Litige' : d.est_litige === false ? 'Pas un litige' : 'Non qualifié') + (d.faits ? ' · ' + esc(d.faits) : '') + '</p>');
+  // Captures
+  const ST_C = { recue: 'reçue', retenue: 'retenue', refusee: 'refusée', ecartee: 'écartée' };
+  h += '<h3 style="margin-top:14px">Captures reçues</h3>' + (caps.length ? '<div class="thumbs">' + caps.map(c => '<figure style="margin:0"><a hidden target="_blank" rel="noopener" id="dcl-' + c.id + '"><img id="dci-' + c.id + '" alt="Capture" style="width:200px;height:auto;max-height:none"></a><figcaption class="small">'
+    + (ouvert && (c.statut === 'recue' || c.statut === 'retenue') ? '<label><input type="radio" name="li-cap" value="' + c.id + '"> vraie capture</label><br>' : '') + esc(ST_C[c.statut] || c.statut) + ' · envoyée le ' + dateLoc(c.envoyee_le) + '</figcaption></figure>').join('') + '</div>' : '<p class="mute small">Aucune capture.</p>');
+  // Convocations
+  const conv = d.convocations || [];
+  h += '<h3 style="margin-top:14px">Personnes convoquées</h3>' + (conv.length ? '<ul class="taches">' + conv.map(c => {
+    const limC = R ? new Date(new Date(c.convoque_le).getTime() + R.convocation_h * 3600000).toISOString() : null;
+    return '<li><span>' + esc(ROLES_LIT[c.role]) + ' : ' + matTxt(c.membres && c.membres.matricule) + ' ' + esc((c.membres && c.membres.nom_gamer) || '') + '</span><span class="small nowrap ' + (c.confirme_le ? 'dim' : 'err') + '">' + (c.confirme_le ? 'réception confirmée le ' + dateLoc(c.confirme_le) : 'à confirmer avant le ' + dateLoc(limC)) + '</span></li>';
+  }).join('') + '</ul>' : '<p class="mute small">Personne n’est convoqué.</p>')
+    + (ouvert ? '<div class="grid-f"><div><label class="lab" for="li-mb">Convoquer un membre</label><select id="li-mb"><option value="">Chargement…</option></select></div><div><label class="lab" for="li-role">Rôle</label><select id="li-role">' + Object.keys(ROLES_LIT).map(k => '<option value="' + k + '">' + ROLES_LIT[k] + '</option>').join('') + '</select></div></div><div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-convoquer">Convoquer</button></div>' : '');
+  // Discussion
+  const msgs = (d.messages_litige || []).slice().sort((x, y) => String(x.cree_le).localeCompare(String(y.cree_le)));
+  h += '<h3 style="margin-top:14px">Discussion</h3>' + (msgs.length ? '<ul class="taches">' + msgs.map(x => '<li><span><b>' + esc(auteurMsg(x)) + '</b> : ' + esc(x.texte) + '</span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message.</p>')
+    + (ouvert ? '<label class="lab" for="li-msg">Votre message</label><textarea id="li-msg" rows="2"></textarea><div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-ecrire">Envoyer</button></div>' : '<p class="mute small">Discussion fermée.</p>');
+  // Sanctions liées
+  h += '<h3 style="margin-top:14px">Sanctions liées</h3>' + (sanctions.length ? '<ul class="taches">' + sanctions.map(s => '<li><span>' + esc(TYPES_SANC[s.type]) + ' · ' + matTxt(s.membres && s.membres.matricule) + ' · ' + esc(s.motif) + '</span>' + etatRecours(s) + '</li>').join('') + '</ul>' : '<p class="mute small">Aucune.</p>')
+    + (d.statut !== 'archive' ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-sanctionner">Sanctionner un joueur</button></div>' : '');
+  // Décision
+  if (ouvert) h += '<h3 style="margin-top:14px">Décision</h3><div class="choix">' + Object.keys(DECISIONS_LIT).map(k => '<label><input type="radio" name="li-dec" value="' + k + '"> ' + DECISIONS_LIT[k] + '</label>').join('') + '</div>'
+    + '<label class="lab" for="li-motif">Motif de la décision</label><textarea id="li-motif" rows="2"></textarea>' + note('« Vraie capture retenue » : choisissez la capture ci-dessus et vérifiez d’abord les lignes du match. La discussion se fermera.', 'a')
+    + '<div class="row-btns"><button class="btn" type="button" data-act="li-trancher">Trancher le dossier</button></div>';
+  else h += '<h3 style="margin-top:14px">Décision</h3><p>' + esc(DECISIONS_LIT[d.decision] || '') + ' · ' + dateLoc(d.decide_le) + (d.motif_decision ? '<br>Motif : ' + esc(d.motif_decision) : '') + '</p>';
+  // Captures écartées
+  if (!ouvert) {
+    const nbE = caps.filter(c => c.statut === 'ecartee').length;
+    h += '<h3 style="margin-top:14px">Captures écartées</h3>' + (d.captures_supprimees_le ? '<p class="small">Supprimées le ' + dateLoc(d.captures_supprimees_le) + '.</p>' : nbE ? '<p class="small">' + nbE + ' capture(s) écartée(s) : à supprimer (tout de suite sans sanction, après le délai de recours avec sanction).</p><div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-supprimer">Supprimer les captures écartées</button></div>' : '<p class="mute small">Aucune.</p>');
+  }
+  // Synthèse
+  if (d.statut === 'tranche') h += '<h3 style="margin-top:14px">Synthèse</h3><ol class="small"><li>Copiez le dossier complet.</li><li>Dans claude.ai, nouvelle conversation : collez-le et envoyez.</li><li>Relisez la synthèse, collez-la ci-dessous, puis validez : le dossier est archivé.</li></ol>'
+    + '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="li-export">Copier le dossier pour claude.ai</button></div><textarea id="li-export-txt" rows="5" readonly hidden></textarea>'
+    + '<label class="lab" for="li-syn">Synthèse relue</label><textarea id="li-syn" rows="5"></textarea><div class="row-btns"><button class="btn" type="button" data-act="li-synthese">Valider et archiver</button></div>';
+  else if (d.statut === 'archive') h += '<h3 style="margin-top:14px">Synthèse validée</h3><p class="small">' + esc(d.synthese || '') + '</p><p class="dim small">Validée le ' + dateLoc(d.synthese_validee_le) + '.</p>';
+  h += '<div id="li-err" class="err" role="alert"></div>';
+  modal('Dossier n° ' + d.id + (d.est_litige ? ' · litige' : ''), h, [{ label: 'Fermer', cls: 'ghost', onClick: async () => { await afficherDossiers(); return true; } }], { large: true, mode: 'dossier' });
+  if (ouvert) SB.from('membres').select('id, matricule, nom_gamer, statut').not('matricule', 'is', null).order('matricule').then(({ data }) => {
+    const s = $('#li-mb'); if (s) s.innerHTML = '<option value="">Choisir…</option>' + (data || []).filter(x => !conv.some(c => c.membre_id === x.id)).map(x => '<option value="' + x.id + '">' + esc(matTxt(x.matricule) + ' · ' + x.nom_gamer) + '</option>').join('');
+  });
+  caps.forEach(async c => { const { data } = await SB.storage.from('captures').createSignedUrl(c.chemin, 600); const a = $('#dcl-' + c.id), i = $('#dci-' + c.id); if (data && data.signedUrl && a && i) { a.href = data.signedUrl; i.src = data.signedUrl; a.hidden = false; } });
+}
+function exportDossier() {
+  const { d, sanctions, caps } = DL, m = d.matchs || {}, R = reglesSite();
+  const l = ['# Dossier de litige n° ' + d.id, '', 'Ouvert le ' + dateLoc(d.ouvert_le) + ' · match M-' + d.match_id + ' (fin ' + dateLoc(m.fin) + ', ' + (m.carte || 'carte inconnue') + ')', 'Qualification : ' + (d.est_litige ? 'litige' : d.est_litige === false ? 'pas un litige' : 'non qualifié'), '',
+    '## Faits constatés', d.faits || '(non renseignés)', '', '## Matricules impliqués'];
+  (d.convocations || []).forEach(c => l.push('- ' + ROLES_LIT[c.role] + ' : ' + matTxt(c.membres && c.membres.matricule) + ' ' + ((c.membres && c.membres.nom_gamer) || '') + ' (convoqué le ' + dateLoc(c.convoque_le) + (c.confirme_le ? ', réception confirmée le ' + dateLoc(c.confirme_le) : ', réception non confirmée') + ')'));
+  l.push('', '## Captures reçues'); caps.forEach(c => l.push('- Capture ' + c.id + ' : envoyée le ' + dateLoc(c.envoyee_le) + ', ' + ({ recue: 'reçue', retenue: 'retenue', refusee: 'refusée', ecartee: 'écartée' }[c.statut] || c.statut)));
+  l.push('', '## Témoignages (discussion)'); (d.messages_litige || []).slice().sort((x, y) => String(x.cree_le).localeCompare(String(y.cree_le))).forEach(x => l.push('- ' + dateLoc(x.cree_le) + ' · ' + auteurMsg(x) + ' : ' + x.texte));
+  l.push('', '## Participants consultés'); (d.convocations || []).filter(c => c.confirme_le || (d.messages_litige || []).some(x => x.membre_id === c.membre_id)).forEach(c => l.push('- ' + matTxt(c.membres && c.membres.matricule)));
+  l.push('', '## Décision', (DECISIONS_LIT[d.decision] || '') + ' le ' + dateLoc(d.decide_le) + '. Motif : ' + (d.motif_decision || ''));
+  l.push('', '## Sanction éventuelle'); if (sanctions.length) sanctions.forEach(s => l.push('- ' + TYPES_SANC[s.type] + ' · ' + matTxt(s.membres && s.membres.matricule) + ' · motif : ' + s.motif + ' · recours jusqu’au ' + dateLoc(s.recours_jusqu))); else l.push('Aucune.');
+  l.push('', '## Délai de recours et captures écartées', sanctions.length ? 'Captures écartées supprimées après le délai de recours (' + (R ? R.recours_h : 48) + ' h).' : 'Sans sanction : captures écartées supprimées tout de suite.');
+  return PROMPT_SYNTHESE + '\n\n---\n\n' + l.join('\n');
+}
+async function actionDossier(nom, fn) {
+  const err = $('#li-err'); if (err) err.textContent = '';
+  const { error } = await fn();
+  if (error) { if (err) err.textContent = erreurRpc(error); else toast(erreurRpc(error), true); return false; }
+  if (nom) toast(nom);
+  DL = await chargerDossier(DL.d.id); rendreDossier(); chargerCompteursAdmin(); return true;
+}
+ACTIONS['li-ouvrir'] = b => ouvrirDossier(Number(b.dataset.id));
+ACTIONS['li-match'] = b => { fermerModal(); ouvrirMatch(Number(b.dataset.id)); };
+ACTIONS['li-qualifier'] = () => { const q = (document.querySelector('input[name="li-q"]:checked') || {}).value; if (!q) { toast('Choisissez « litige » ou « pas un litige ».', true); return; } actionDossier('Qualification enregistrée.', () => SB.rpc('qualifier_dossier', { p_dossier: DL.d.id, p_litige: q === 'oui', p_faits: v('li-faits') })); };
+ACTIONS['li-convoquer'] = () => { const mb = Number(v('li-mb')); if (!mb) { toast('Choisissez le membre à convoquer.', true); return; } actionDossier('Membre convoqué et averti.', () => SB.rpc('convoquer', { p_dossier: DL.d.id, p_membre: mb, p_role: v('li-role') })); };
+ACTIONS['li-ecrire'] = () => { if (!v('li-msg')) return; actionDossier('', () => SB.rpc('ecrire_litige', { p_dossier: DL.d.id, p_texte: v('li-msg') })); };
+ACTIONS['li-trancher'] = async () => {
+  const dec = (document.querySelector('input[name="li-dec"]:checked') || {}).value, cap = Number((document.querySelector('input[name="li-cap"]:checked') || {}).value || 0);
+  const err = $('#li-err'); err.textContent = '';
+  if (!dec) { err.textContent = 'Choisissez la décision.'; return; }
+  if (!v('li-motif')) { err.textContent = 'Le motif de la décision est obligatoire.'; return; }
+  if (dec === 'capture_retenue') {
+    if (!cap) { err.textContent = 'Choisissez la vraie capture.'; return; }
+    try {
+      await chargerSaisons(); await chargerContexte(DL.d.matchs.saison_id);
+      const mm = CX.matchsList.find(x => x.dbid === DL.d.match_id), R = reglesSite();
+      const c = L.controlesMatch(Object.assign({}, mm, { demarrage: true }), CX, saisonJS(saisonSB(mm.saison_id)), R);
+      if (c.bloquants.length) { err.textContent = 'Le match ne passe pas les contrôles : ' + c.bloquants[0] + ' Corrigez ses lignes (« Ouvrir le match »).'; return; }
+    } catch (e) { err.textContent = 'Contrôle impossible : ' + e.message; return; }
+  }
+  if (!confirm('Trancher ce dossier ? La discussion sera fermée.')) return;
+  actionDossier('Dossier tranché. Les convoqués sont avertis.', () => SB.rpc('trancher_dossier', { p_dossier: DL.d.id, p_decision: dec, p_capture: cap || null, p_motif: v('li-motif') }));
+};
+ACTIONS['li-sanctionner'] = () => nouvelleSanction({ dossier: DL.d.id });
+ACTIONS['li-export'] = async () => {
+  const t = exportDossier();
+  try { await navigator.clipboard.writeText(t); toast('Dossier copié : collez-le dans claude.ai.'); }
+  catch (e) { const z = $('#li-export-txt'); z.value = t; z.hidden = false; z.focus(); z.select(); toast('Copie automatique refusée : le texte est sélectionné, copiez-le à la main.', true); }
+};
+ACTIONS['li-synthese'] = () => { if (!v('li-syn')) { toast('Collez d’abord la synthèse relue.', true); return; } if (!confirm('Valider cette synthèse et archiver le dossier ?')) return; actionDossier('Synthèse validée, dossier archivé.', () => SB.rpc('valider_synthese', { p_dossier: DL.d.id, p_synthese: v('li-syn') })); };
+ACTIONS['li-supprimer'] = async () => {
+  const err = $('#li-err'); err.textContent = '';
+  const { data, error } = await SB.rpc('captures_a_supprimer', { p_dossier: DL.d.id });
+  if (error) { err.textContent = erreurRpc(error); return; }
+  if (!confirm('Supprimer définitivement ' + (data || []).length + ' capture(s) écartée(s) ? Le registre et la synthèse restent.')) return;
+  if ((data || []).length) { const r = await SB.storage.from('captures').remove(data); if (r.error) { err.textContent = 'Suppression impossible : ' + r.error.message; return; } }
+  actionDossier('Captures écartées supprimées.', () => SB.rpc('noter_captures_supprimees', { p_dossier: DL.d.id }));
+};
+
+/* Mon compte : mes convocations (discussion confidentielle) */
+async function afficherMesConvocations() {
+  const z = $('#mes-convocations'); if (!z || !SB || !DOS || !DOS.m) return;
+  const { data, error } = await SB.from('convocations').select('*, dossiers(id, match_id, statut, ouvert_le, messages_litige(*))').eq('membre_id', DOS.m.id).order('convoque_le', { ascending: false });
+  if (error || !data || !data.length) { z.innerHTML = ''; return; }
+  const R = reglesSite();
+  z.innerHTML = '<h3 style="margin-top:12px">Mes convocations</h3>' + note('Confidentiel : ne divulguez ni la discussion, ni les témoignages, ni les captures. Vous pouvez dire que vous êtes convoqué et parler de ce qui vous concerne directement.', 'a')
+    + data.map(c => { const d = c.dossiers || {}, ouvert = d.statut === 'ouvert', msgs = (d.messages_litige || []).slice().sort((x, y) => String(x.cree_le).localeCompare(String(y.cree_le)));
+      const limC = R ? new Date(new Date(c.convoque_le).getTime() + R.convocation_h * 3600000).toISOString() : null;
+      return '<div class="card-l"><div class="t"><div><b>Dossier n° ' + d.id + '</b> · match M-' + d.match_id + '<div class="small dim">' + esc(ROLES_LIT[c.role]) + ' · convoqué le ' + dateLoc(c.convoque_le) + '</div></div>' + badge(ouvert ? 'En cours' : 'Tranché', ouvert ? 'a' : 'o') + '</div>'
+        + (c.confirme_le ? '<p class="small dim">Réception confirmée le ' + dateLoc(c.confirme_le) + '.</p>' : '<div class="row-btns"><button class="btn sm" type="button" data-act="moi-confirmer" data-id="' + d.id + '">Je confirme la réception' + (limC ? ' (avant le ' + dateLoc(limC) + ')' : '') + '</button></div>')
+        + (msgs.length ? '<ul class="taches">' + msgs.map(x => '<li><span><b>' + esc(auteurMsg(x, DOS.m.id)) + '</b> : ' + esc(x.texte) + '</span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message.</p>')
+        + (ouvert ? '<label class="lab" for="mc-' + d.id + '">Votre message à Katana</label><textarea id="mc-' + d.id + '" rows="2"></textarea><div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-ecrire-lit" data-id="' + d.id + '">Envoyer</button></div>' : '<p class="mute small">Discussion fermée.</p>') + '</div>';
+    }).join('');
+}
+ACTIONS['moi-confirmer'] = async b => { const { error } = await SB.rpc('confirmer_convocation', { p_dossier: Number(b.dataset.id) }); if (error) { toast(erreurRpc(error), true); return; } toast('Réception confirmée.'); afficherMesConvocations(); };
+ACTIONS['moi-ecrire-lit'] = async b => { const t = v('mc-' + b.dataset.id); if (!t) return; const { error } = await SB.rpc('ecrire_litige', { p_dossier: Number(b.dataset.id), p_texte: t }); if (error) { toast(erreurRpc(error), true); return; } toast('Message envoyé.'); afficherMesConvocations(); };
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
