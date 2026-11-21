@@ -45,7 +45,7 @@
 | 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | Fusionné (PR n° 4) ; migration 0004 exécutée, test 27/27 |
 | 2C | Pseudo avec volsever (compteur d'appels, repli manuel) ; effacement des données ; migration 0005 ; fonctions `pseudo-volsever` et `effacer-donnees` | Fusionné (PR n° 6) ; migration 0005 exécutée, test 21/21 dans le vrai projet ; 2 fonctions installées (« Verify JWT » activé) ; écrans administrateur vérifiés sur téléphone le 21/11/2026 |
 | 3 | Matchs et captures, registre | 3A (matchs de Katana) : **fusionné (PR n° 8)** le 21/11/2026 ; migration 0006 exécutée (test 8/8) ; migration 0007 (matchs, lignes, captures, registre, stockage « captures », colonne `saisons.fin_confirmee`) exécutée et test 0007 réussi (23/23) dans le vrai projet le 21/11/2026 ; onglets Saison et Matchs branchés sur Supabase. 3B (matchs libres : créneaux, captures des responsables, délai de 10 min, concordance, attente) à faire |
-| 3C Classements | Onglet Administration > Classements branché sur Supabase (calcul sur les matchs validés, contrôle avant publication, publication figée) ; page publique et accueil lisent `publications` ; migration 0008 (numéro automatique, un seul final, classement figé, journal) | **PR ouverte** ; migration 0008 et test 0008 (11/11 en local) **à exécuter** |
+| 3C Classements | Onglet Administration > Classements branché sur Supabase (calcul sur les matchs validés, contrôle avant publication, publication figée) ; page publique et accueil lisent `publications` ; migration 0008 (numéro automatique, un seul final, classement figé, journal) | **PR n° 9 ouverte** ; migration 0008 exécutée et test 0008 réussi (11/11) dans le vrai projet le 21/11/2026 ; premier provisoire d'Aurora renseigné (29/11/2026) |
 | 4 | Litiges, sanctions, captures écartées | À faire |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
 
@@ -70,7 +70,7 @@ Points en suspens :
 
 - Site : https://zoomdaddykatana-sudo.github.io/dfmm-site/ (Pages publie la branche `ccr-08840471-84tqcu`).
 - Supabase : projet `ijpbplzbjohfrqwnvrqv` (URL et clé publishable dans `config.js`, rien d'autre). Fonctions installées : `lien-reinitialisation`, `inscription` (« Verify JWT » désactivé), `pseudo-volsever` et `effacer-donnees` (« Verify JWT » **activé** : réservées aux personnes connectées). Secret déjà rangé : `VOLSEVER_API_KEY`.
-- Migrations (`supabase/migrations/`) : 0001 à 0007 exécutées dans le vrai projet (par le SQL, pas par l'outil de migrations : la liste des migrations de Supabase reste vide, c'est normal). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
+- Migrations (`supabase/migrations/`) : 0001 à 0008 exécutées dans le vrai projet (par le SQL, pas par l'outil de migrations : la liste des migrations de Supabase reste vide, c'est normal). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
 - Forfait gratuit Supabase : pause après 1 semaine sans activité, pas de sauvegarde automatique, 1 Go de fichiers, envoi d'e-mails limité à 2 par heure et aux membres de l'équipe du projet.
 - volsever : `GET https://gate.volsever.com/proxy/api/game/delta-force?id={UID}` ; réponse `data.username` ; environ 5 s ; forfait gratuit 45 requêtes par jour et 15 par minute ; clé envoyée dans l'en-tête `X-API-KEY` (documentation : docs.volsever.com, outil « Delta Force (Tencent) ») ; identifiant inconnu = code 404. Le compteur d'appels est tenu dans la table `volsever_appels` (24 h glissantes et dernière minute).
 - Pseudo et tag de clan : « ¬ » est un tag de clan validé, à conserver et comparer tel quel.
@@ -96,7 +96,7 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Lot 3C (classements, PR ouverte) : montrer à Katana le SQL de la migration 0008 puis du test 0008 (11/11), les exécuter sur son « oui », vérifier qu'il ne reste rien ; lui faire renseigner le premier provisoire (Administration > Saison > Modifier > 29/11/2026) ; fusion sur son accord écrit.
+1. Lot 3C (classements, PR n° 9) : migration 0008 et test 0008 faits ; premier provisoire renseigné ; fusion sur l'accord écrit de Katana.
 2. Matchs déjà joués : saisis **en brouillon** (M-2 fait) ; règle des 50 % : valider quand les réinscriptions sont approuvées (ancien matricule). Premier provisoire le 29/11/2026 : les matchs doivent être validés avant la publication (ceux de Katana comptent s'ils sont validés avant).
 3. Lot 3B (matchs libres) ; puis titres et lots (ancien onglet « Titres et lots ») ; lot 4 (litiges, sanctions).
 4. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (`index.html`).
