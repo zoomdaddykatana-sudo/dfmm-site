@@ -51,7 +51,7 @@
 Points en suspens :
 - Nettoyage de la fausse fiche « EssaiTest » et du compte `essai1@dfmm.invalid` : fait, vérifié le 21/11/2026 (0 fiche, 0 compte).
 - Mise à jour du règlement du site (lot 5) et du guide PDF (ne pas toucher au PDF).
-- Message de réinscription pour les 25 : rédigé et validé ; reste l'ouverture des inscriptions (demande écrite de Katana), puis l'envoi (guider Katana : feuille Google, Extensions > Apps Script, essai à soi-même, puis envoi à tous).
+- Message de réinscription pour les 25 : **envoyé le 21/11/2026** (essai vérifié, puis « 25 message(s) envoyé(s). »). Reste : approuver chaque réinscription reçue avec l'ancien matricule (Administration > Inscriptions > Approuver > Matricule = l'ancien, pas « Nouveau matricule »).
 - Sauvegarde : bouton dans Administration > Sauvegarde ; à faire chaque semaine (pas de sauvegarde automatique). Depuis la PR n° 7, elle inclut `demandes`, `notifications` et `volsever_appels` ; le test `tests/sauvegarde.test.js` échoue si une nouvelle table de migration n'est pas ajoutée à `TABLES_SAUVEGARDE` (`index.html`).
 - Pseudo et effacement : jamais essayés de bout en bout avec un vrai compte (aucun membre encore). Premier essai réel avec le premier membre réinscrit (consomme 1 appel volsever).
 
