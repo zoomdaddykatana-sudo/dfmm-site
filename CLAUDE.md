@@ -44,7 +44,7 @@
 | 2A Inscriptions | Inscription, approbation, reprise des anciens matricules, membres, sauvegarde ; migrations 0002 et 0003 | Fusionné (PR n° 3) |
 | 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | Fusionné (PR n° 4) ; migration 0004 exécutée, test 27/27 |
 | 2C | Pseudo avec volsever (compteur d'appels, repli manuel) ; effacement des données ; migration 0005 ; fonctions `pseudo-volsever` et `effacer-donnees` | Fusionné (PR n° 6) ; migration 0005 exécutée, test 21/21 dans le vrai projet ; 2 fonctions installées (« Verify JWT » activé) ; écrans administrateur vérifiés sur téléphone le 21/11/2026 |
-| 3 | Matchs et captures, registre | 3A (matchs de Katana) : **PR ouverte** ; migration 0006 exécutée (test 8/8) ; migration 0007 (matchs, lignes, captures, registre, stockage « captures », colonne `saisons.fin_confirmee`) exécutée et test 0007 réussi (23/23) dans le vrai projet le 21/11/2026 ; onglets Saison et Matchs branchés sur Supabase. 3B (matchs libres : créneaux, captures des responsables, délai de 10 min, concordance, attente) à faire |
+| 3 | Matchs et captures, registre | 3A (matchs de Katana) : **fusionné (PR n° 8)** le 21/11/2026 ; migration 0006 exécutée (test 8/8) ; migration 0007 (matchs, lignes, captures, registre, stockage « captures », colonne `saisons.fin_confirmee`) exécutée et test 0007 réussi (23/23) dans le vrai projet le 21/11/2026 ; onglets Saison et Matchs branchés sur Supabase. 3B (matchs libres : créneaux, captures des responsables, délai de 10 min, concordance, attente) à faire |
 | 4 | Litiges, sanctions, captures écartées | À faire |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
 
@@ -94,7 +94,7 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Lot 3A (PR n° 8) : migration 0007 et test 0007 faits ; saison « Aurora » créée le 21/11/2026 (du 10/11/2026 au 21/01/2027, fin estimée, à corriger quand le jeu l'annonce) ; premier match saisi en brouillon (M-2, 16 lignes, 1 capture). Les matchs déjà joués sont saisis **en brouillon** : 0 membre réinscrit, donc la règle des 50 % bloque la validation ; une fois les réinscriptions approuvées, rouvrir chaque brouillon (les pseudos se relient seuls) et valider. Sur son accord écrit, fusionner la PR du lot 3A.
+1. Lot 3A fusionné (PR n° 8) ; migration 0007 et test 0007 faits ; saison « Aurora » créée le 21/11/2026 (du 10/11/2026 au 21/01/2027, fin estimée, à corriger quand le jeu l'annonce) ; premier match saisi en brouillon (M-2, 16 lignes, 1 capture). Les matchs déjà joués sont saisis **en brouillon** : 0 membre réinscrit, donc la règle des 50 % bloque la validation ; une fois les réinscriptions approuvées, rouvrir chaque brouillon (les pseudos se relient seuls) et valider.
 2. E-mails de réinscription : inscriptions ouvertes le 21/11/2026 (à sa demande) ; message envoyé aux 25 le 21/11/2026 (`outils/envoi-reinscription.md`) ; approuver chaque réinscription avec l'ancien matricule. Les membres doivent être réinscrits et approuvés (reprise de l'ancien matricule, date d'origine) pour que leurs lignes de match comptent ; une ligne identifiée après la validation ne compte que pour les classements suivants.
 3. Lot 3B (matchs libres), puis classements publiés depuis Supabase (remplacer l'ancien onglet « Classements »).
 4. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (`index.html`).
