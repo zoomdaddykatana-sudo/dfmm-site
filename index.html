@@ -1221,8 +1221,8 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'saison', 'acces', 'sauvegarde'];
-const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
@@ -1231,6 +1231,7 @@ function compteurTab(k) {
   if (k === 'demandes') return ADM.nbDem || 0;
   if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
   if (k === 'matchs') return ADM.nbMatchs || 0;
+  if (k === 'sanctions') return ADM.nbContest || 0;
   return 0;
 }
 function rendreAdmin() {
@@ -2033,14 +2034,16 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c, vs, mt] = await Promise.all([
+  const [a, b, c, vs, mt, ct] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
     SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
     SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString()),
-    SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente'])
+    SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente']),
+    SB.from('sanctions').select('id', { count: 'exact', head: true }).not('conteste_le', 'is', null).is('decision_recours', null).eq('statut', 'active')
   ]);
   ADM.nbMatchs = mt.count || 0;
+  ADM.nbContest = (ct && ct.count) || 0;
   ADM.nbInsc = a.count || 0;
   ADM.nbDem = c.count || 0;
   ADM.vsJour = vs.count || 0;
@@ -2145,8 +2148,10 @@ async function chargerMonDossier() {
   if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
   h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
+  h += '<div id="mes-sanctions"></div>';
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
   z.innerHTML = h;
+  afficherMesSanctions();
 }
 function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
 function moiCompte2() {
@@ -2181,9 +2186,9 @@ function moiRetrait() {
     [{ label: 'Annuler', cls: 'ghost' }, { label: 'Confirmer mon retrait', cls: 'danger', onClick: async () => {
       const err = $('#d-err'); err.textContent = '';
       if (!coche('d-ok')) { err.textContent = 'Cochez la case pour confirmer.'; return false; }
-      const { error } = await SB.rpc('demander_retrait', { p_motif: v('d-motif') || null });
+      const { data: rr, error } = await SB.rpc('demander_retrait', { p_motif: v('d-motif') || null });
       if (error) { err.textContent = erreurRpc(error); return false; }
-      toast('Votre retrait est enregistré.'); chargerMonDossier(); majPastilleCompte(); return true;
+      toast(rr === 'en_attente' ? 'Votre demande de retrait est transmise à Katana, qui décidera.' : 'Votre retrait est enregistré.'); chargerMonDossier(); majPastilleCompte(); return true;
     } }]);
 }
 async function notifLues() {
@@ -2423,7 +2428,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -2534,10 +2539,11 @@ ACTIONS['sa-activer'] = b => activerSaisonSB(b.dataset.id);
 
 /* Contexte des règles : membres, comptes et matchs de la saison, en heure de Madagascar */
 async function chargerContexte(saisonId) {
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, sx] = await Promise.all([
     SB.from('membres').select('id, matricule, nom_gamer, statut, periodes(debut, fin)').not('matricule', 'is', null),
     SB.from('comptes_jeu').select('id, membre_id, uid, pseudo, statut, comptes_periodes(debut, fin), pseudos_historique(pseudo, debut, fin)'),
-    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, statut, motif, notes, valide_le, attente_decide_le, match_lignes(*), captures(id, envoyee_le, statut)').eq('saison_id', saisonId) : Promise.resolve({ data: [] })
+    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, statut, motif, notes, valide_le, attente_decide_le, match_lignes(*), captures(id, envoyee_le, statut)').eq('saison_id', saisonId) : Promise.resolve({ data: [] }),
+    SB.from('sanctions').select('membre_id, type, debut, fin, statut, match_id').in('type', ['suspension', 'retrait_statistiques'])
   ]);
   const err = a.error || b.error || c.error; if (err) throw new Error(err.message);
   const per = l => (l || []).map(p => ({ debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' }));
@@ -2545,7 +2551,12 @@ async function chargerContexte(saisonId) {
   (a.data || []).forEach(m => { const mat = matTxt(m.matricule); parId[m.id] = mat; membres[mat] = { matricule: mat, id: m.id, nom_gamer: m.nom_gamer, statut: STATUTS_MB[m.statut] || m.statut, periodes: per(m.periodes), suspensions: [] }; });
   (b.data || []).forEach(x => { if (!parId[x.membre_id]) return; comptes[String(x.id)] = { id: String(x.id), matricule: parId[x.membre_id], uid: x.uid, pseudo: x.pseudo, statut: x.statut, periodes: per(x.comptes_periodes), pseudos: (x.pseudos_historique || []).map(p => ({ pseudo: p.pseudo, debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' })) }; });
   CX = { membres, comptes, parId, comptesList: Object.values(comptes), creneaux: {}, matchsList: [] };
+  // Sanctions (lot 4A) : suspensions (matchs de la période non comptés) et statistiques retirées dans un match.
+  const sanc = (sx && !sx.error && sx.data) || [];
+  sanc.filter(x => x.type === 'suspension' && CX.parId[x.membre_id]).forEach(x => { CX.membres[CX.parId[x.membre_id]].suspensions.push({ debut: isoLoc(x.debut), fin: isoLoc(x.fin), annulee: x.statut === 'levee' }); });
   CX.matchsList = (c.data || []).map(matchJS);
+  const retraits = sanc.filter(x => x.type === 'retrait_statistiques' && x.statut === 'active');
+  CX.matchsList.forEach(m => m.lignes.forEach(l => { if (retraits.some(x => x.match_id === m.dbid && CX.parId[x.membre_id] === l.mat)) l.exclue_sanction = true; }));
   return CX;
 }
 function ligneJS(l) {
@@ -2988,6 +2999,110 @@ document.addEventListener('change', e => {
   else if (t.id === 'cl-type') { UI.clType = t.value; CLC = null; $('#cl-res').innerHTML = ''; majCoupureTxt(); }
   else if (t.id === 'cl-date') { CLC = null; $('#cl-res').innerHTML = ''; majCoupureTxt(); }
 });
+
+/* ----- Lot 4A : sanctions (jamais publiées) ----- */
+const TYPES_SANC = { avertissement: 'Avertissement', suspension: 'Suspension', exclusion: 'Exclusion', retrait_statistiques: 'Statistiques d’un match retirées' };
+// Tableau-guide du cahier (section 9) : Katana décide au cas par cas.
+const GUIDE_SANC = [
+  ['Comportement toxique prouvé, première fois', 'avertissement'], ['Comportement toxique répété', 'suspension'],
+  ['Capture falsifiée', 'suspension'], ['Deux comptes d’une même personne dans un même match, ou compte prêté', 'retrait_statistiques'],
+  ['Compte d’un ami inscrit comme le sien', 'suspension'], ['Farming ou entente pour manipuler un match', 'exclusion'],
+  ['Récidive après une suspension', 'exclusion'], ['Divulgation d’un litige, première fois', 'avertissement'],
+  ['Divulgation répétée', 'suspension'], ['Divulgation qui nuit gravement à une personne', 'exclusion'], ['Autre', '']
+];
+let SANC = [];
+function etatRecours(s) {
+  if (s.statut === 'levee') return badge('Levée', 'o');
+  if (s.conteste_le && !s.decision_recours) return badge('Contestée', 'a');
+  if (s.decision_recours === 'maintenue') return badge('Maintenue', 'r');
+  return new Date(s.recours_jusqu) > new Date() ? badge('Recours ouvert', 'a') : badge('Définitive', 'r');
+}
+function periodeSanc(s) {
+  return s.type === 'suspension' ? 'du ' + dateLoc(s.debut) + ' au ' + dateLoc(s.fin) : 'le ' + dateLoc(s.debut);
+}
+TAB.sanctions = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px"><button class="btn" type="button" data-act="sa2-nouvelle">Nouvelle sanction</button></div>' + note('Les sanctions ne sont jamais publiées (ni nom, ni motif). Le joueur reçoit le motif et peut contester dans le délai réglé (« Recours »).') + '<div id="sa2-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherSanctions
+};
+async function afficherSanctions() {
+  const z = $('#sa2-liste'); if (!z) return;
+  const { data, error } = await SB.from('sanctions').select('*, membres(matricule, nom_gamer)').order('cree_le', { ascending: false });
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  SANC = data || [];
+  if (!SANC.length) { z.innerHTML = note('Aucune sanction.'); return; }
+  z.innerHTML = SANC.map(s => '<div class="card-l"><div class="t"><div><b>' + esc(TYPES_SANC[s.type]) + '</b> · ' + matTxt(s.membres && s.membres.matricule) + ' ' + esc((s.membres && s.membres.nom_gamer) || '')
+    + '<div class="small dim">' + periodeSanc(s) + (s.match_id ? ' · match M-' + s.match_id : '') + (s.categorie ? ' · ' + esc(s.categorie) : '') + '</div></div>' + etatRecours(s) + '</div>'
+    + '<dl class="kv"><dt>Motif communiqué</dt><dd>' + esc(s.motif) + '</dd><dt>Recours</dt><dd>jusqu’au ' + dateLoc(s.recours_jusqu) + '</dd>'
+    + (s.contestation ? '<dt>Contestation</dt><dd>' + esc(s.contestation) + ' <span class="dim small">(' + dateLoc(s.conteste_le) + ')</span></dd>' : '')
+    + (s.motif_recours ? '<dt>Décision</dt><dd>' + esc(s.motif_recours) + ' <span class="dim small">(' + dateLoc(s.recours_decide_le) + ')</span></dd>' : '') + '</dl>'
+    + (s.statut === 'active' ? '<div class="row-btns">' + (s.conteste_le && !s.decision_recours ? '<button class="btn sm" type="button" data-act="sa2-trancher" data-id="' + s.id + '">Trancher la contestation</button>' : '') + '<button class="btn sm ghost" type="button" data-act="sa2-lever" data-id="' + s.id + '">Lever la sanction</button></div>' : '')
+    + '</div>').join('');
+}
+async function nouvelleSanction() {
+  const { data, error } = await SB.from('membres').select('id, matricule, nom_gamer, statut').not('matricule', 'is', null).order('matricule');
+  if (error) { toast('Lecture impossible : ' + error.message, true); return; }
+  const R = reglesSite(), auj = now().slice(0, 10), max = R ? L.addDays(auj, R.suspension_max_jours) : '';
+  const h = '<label class="lab" for="sn-m">Membre</label><select id="sn-m"><option value="">Choisir…</option>' + (data || []).map(m => '<option value="' + m.id + '">' + esc(matTxt(m.matricule) + ' · ' + m.nom_gamer + (m.statut !== 'actif' ? ' (' + (STATUTS_MB[m.statut] || m.statut) + ')' : '')) + '</option>').join('') + '</select>'
+    + '<label class="lab" for="sn-cat">Cas (tableau-guide du cahier)</label><select id="sn-cat"><option value="">Choisir…</option>' + GUIDE_SANC.map(([c, t]) => '<option value="' + esc(c) + '" data-t="' + t + '">' + esc(c) + '</option>').join('') + '</select>'
+    + '<label class="lab" for="sn-type">Décision</label><select id="sn-type">' + Object.keys(TYPES_SANC).map(k => '<option value="' + k + '">' + TYPES_SANC[k] + '</option>').join('') + '</select>'
+    + '<div id="sn-susp" hidden><label class="lab" for="sn-fin">Dernier jour de la suspension (inclus ; au plus tard le ' + fDc(max) + ')</label><input type="date" id="sn-fin" min="' + auj + '" max="' + max + '"></div>'
+    + '<div id="sn-match" hidden><label class="lab" for="sn-mid">Numéro du match (M-…)</label><input type="number" id="sn-mid" min="1" inputmode="numeric"></div>'
+    + '<label class="lab" for="sn-motif">Motif (communiqué au joueur)</label><textarea id="sn-motif" rows="3"></textarea>'
+    + note('La décision s’applique tout de suite. Le joueur est averti dans « Mon compte » et peut contester pendant ' + (R ? R.recours_h : 48) + ' h. Fausse identité ou double inscription (compte supprimé, accès fermé) : à traiter à part, avec Claude.', 'a')
+    + '<div id="a-err" class="err" role="alert"></div>';
+  modal('Nouvelle sanction', h, [{ label: 'Annuler', cls: 'ghost' }, { label: 'Appliquer la décision', cls: 'danger', onClick: async () => {
+    const type = v('sn-type'), p = { membre_id: Number(v('sn-m')), type, motif: v('sn-motif'), categorie: v('sn-cat') || null };
+    if (!p.membre_id) return erreurA('Choisissez le membre.');
+    if (!p.motif) return erreurA('Le motif est obligatoire : il est communiqué au joueur.');
+    if (type === 'suspension') { p.fin_jour = v('sn-fin'); if (!L.validD(p.fin_jour)) return erreurA('Indiquez le dernier jour de la suspension.'); }
+    if (type === 'retrait_statistiques') { p.match_id = Number(v('sn-mid')); if (!p.match_id) return erreurA('Indiquez le numéro du match.'); }
+    if (!confirm('Appliquer cette décision maintenant ?')) return false;
+    const { error: e } = await SB.rpc('sanctionner', { p });
+    if (e) return erreurA(erreurRpc(e));
+    toast('Décision appliquée. Le joueur est averti.'); chargerCompteursAdmin(); afficherSanctions(); return true;
+  } }]);
+  const maj = () => { const t = v('sn-type'); $('#sn-susp').hidden = t !== 'suspension'; $('#sn-match').hidden = t !== 'retrait_statistiques'; };
+  $('#sn-type').addEventListener('change', maj);
+  $('#sn-cat').addEventListener('change', e => { const o = e.target.selectedOptions[0]; if (o && o.dataset.t) { $('#sn-type').value = o.dataset.t; maj(); } });
+}
+function deciderSanctionUI(id, decision) {
+  const s = SANC.find(x => String(x.id) === String(id)); if (!s) return;
+  const h = (decision === 'trancher' ? '<p><b>Contestation :</b> ' + esc(s.contestation) + '</p><div class="choix"><label><input type="radio" name="sd" value="maintenir" checked> Maintenir la décision</label><label><input type="radio" name="sd" value="lever"> Lever la sanction (matchs recomptés)</label></div>'
+    : note('Lever la sanction : ses effets s’arrêtent et les matchs concernés sont recomptés.' + (s.type === 'exclusion' ? ' Le membre redevient actif avec sa période et son compte d’avant.' : ''), 'a'))
+    + '<label class="lab" for="sd-motif">Motif (communiqué au joueur)</label><textarea id="sd-motif" rows="2"></textarea><div id="a-err" class="err" role="alert"></div>';
+  modal(decision === 'trancher' ? 'Trancher la contestation' : 'Lever la sanction', h, [{ label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', onClick: async () => {
+    const d = decision === 'trancher' ? (document.querySelector('input[name="sd"]:checked') || {}).value : 'lever';
+    if (!v('sd-motif')) return erreurA('Le motif est obligatoire.');
+    const { error } = await SB.rpc('decider_sanction', { p_sanction: s.id, p_decision: d, p_motif: v('sd-motif') });
+    if (error) return erreurA(erreurRpc(error));
+    toast(d === 'lever' ? 'Sanction levée.' : 'Décision maintenue.'); chargerCompteursAdmin(); afficherSanctions(); return true;
+  } }]);
+}
+ACTIONS['sa2-nouvelle'] = () => nouvelleSanction();
+ACTIONS['sa2-trancher'] = b => deciderSanctionUI(b.dataset.id, 'trancher');
+ACTIONS['sa2-lever'] = b => deciderSanctionUI(b.dataset.id, 'lever');
+
+/* Mon compte : mes sanctions et contestation */
+async function afficherMesSanctions() {
+  const z = $('#mes-sanctions'); if (!z || !SB) return;
+  const { data, error } = await SB.from('sanctions').select('id, type, motif, debut, fin, match_id, recours_jusqu, contestation, conteste_le, statut, decision_recours, motif_recours').order('debut', { ascending: false });
+  if (error || !data || !data.length) { z.innerHTML = ''; return; }
+  z.innerHTML = '<h3 style="margin-top:12px">Décisions de Katana</h3>' + data.map(s => '<div class="card-l"><div class="t"><div><b>' + esc(TYPES_SANC[s.type]) + '</b><div class="small dim">' + periodeSanc(s) + (s.match_id ? ' · match M-' + s.match_id : '') + '</div></div>' + etatRecours(s) + '</div>'
+    + '<p class="small">Motif : ' + esc(s.motif) + '</p>' + (s.contestation ? '<p class="small dim">Votre contestation : ' + esc(s.contestation) + '</p>' : '') + (s.motif_recours ? '<p class="small">Réponse : ' + esc(s.motif_recours) + '</p>' : '')
+    + (s.statut === 'active' && !s.conteste_le && new Date(s.recours_jusqu) > new Date() ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-contester" data-id="' + s.id + '">Contester (jusqu’au ' + dateLoc(s.recours_jusqu) + ')</button></div>' : '') + '</div>').join('');
+}
+function contesterUI(id) {
+  modal('Contester la décision', '<p class="mute small">Expliquez à Katana pourquoi vous contestez. Une seule contestation est possible, avant la fin du délai. La décision reste appliquée en attendant sa réponse.</p><label class="lab" for="ct-txt">Votre explication</label><textarea id="ct-txt" rows="4"></textarea><div id="ct-err" class="err" role="alert"></div>',
+    [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer', onClick: async () => {
+      const err = $('#ct-err'); err.textContent = '';
+      if (!v('ct-txt')) { err.textContent = 'Écrivez votre explication.'; return false; }
+      const { error } = await SB.rpc('contester_sanction', { p_sanction: Number(id), p_texte: v('ct-txt') });
+      if (error) { err.textContent = erreurRpc(error); return false; }
+      toast('Contestation envoyée à Katana.'); afficherMesSanctions(); return true;
+    } }]);
+}
+ACTIONS['moi-contester'] = b => contesterUI(b.dataset.id);
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
