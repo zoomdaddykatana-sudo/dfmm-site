@@ -14,9 +14,9 @@ $$;
 grant usage on schema auth to anon, authenticated;
 grant execute on function auth.uid() to anon, authenticated;
 grant usage on schema public to anon, authenticated;
--- Droits par défaut de Supabase sur les nouvelles tables (la migration doit les retirer elle-même).
-alter default privileges in schema public grant all on tables to anon, authenticated, service_role;
-alter default privileges in schema public grant all on sequences to anon, authenticated, service_role;
+-- Droits par défaut comme sur un projet Supabase récent : rien d'automatique pour le rôle serveur (service_role).
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
 alter default privileges in schema public grant execute on functions to anon, authenticated, service_role;
 
 -- Stockage de fichiers (lot 2A) : imitation minimale de Supabase Storage.
