@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>LEAGUE UV — Victory Unite (DFMM)</title>
 <meta name="theme-color" content="#080A0A">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icone-192.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Exo+2:ital,wght@1,700;1,800&amp;display=swap">
@@ -258,6 +261,10 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 
 .foot{border-top:1px solid var(--line);padding:22px max(4vw,16px) 30px;color:var(--dim);font-size:14px;display:grid;gap:6px}
 .foot b{color:var(--mute)}
+
+/* Lot socle : connexion et version de test */
+input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px solid var(--line2);padding:9px 11px;font-size:16px;border-radius:0;color:var(--ink)}
+.banner.test{border-color:var(--red);background:var(--redbg);color:var(--ink)}
 </style>
 </head>
 <body>
@@ -276,6 +283,7 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
     <a href="#reglement" data-nav="reglement">Règlement</a>
     <a href="#processus" data-nav="processus">Processus</a>
     <a href="#participer" data-nav="participer">Participer</a>
+    <a href="#compte" data-nav="compte" id="nav-compte">Connexion</a>
     <a href="#admin" data-nav="admin" class="adm" id="nav-admin" hidden>Administration</a>
   </nav>
 </header>
@@ -758,6 +766,16 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
   </div>
 </section>
 
+<!-- ============ COMPTE ============ -->
+<section class="view" data-view="compte" hidden>
+  <div class="band">
+    <div class="wrap" style="max-width:560px">
+      <div class="sec-head"><h1>Mon compte</h1><p>Connexion des membres et de l’administrateur.</p></div>
+      <div id="compte-zone"></div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ ADMINISTRATION ============ -->
 <section class="view" data-view="admin" hidden>
   <div class="band">
@@ -845,6 +863,8 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
 </template>
+<script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
 <script id="pub-data" type="application/json">null</script>
 <script id="app-logic">/* LEAGUE UV — DFMM : règles de calcul, sans affichage (testables à part). */
 var L = (function () {
@@ -1325,7 +1345,7 @@ const S = {}; COLS.forEach(c => { S[c] = []; });
 const ETAT = { charge: {}, erreur: {} };
 const CAP = { db: null, user: null };
 let ADMIN = false, PRET = false, PUB = null, ED = null, MODE = '';
-const UI = { vue: 'accueil', tab: 'bord', tabRendu: '', grp: 'tous', archive: '', membre: '', rech: '', filtreMb: 'tous', filtreInsc: 'attente', clSaison: '', clType: 'Provisoire', clCoupure: '', lotSaison: '', matchSaison: '', jRech: '', jMax: 100, demType: 'inscription', msg: null };
+const UI = { vue: 'accueil', tab: 'parametres', tabRendu: '', grp: 'tous', archive: '', membre: '', rech: '', filtreMb: 'tous', filtreInsc: 'attente', clSaison: '', clType: 'Provisoire', clCoupure: '', lotSaison: '', matchSaison: '', jRech: '', jMax: 100, demType: 'inscription', msg: null };
 
 const capCache = {};
 function cap(nom) {
@@ -1435,6 +1455,7 @@ function rendre() {
   if (UI.vue === 'accueil') rendreAccueil();
   if (UI.vue === 'classements') rendreClassementsPublic();
   if (UI.vue === 'admin') rendreAdmin();
+  if (UI.vue === 'compte') rendreCompte();
 }
 function rendreChip() {
   const s = (ADMIN && saisonActive()) || (PUB && PUB.saison);
@@ -1633,7 +1654,8 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS = [['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
+const TABS_ACTIFS = ['parametres', 'acces'];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return S.inscriptions.filter(enCours).length;
@@ -1644,14 +1666,16 @@ function compteurTab(k) {
 }
 function rendreAdmin() {
   const att = $('#adm-attente');
-  if (!ADMIN) { att.hidden = false; $('#adm').hidden = true; att.textContent = PRET ? 'Accès réservé à l’organisation. Connectez-vous avec le compte propriétaire de cette page.' : 'Vérification de l’accès…'; return; }
+  if (!ADMIN) { att.hidden = false; $('#adm').hidden = true; att.innerHTML = PRET ? 'Accès réservé à l’organisation. <a href="#compte">Connectez-vous</a> avec le compte administrateur.' : 'Vérification de l’accès…'; return; }
+  if (TABS_ACTIFS.indexOf(UI.tab) < 0) { UI.tab = TABS_ACTIFS[0]; UI.tabRendu = ''; }
   att.hidden = true; $('#adm').hidden = false;
-  $('#adm-tabs').innerHTML = TABS.map(([k, l]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(l) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
+  $('#adm-tabs').innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, l]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(l) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
   const T = TAB[UI.tab] || TAB.bord;
   if (UI.tabRendu !== UI.tab) { $('#adm-shell').innerHTML = T.shell ? T.shell() : ''; UI.tabRendu = UI.tab; if (T.apres) T.apres(); }
   const errs = Object.keys(ETAT.erreur);
   $('#adm-body').innerHTML = (errs.length ? note('Lecture impossible : ' + esc(errs.map(k => k + ' (' + ETAT.erreur[k] + ')').join(', ')), 'r') : '') + (T.body ? T.body() : '');
   $('#adm-decisions').hidden = UI.tab !== 'decisions';
+  if (UI.tab === 'parametres') chargerHistorique();
 }
 function optSaisons(sel) { return S.saisons.slice().sort((a, b) => String(b.debut).localeCompare(String(a.debut))).map(s => '<option value="' + esc(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nom) + '</option>').join(''); }
 
@@ -2557,6 +2581,10 @@ const ACTIONS = {
   'cl-facebook': () => { if (UI.calc && UI.calc.agg.nbMatchs) modalTexte('Texte pour Facebook', 'Aperçu du classement calculé (publiez-le d’abord pour qu’il soit officiel).', texteFacebook(instantane(UI.calc, UI.clType))); else toast('Aucun classement à résumer.', true); },
   'cl-page': () => agir(async () => { await publierPage(null); }, 'Page publique mise à jour : elle se recharge.'),
   'j-plus': () => { UI.jMax += 100; rendreAdmin(); },
+  'deconnexion': () => seDeconnecter(),
+  'param-enregistrer': b => enregistrerParam(b.dataset.k),
+  'lien-creer': b => creerLien(b),
+  'lien-copier': () => copier($('#l-lien')),
   'sa-nouvelle': () => modifierSaison(''),
   'sa-modifier': b => modifierSaison(b.dataset.id),
   'sa-activer': b => agir(async () => { await majSys({ saison_active: b.dataset.id }); await noter('Saison', b.dataset.id, 'Saison rendue active', ''); }, 'Saison active changée.'),
@@ -2567,7 +2595,7 @@ const ACTIONS = {
 Object.keys(ACT_MB).forEach(k => { ACTIONS['mb-' + k] = b => ACT_MB[k](b.dataset.id); });
 
 /* ---------------- Navigation et démarrage ---------------- */
-const VUES = ['accueil', 'classements', 'reglement', 'processus', 'participer', 'admin'];
+const VUES = ['accueil', 'classements', 'reglement', 'processus', 'participer', 'compte', 'admin'];
 function router() {
   const h = (location.hash || '').slice(1);
   let vue = h, t = '';
@@ -2575,7 +2603,7 @@ function router() {
   if (VUES.indexOf(vue) < 0) vue = 'accueil';
   const chg = UI.vue !== vue;
   UI.vue = vue;
-  if (t && TAB[t] && UI.tab !== t) { UI.tab = t; UI.tabRendu = ''; if (t !== 'membres') UI.membre = ''; }
+  if (t && TAB[t] && TABS_ACTIFS.indexOf(t) >= 0 && UI.tab !== t) { UI.tab = t; UI.tabRendu = ''; if (t !== 'membres') UI.membre = ''; }
   $$('.view').forEach(s => { s.hidden = s.dataset.view !== vue; });
   $$('#nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === vue));
   rendre();
@@ -2618,22 +2646,156 @@ function lierEvenements() {
   document.addEventListener('input', saisie);
   document.addEventListener('change', saisie);
   $('#dem-form').addEventListener('submit', soumettreDemande);
+  document.addEventListener('submit', e => { if (e.target.id === 'f-connexion') seConnecter(e); else if (e.target.id === 'f-mdp') changerMdp(e); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) fermerModal(); });
 }
+/* ---------------- Supabase (lot socle) ---------------- */
+const CFG = window.DFMM_CONFIG || null;
+const SB = (window.supabase && CFG) ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
+const PARAM = {};
+let PARAMS = [], SESSION = null, RECUP = false;
+
+async function chargerParametres() {
+  if (!SB) return;
+  const { data, error } = await SB.from('parametres').select('*').order('section').order('ordre');
+  if (error) { console.warn('Paramètres illisibles :', error.message); return; }
+  PARAMS = data || [];
+  PARAMS.forEach(p => { PARAM[p.cle] = p.valeur; });
+}
+function rendreBandeau() {
+  const b = $('#banner');
+  if (!SB) { b.hidden = false; b.className = 'banner test'; b.textContent = 'Connexion à la base impossible pour le moment : vérifiez votre connexion Internet.'; return; }
+  if (PARAM.version_test === false) { b.hidden = true; return; }
+  b.hidden = false; b.className = 'banner test';
+  b.textContent = 'Version de test : ' + (PARAM.inscriptions_ouvertes === true ? '' : 'les inscriptions sont fermées et ') + 'aucune donnée n’est officielle.';
+}
+async function majSession(session) {
+  SESSION = session || null;
+  let adm = false;
+  if (SB && SESSION) { const { data } = await SB.rpc('est_admin'); adm = data === true; }
+  ADMIN = adm;
+  $('#nav-admin').hidden = !ADMIN;
+  $('#nav-compte').textContent = SESSION ? 'Mon compte' : 'Connexion';
+  UI.tabRendu = '';
+  rendre();
+}
+function rendreCompte() {
+  const z = $('#compte-zone');
+  if (!SB) { z.innerHTML = note('Connexion impossible pour le moment.', 'r'); return; }
+  if (!PRET) { z.innerHTML = '<p class="mute">Chargement…</p>'; return; }
+  if (SESSION && RECUP) {
+    z.innerHTML = '<form id="f-mdp" class="panel" novalidate><h3>Choisir un nouveau mot de passe</h3><label class="lab" for="n-mdp">Nouveau mot de passe (8 caractères au moins)</label><input type="password" id="n-mdp" autocomplete="new-password"><label class="lab" for="n-mdp2">Le même, une seconde fois</label><input type="password" id="n-mdp2" autocomplete="new-password"><div id="n-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Enregistrer</button></div></form>';
+    return;
+  }
+  if (SESSION) {
+    z.innerHTML = '<div class="panel"><h3>Vous êtes connecté</h3><p>' + esc(SESSION.user.email) + (ADMIN ? ' · administrateur' : '') + '</p><div class="row-btns">' + (ADMIN ? '<a class="btn" href="#admin">Administration</a>' : '') + '<button class="btn ghost" type="button" data-act="deconnexion">Se déconnecter</button></div></div>' + (ADMIN ? '' : note('L’espace membre arrive dans une prochaine version du site.'));
+    return;
+  }
+  z.innerHTML = '<form id="f-connexion" class="panel" novalidate><h3>Se connecter</h3><label class="lab" for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email"><label class="lab" for="c-mdp">Mot de passe</label><input type="password" id="c-mdp" autocomplete="current-password"><div id="c-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Se connecter</button></div><p class="mute small">Mot de passe oublié ? Écrivez à Katana sur Messenger : il vous enverra un lien pour en choisir un nouveau.</p></form>' + (PARAM.inscriptions_ouvertes === true ? '' : note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV.'));
+}
+async function seConnecter(e) {
+  e.preventDefault();
+  const err = $('#c-err'), email = v('c-email'), mdp = $('#c-mdp').value, btn = e.submitter;
+  err.textContent = '';
+  if (!email || !mdp) { err.textContent = 'Indiquez votre e-mail et votre mot de passe.'; return; }
+  if (btn) btn.disabled = true;
+  const { error } = await SB.auth.signInWithPassword({ email, password: mdp });
+  if (btn) btn.disabled = false;
+  if (error) err.textContent = 'Connexion impossible : e-mail ou mot de passe incorrect.';
+}
+async function changerMdp(e) {
+  e.preventDefault();
+  const a = $('#n-mdp').value, b = $('#n-mdp2').value, err = $('#n-err');
+  err.textContent = '';
+  if (a.length < 8) { err.textContent = 'Le mot de passe doit faire 8 caractères au moins.'; return; }
+  if (a !== b) { err.textContent = 'Les deux mots de passe ne sont pas identiques.'; return; }
+  const { error } = await SB.auth.updateUser({ password: a });
+  if (error) { err.textContent = 'Enregistrement impossible : ' + error.message; return; }
+  RECUP = false; toast('Nouveau mot de passe enregistré.'); rendreCompte();
+}
+async function seDeconnecter() { await SB.auth.signOut(); RECUP = false; toast('Vous êtes déconnecté.'); location.hash = '#accueil'; }
+
+/* ----- Administration : paramètres ----- */
+function champParam(p) {
+  const id = 'p-' + p.cle, x = p.valeur;
+  if (p.type === 'booleen') return '<select id="' + id + '"><option value="true"' + (x === true ? ' selected' : '') + '>Oui</option><option value="false"' + (x === false ? ' selected' : '') + '>Non</option></select>';
+  if (p.type === 'jour') return '<select id="' + id + '">' + JOURS.map((j, i) => '<option value="' + i + '"' + (x === i ? ' selected' : '') + '>' + j + '</option>').join('') + '</select>';
+  if (p.type === 'heure') return '<input type="time" id="' + id + '" value="' + esc(x) + '">';
+  if (p.type === 'texte') return '<input type="text" id="' + id + '" value="' + esc(x) + '">';
+  return '<input type="number" id="' + id + '" min="0" step="' + (p.type === 'decimal' ? '0.1' : '1') + '" inputmode="decimal" value="' + esc(x) + '">';
+}
+function lireParam(p) {
+  const x = $('#p-' + p.cle).value;
+  if (p.type === 'booleen') return x === 'true';
+  if (p.type === 'jour') return Number(x);
+  if (p.type === 'heure' || p.type === 'texte') return x;
+  const n = Number(String(x).replace(',', '.'));
+  return x === '' || isNaN(n) ? null : n;
+}
+TAB.parametres = {
+  body: () => {
+    if (!PARAMS.length) return note('Paramètres introuvables : la migration 0001 n’a pas encore été exécutée dans Supabase.', 'r');
+    const sections = PARAMS.map(p => p.section).filter((x, i, a) => a.indexOf(x) === i);
+    return note('Chaque changement s’applique tout de suite et reste dans l’historique.') + sections.map(sec => '<div class="panel"><h3>' + esc(sec) + '</h3><div class="scroll"><table><tbody>' + PARAMS.filter(p => p.section === sec).map(p => '<tr><td>' + esc(p.libelle) + '</td><td style="min-width:140px">' + champParam(p) + '</td><td><button class="btn sm" type="button" data-act="param-enregistrer" data-k="' + esc(p.cle) + '">Enregistrer</button></td></tr>').join('') + '</tbody></table></div></div>').join('') + '<div class="panel"><h3>Derniers changements</h3><div id="param-hist" class="mute small">Chargement…</div></div>';
+  }
+};
+async function enregistrerParam(cle) {
+  const p = PARAMS.find(x => x.cle === cle); if (!p) return;
+  const val = lireParam(p);
+  if (val === null) { toast('Valeur invalide.', true); return; }
+  const { data, error } = await SB.from('parametres').update({ valeur: val }).eq('cle', cle).select();
+  if (error) { toast('Refusé : ' + error.message, true); return; }
+  if (!data || !data.length) { toast('Modification refusée : droits insuffisants.', true); return; }
+  p.valeur = data[0].valeur; PARAM[cle] = p.valeur;
+  toast('Paramètre enregistré.'); rendreBandeau(); chargerHistorique();
+}
+async function chargerHistorique() {
+  const z = $('#param-hist'); if (!z || !SB) return;
+  const { data, error } = await SB.from('parametres_historique').select('*').order('modifie_le', { ascending: false }).limit(15);
+  if (!$('#param-hist')) return;
+  if (error) { z.textContent = 'Historique illisible : ' + error.message; return; }
+  const lib = k => (PARAMS.find(p => p.cle === k) || {}).libelle || k;
+  z.innerHTML = data.length ? '<ul class="taches">' + data.map(h => '<li><span>' + esc(lib(h.cle)) + ' : ' + esc(JSON.stringify(h.ancienne_valeur)) + ' → ' + esc(JSON.stringify(h.nouvelle_valeur)) + '</span><span class="dim nowrap">' + esc(new Date(h.modifie_le).toLocaleString('fr-FR', { timeZone: 'Indian/Antananarivo' })) + '</span></li>').join('') + '</ul>' : 'Aucun changement pour l’instant.';
+}
+
+/* ----- Administration : accès des joueurs ----- */
+TAB.acces = {
+  shell: () => '<div class="panel"><h3>Lien de réinitialisation du mot de passe</h3><p class="mute small">Aucun e-mail n’est envoyé. Copiez le lien et envoyez-le au joueur en privé sur Messenger. Il ne sert qu’une fois et expire vite (1 heure par défaut).</p><label class="lab" for="l-email">E-mail du compte du joueur</label><input type="email" id="l-email" autocomplete="off"><div class="row-btns"><button class="btn" type="button" data-act="lien-creer">Créer le lien</button></div><div id="l-sortie"></div></div>',
+  body: () => ''
+};
+async function creerLien(b) {
+  const email = v('l-email'), out = $('#l-sortie');
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { out.innerHTML = '<p class="err">Adresse e-mail invalide.</p>'; return; }
+  b.disabled = true; out.innerHTML = '<p class="mute">Création du lien…</p>';
+  const { data, error } = await SB.functions.invoke('lien-reinitialisation', { body: { email, redirectTo: location.origin + location.pathname } });
+  b.disabled = false;
+  if (error || !data || !data.lien) {
+    let m = data && data.erreur;
+    if (!m && error && error.context && typeof error.context.json === 'function') { try { m = (await error.context.json()).erreur; } catch (e) { m = ''; } }
+    out.innerHTML = '<p class="err">' + esc(m || 'Création impossible. La fonction « lien-reinitialisation » est-elle installée dans Supabase ?') + '</p>';
+    return;
+  }
+  out.innerHTML = '<label class="lab" for="l-lien">Lien à envoyer au joueur</label><textarea id="l-lien" class="msg-out" rows="4" readonly>' + esc(data.lien) + '</textarea><div class="row-btns"><button class="btn" type="button" data-act="lien-copier">Copier le lien</button></div>';
+}
+
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
   try { PUB = JSON.parse($('#pub-data').textContent || 'null'); } catch (e) { PUB = null; }
   initParticiper();
   lierEvenements();
   router();
-  if (await attendreClaude()) {
-    CAP.db = await cap('db');
-    CAP.user = await cap('user');
-    try { ADMIN = !!(CAP.db && CAP.user && await CAP.user.canEdit()); } catch (e) { ADMIN = false; }
-  }
-  PRET = true;
-  $('#nav-admin').hidden = !ADMIN;
-  if (CAP.db) { if (ADMIN) COLS.forEach(abonner); else abonner('publications'); }
+  if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
+  if (SB) {
+    await chargerParametres();
+    SB.auth.onAuthStateChange((evt, session) => {
+      if (evt === 'PASSWORD_RECOVERY') { RECUP = true; location.hash = '#compte'; }
+      setTimeout(() => { majSession(session); }, 0);
+    });
+    const { data } = await SB.auth.getSession();
+    PRET = true;
+    await majSession(data.session);
+  } else PRET = true;
+  rendreBandeau();
   router();
 }
 demarrer();
