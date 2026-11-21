@@ -16,7 +16,7 @@ for (const f of fs.readdirSync(dm).sort()) {
 }
 PARAMS.inscriptions_ouvertes.valeur = true;
 const base = { parametres: Object.values(PARAMS), membres: [], periodes: [], comptes_jeu: [], comptes_periodes: [], pseudos_historique: [],
-  saisons: [], sanctions: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
+  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
 for (let i = 1; i <= 8; i++) {
   base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', date_approbation: '2026-11-18T00:00:00+03:00' });
   base.periodes.push({ id: 100 + i, membre_id: i, debut: '2026-11-17T21:00:00Z', fin: null });
@@ -153,6 +153,38 @@ srv.listen(8765, async () => {
       await p.click('[data-act="sa2-lever"]'); await p.fill('#sd-motif', 'Erreur'); await p.click('#modal-f button:has-text("Enregistrer")'); await p.waitForTimeout(600);
       if (!/Levée/.test(await p.textContent('#sa2-liste'))) throw new Error('pas levée');
       const c = await premierCl(); if (!/Faux 8/.test(c)) throw new Error('MOST Eliminator : ' + c.slice(0, 200));
+      await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
+    });
+    await etape('litige : match mis en attente → dossier ouvert', async () => {
+      await p.click('[data-act="m-ouvrir"]'); await p.waitForTimeout(500);
+      await p.fill('#e-motif', 'Vérification'); await p.click('#modal-f button:has-text("Repasser en brouillon")'); await p.waitForTimeout(600);
+      await p.fill('#e-motif', 'Deux captures différentes'); await p.click('#modal-f button:has-text("Mettre en attente")'); await p.waitForTimeout(600);
+      if (!/En attente/.test(await p.textContent('#modal-t'))) throw new Error(await p.textContent('#modal-t'));
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(300);
+      await p.goto('http://localhost:8765/#admin-litiges'); await p.waitForTimeout(600);
+      const t = await p.textContent('#li-liste'); if (!/n° \d+/.test(t) || !/En cours/.test(t)) throw new Error(t.slice(0, 200));
+      if (!/Litiges1/.test((await p.textContent('#adm-tabs')).replace(/\s+/g, ''))) throw new Error('compteur ' + await p.textContent('#adm-tabs'));
+    });
+    await etape('litige : qualifier, convoquer, écrire', async () => {
+      await p.click('[data-act="li-ouvrir"]'); await p.waitForTimeout(600);
+      await p.check('input[name="li-q"][value="oui"]'); await p.fill('#li-faits', 'Scores différents'); await p.click('[data-act="li-qualifier"]'); await p.waitForTimeout(500);
+      await p.selectOption('#li-mb', '1'); await p.selectOption('#li-role', 'responsable'); await p.click('[data-act="li-convoquer"]'); await p.waitForTimeout(500);
+      await p.fill('#li-msg', 'Expliquez-moi la différence.'); await p.click('[data-act="li-ecrire"]'); await p.waitForTimeout(500);
+      const t = await p.textContent('#modal-b');
+      if (!/Responsable : DFMM-1/.test(t) || !/Expliquez-moi la différence/.test(t) || !/à confirmer avant/.test(t)) throw new Error(t.slice(0, 400));
+    });
+    await etape('litige : trancher (vraie capture), discussion fermée', async () => {
+      await p.check('input[name="li-cap"]'); await p.check('input[name="li-dec"][value="capture_retenue"]'); await p.fill('#li-motif', 'Capture confirmée');
+      await p.click('[data-act="li-trancher"]'); await p.waitForTimeout(800);
+      const t = await p.textContent('#modal-b');
+      if (!/Discussion fermée/.test(t) || !/Vraie capture retenue/.test(t)) throw new Error(t.slice(0, 400) + ' | ' + await p.textContent('#li-err'));
+      if ((await p.evaluate(() => window.FAUSSE_BASE.matchs[0].statut)) !== 'valide') throw new Error('match non validé');
+    });
+    await etape('litige : synthèse validée, dossier archivé', async () => {
+      await p.fill('#li-syn', 'La capture reçue était la bonne.'); await p.click('[data-act="li-synthese"]'); await p.waitForTimeout(700);
+      const t = await p.textContent('#modal-b'); if (!/Synthèse validée/.test(t)) throw new Error(t.slice(-300));
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(400);
+      if (!/Archivé/.test(await p.textContent('#li-liste'))) throw new Error('pas archivé');
       await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
     });
     await etape('repasser en brouillon (motif obligatoire)', async () => {
