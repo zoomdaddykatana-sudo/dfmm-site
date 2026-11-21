@@ -1016,7 +1016,7 @@ function rendre() {
   if (UI.vue === 'inscription') rendreInscription();
 }
 function rendreChip() {
-  const s = (ADMIN && saisonActive()) || (PUB && PUB.saison);
+  const s = (ADMIN && saisonActiveSB()) || (PUB && PUB.saison);
   const el = $('#saison-chip');
   if (s && s.nom) { el.hidden = false; el.innerHTML = (/^saison/i.test(s.nom) ? '' : 'Saison ') + '<b>' + esc(s.nom) + '</b>'; } else el.hidden = true;
 }
@@ -1057,7 +1057,7 @@ function calHtml() {
   return '<dl class="kv"><dt>Saison</dt><dd>' + esc(s.nom) + '</dd><dt>Dates</dt><dd>du ' + fD(s.debut) + ' au ' + fD(s.fin) + '</dd><dt>Prochain classement</dt><dd>' + (prochaine ? fD(prochaine) : '—') + '</dd>' + base + '</dl>';
 }
 function pubAffichee() {
-  if (UI.archive) { const a = S.publications.find(p => p.id === UI.archive); if (a) return a; }
+  if (UI.archive) { const a = PUBS.find(p => String(p.id) === String(UI.archive)); if (a) return a; }
   return PUB && PUB.pub || null;
 }
 function defCat(c, p) {
@@ -1081,7 +1081,7 @@ function carteCl(c, p, toutes) {
 function rendreClassementsPublic() {
   const p = pubAffichee();
   $('#cl-meta').innerHTML = p ? esc(libPub(p)) + '. Matchs terminés avant le ' + fDT(p.coupure) + ' : ' + p.nb_matchs + ' match(s), ' + p.nb_joueurs + ' joueur(s) classé(s).' + (p.type !== 'Final' ? ' Réclamations en privé jusqu’au ' + fDT(p.recours_jusqu) + '.' : '') : 'Aucun classement publié pour le moment. Le premier classement provisoire sera publié un dimanche, après les premiers matchs validés.';
-  const arch = S.publications.slice().sort((a, b) => String(b.publie_le).localeCompare(String(a.publie_le)));
+  const arch = PUBS.slice();
   $('#cl-archives').innerHTML = arch.length > 1 ? '<label class="lab" for="cl-arch">Afficher un autre classement</label><select id="cl-arch" style="max-width:420px;margin-bottom:14px"><option value="">Dernier classement publié</option>' + arch.map(a => '<option value="' + esc(a.id) + '"' + (UI.archive === a.id ? ' selected' : '') + '>' + esc(libPub(a)) + '</option>').join('') + '</select>' : '';
   $$('#cl-seg button').forEach(b => b.classList.toggle('on', b.dataset.grp === UI.grp));
   if (!p) { $('#cl-body').innerHTML = '<div class="cl-card"><div class="vide-cl">Les classements apparaîtront ici après la première publication.</div></div>'; return; }
@@ -1221,7 +1221,7 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'saison', 'acces', 'sauvegarde'];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'saison', 'acces', 'sauvegarde'];
 const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
@@ -1745,91 +1745,6 @@ function reduireImage(file, max, q) {
 }
 function extraireJSON(t) { const a = String(t).indexOf('{'), b = String(t).lastIndexOf('}'); return a >= 0 && b > a ? String(t).slice(a, b + 1) : t; }
 
-/* ----- Classements (calcul, contrôle final, publication) ----- */
-function coupureParDefaut(s, type) {
-  if (type === 'Final') { const lim = L.finCompetition(s); return lim ? L.addDays(lim, 1) + 'T00:00' : now(); }
-  return L.derniereCoupure(now(), s) || now();
-}
-TAB.classements = {
-  shell: () => '<div class="panel"><div class="grid-f"><div><label class="lab" for="cl-s">Saison</label><select id="cl-s">' + optSaisons(UI.clSaison || (saisonActive() || {}).id) + '</select></div><div><label class="lab" for="cl-type">Type</label><select id="cl-type"><option' + (UI.clType === 'Provisoire' ? ' selected' : '') + '>Provisoire</option><option' + (UI.clType === 'Final' ? ' selected' : '') + '>Final</option></select></div><div><label class="lab" for="cl-coupure">Coupure : matchs terminés avant</label><input type="datetime-local" id="cl-coupure"></div></div><p class="dim small">Par défaut : le dernier samedi à 17 h pour un provisoire, le lendemain de la date limite des matchs pour le classement final.</p><h3 style="margin-top:12px">Vérifications manuelles avant publication</h3><label class="coche"><input type="checkbox" id="cl-v1"><span>Les preuves des matchs inclus ont été vérifiées.</span></label><label class="coche"><input type="checkbox" id="cl-v2"><span>Les réclamations en cours ont été traitées ou n’affectent pas ce classement.</span></label><label class="coche"><input type="checkbox" id="cl-v3"><span>La publication ne contient aucune donnée personnelle (seulement noms de gamer, pseudos, matricules et statistiques).</span></label><div class="row-btns"><button class="btn" type="button" data-act="cl-publier">Publier ce classement</button><button class="btn ghost" type="button" data-act="cl-facebook">Texte pour Facebook</button><button class="btn ghost" type="button" data-act="cl-page">Mettre à jour la page publique</button></div></div>',
-  apres: () => { const s = saisonPar($('#cl-s').value); UI.clSaison = s ? s.id : ''; if (s) $('#cl-coupure').value = UI.clCoupure || coupureParDefaut(s, UI.clType); },
-  body: () => {
-    const s = saisonPar(UI.clSaison) || saisonActive();
-    if (!s) return note('Créez d’abord une saison.', 'a');
-    const coupure = UI.clCoupure || coupureParDefaut(s, UI.clType);
-    const cx = ctx(), agg = L.agreger(cx, s, coupure), cl = L.classer(agg, cx.membres);
-    UI.calc = { s, coupure, agg, cl };
-    const n = S.publications.filter(p => p.saison && p.saison.id === s.id && p.type === UI.clType).length + 1;
-    let h = '<div class="kpis">' + [[agg.nbMatchs, 'matchs comptés'], [cl.pop.length, 'joueurs classés'], [cl.seuil, 'seuil BEST (matchs)'], [fN(cl.q1, 2), 'Q1 du score moyen']].map(([a, b]) => '<div class="kpi"><b>' + a + '</b><span>' + b + '</span></div>').join('') + '</div>';
-    h += '<p class="mute">Aperçu du classement ' + UI.clType.toLowerCase() + (UI.clType === 'Provisoire' ? ' n°' + n : '') + ' : matchs validés de ' + esc(s.nom) + ' terminés avant le ' + fDT(coupure) + '.</p>';
-    h += '<div class="panel"><h3>Contrôle final automatique</h3><ul class="chk">' + controleFinal(s, coupure, cl).map(([ok, t]) => '<li class="' + (ok === true ? 'o' : ok === null ? 'w' : 'b') + '">' + esc(t) + '</li>').join('') + '</ul></div>';
-    const pseudo = { type: UI.clType, seuil: cl.seuil, q1: cl.q1 };
-    h += '<div class="cl-grid">' + cl.cats.map(c => carteCl({ key: c.key, kind: c.kind, label: c.label, statut: c.statut, laureats: c.laureats, lignes: c.lignes.map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomJoueur(l.j.mat), pseudos: pseudosJoueur(l.j.mat), val: l.val, n: l.j.n })) }, pseudo, true)).join('') + '</div>';
-    return h;
-  }
-};
-function controleFinal(s, coupure, cl) {
-  const cx = ctx(), lim = L.finCompetition(s), items = [];
-  const inclus = S.matchs.filter(m => m.statut === 'Validé' && m.saison_id === s.id && L.validDT(m.fin) && m.fin < coupure && (!lim || m.fin.slice(0, 10) <= lim) && (!s.debut || m.fin.slice(0, 10) >= s.debut));
-  const pb = inclus.filter(m => L.controlesMatch(m, cx, s).bloquants.length);
-  items.push([!pb.length, pb.length ? 'Matchs validés qui ne passent plus les contrôles : ' + pb.map(m => m.id).join(', ') + '. Repassez-les en brouillon pour corriger.' : 'Les ' + inclus.length + ' match(s) inclus passent les contrôles : effectif, équilibre, 30 % de membres, doublons et valeurs.']);
-  const multi = S.membres.filter(m => comptesDe(m.id).filter(c => c.statut === 'Actif').length > 1);
-  items.push([!multi.length, multi.length ? 'Plusieurs comptes actifs : ' + multi.map(m => m.id).join(', ') + '.' : 'Un seul compte actif par matricule.']);
-  const sansCap = inclus.filter(m => !(m.captures && m.captures.length));
-  items.push([sansCap.length ? null : true, sansCap.length ? sansCap.length + ' match(s) sans capture archivée : vérifiez que les preuves sont conservées.' : 'Une capture archivée pour chaque match inclus.']);
-  items.push([true, 'Seules les lignes comptabilisées des matchs validés sont additionnées, zéros compris.']);
-  items.push([true, 'Seuil BEST : médiane des matchs joués arrondie au supérieur = ' + cl.seuil + '. Q1 sur les ' + cl.pop.length + ' joueurs classés, y compris sous le seuil = ' + fN(cl.q1, 2) + '.']);
-  const na = cl.cats.filter(c => c.statut === 'Non attribué').map(c => c.label);
-  items.push([true, na.length ? 'Égalité parfaite, distinction non attribuée : ' + na.join(', ') + '.' : 'Aucune égalité parfaite en tête.']);
-  return items;
-}
-function instantane(calc, type) {
-  const { s, coupure, agg, cl } = calc, t = now();
-  const numeroP = S.publications.filter(p => p.saison && p.saison.id === s.id && p.type === type).length + 1;
-  return {
-    saison: { id: s.id, nom: s.nom, debut: s.debut, fin: s.fin }, type, numero: numeroP, publie_le: t, coupure,
-    recours_jusqu: L.addMinutes(t, L.regles(s).recours_h * 60), nb_matchs: agg.nbMatchs, nb_joueurs: cl.pop.length, seuil: cl.seuil, q1: cl.q1,
-    categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut, laureats: c.laureats.map(j => ({ mat: j.mat, nom: nomJoueur(j.mat), val: L.valeur(c, j) })), lignes: c.lignes.slice(0, 10).map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomJoueur(l.j.mat), pseudos: pseudosJoueur(l.j.mat), val: l.val, n: l.j.n })) }))
-  };
-}
-async function publierClassement() {
-  const calc = UI.calc; if (!calc) return;
-  if (!coche('cl-v1') || !coche('cl-v2') || !coche('cl-v3')) { toast('Cochez les trois vérifications manuelles avant de publier.', true); return; }
-  if (controleFinal(calc.s, calc.coupure, calc.cl).some(([ok]) => ok === false)) { toast('Contrôle final non satisfait : corrigez les points en rouge avant de publier.', true); return; }
-  if (!calc.agg.nbMatchs) { toast('Aucun match validé avant la coupure : rien à publier.', true); return; }
-  const p = instantane(calc, UI.clType);
-  const id = 'P-' + calc.s.id + '-' + (p.type === 'Final' ? 'F' : 'P') + p.numero;
-  const ok = await agir(async () => {
-    await ecrire('publications', id, p);
-    await noter('Publication', id, 'Classement ' + p.type.toLowerCase() + (p.type === 'Final' ? '' : ' n°' + p.numero) + ' publié (' + p.nb_matchs + ' matchs, ' + p.nb_joueurs + ' joueurs)', 'Coupure : ' + fDT(p.coupure));
-  }, 'Classement enregistré.');
-  if (!ok) return;
-  try { await publierPage(Object.assign({}, p, { id })); toast('Classement publié : la page publique se recharge.'); }
-  catch (e) { modalTexte('Classement enregistré', 'Le classement est enregistré, mais la page publique n’a pas pu être mise à jour automatiquement (' + esc((e && e.message) || 'erreur') + '). Demandez à Claude de la republier. En attendant, voici le texte à partager :', texteFacebook(p)); }
-}
-function texteFacebook(p) {
-  const l = ['LEAGUE UV · ' + (p.type === 'Final' ? 'CLASSEMENT FINAL' : 'CLASSEMENT PROVISOIRE N°' + p.numero), (p.saison ? p.saison.nom + ' · ' : '') + 'matchs terminés avant le ' + fDT(p.coupure), ''];
-  p.categories.forEach(c => { l.push(c.label + ' : ' + (c.laureats.length ? c.laureats.map(x => x.nom).join(' et ') + ' (' + fV(c.kind, c.laureats[0].val) + ')' + (c.laureats.length > 1 ? ', co-lauréats' : '') : 'aucun joueur éligible')); });
-  l.push('', p.type === 'Final' ? 'Félicitations à tous les participants.' : 'Réclamations en message privé jusqu’au ' + fDT(p.recours_jusqu) + '.', '', '#DeltaForceMobile #DeltaForceMadagascar #LeagueUV #MadagascarGaming');
-  return l.join('\n');
-}
-function infoSaison(s) { const R = L.regles(s); return { id: s.id, nom: s.nom, debut: s.debut, fin: s.fin, statut: s.statut, premier_provisoire: s.premier_provisoire || '', periodicite: R.periodicite, coupure_heure: R.coupure_heure, limite: L.finCompetition(s), canal: s.canal || '' }; }
-function donneesPubliques(p) {
-  const s = saisonActive();
-  const derniere = p || S.publications.slice().sort((a, b) => String(b.publie_le).localeCompare(String(a.publie_le)))[0] || (PUB && PUB.pub) || null;
-  return { v: 1, maj: now(), saison: s ? infoSaison(s) : (PUB && PUB.saison) || null, pub: derniere };
-}
-function regenerer(data) {
-  const SO = '<' + 'script', SF = '</' + 'script>';
-  const json = JSON.stringify(data).replace(/</g, '\\u003c').split(String.fromCharCode(8232)).join('\\u2028').split(String.fromCharCode(8233)).join('\\u2029');
-  return '<!DOCTYPE html>\n<html lang="fr">\n<head>\n' + HEAD + '\n<style id="app-style">' + $('#app-style').textContent + '</style>\n</head>\n<body>\n<div id="app"></div>\n<template id="tpl">' + $('#tpl').innerHTML + '</template>\n' + SO + ' id="pub-data" type="application/json">' + json + SF + '\n' + SO + ' id="app-logic">' + $('#app-logic').textContent + SF + '\n' + SO + ' id="app-script">' + $('#app-script').textContent + SF + '\n</body>\n</html>\n';
-}
-async function publierPage(p) {
-  const art = await cap('artifact');
-  if (!art || typeof art.publish !== 'function') throw new Error('mise à jour de la page indisponible ici');
-  await art.publish(regenerer(donneesPubliques(p)));
-}
-
 /* ----- Titres et lots ----- */
 TAB.lots = {
   shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="lo-s">Saison</label><select id="lo-s">' + optSaisons(UI.lotSaison || (saisonActive() || {}).id) + '</select></div></div>' + note('Calcul sur tous les matchs validés de la saison (avant la date limite des matchs). À confirmer sur le classement final publié. Les lots ne sont jamais publiés : cochez seulement les catégories dont le lot est confirmé.', 'a'),
@@ -1906,9 +1821,6 @@ const ACTIONS = {
   'mb-retour': () => { UI.membre = ''; rendreAdmin(); },
   'cr-saisir': () => saisirCreneau(),
   'cr-decider': b => deciderCreneau(b.dataset.id),
-  'cl-publier': () => publierClassement(),
-  'cl-facebook': () => { if (UI.calc && UI.calc.agg.nbMatchs) modalTexte('Texte pour Facebook', 'Aperçu du classement calculé (publiez-le d’abord pour qu’il soit officiel).', texteFacebook(instantane(UI.calc, UI.clType))); else toast('Aucun classement à résumer.', true); },
-  'cl-page': () => agir(async () => { await publierPage(null); }, 'Page publique mise à jour : elle se recharge.'),
   'j-plus': () => { UI.jMax += 100; rendreAdmin(); },
   'deconnexion': () => seDeconnecter(),
   'param-enregistrer': b => enregistrerParam(b.dataset.k),
@@ -1961,9 +1873,6 @@ function lierEvenements() {
     if (t.id === 'j-rech') { UI.jRech = t.value; UI.jMax = 100; $('#adm-body').innerHTML = TAB.journal.body(); return; }
     if (e.type !== 'change') return;
     if (t.id === 'ma-s') { UI.matchSaison = t.value; rendreAdmin(); }
-    else if (t.id === 'cl-s') { UI.clSaison = t.value; UI.clCoupure = ''; const s = saisonPar(t.value); if (s) $('#cl-coupure').value = coupureParDefaut(s, UI.clType); rendreAdmin(); }
-    else if (t.id === 'cl-type') { UI.clType = t.value; UI.clCoupure = ''; const s = saisonPar(UI.clSaison) || saisonActive(); if (s) $('#cl-coupure').value = coupureParDefaut(s, UI.clType); rendreAdmin(); }
-    else if (t.id === 'cl-coupure') { UI.clCoupure = L.normDT(t.value); rendreAdmin(); }
     else if (t.id === 'lo-s') { UI.lotSaison = t.value; rendreAdmin(); }
     else if (t.dataset.act === 'lot-toggle') {
       const s = saisonPar(UI.lotSaison) || saisonActive(); if (!s) return;
@@ -2633,7 +2542,7 @@ async function chargerContexte(saisonId) {
   const err = a.error || b.error || c.error; if (err) throw new Error(err.message);
   const per = l => (l || []).map(p => ({ debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' }));
   const membres = {}, parId = {}, comptes = {};
-  (a.data || []).forEach(m => { const mat = matTxt(m.matricule); parId[m.id] = mat; membres[mat] = { matricule: mat, id: m.id, nom_gamer: m.nom_gamer, statut: m.statut, periodes: per(m.periodes), suspensions: [] }; });
+  (a.data || []).forEach(m => { const mat = matTxt(m.matricule); parId[m.id] = mat; membres[mat] = { matricule: mat, id: m.id, nom_gamer: m.nom_gamer, statut: STATUTS_MB[m.statut] || m.statut, periodes: per(m.periodes), suspensions: [] }; });
   (b.data || []).forEach(x => { if (!parId[x.membre_id]) return; comptes[String(x.id)] = { id: String(x.id), matricule: parId[x.membre_id], uid: x.uid, pseudo: x.pseudo, statut: x.statut, periodes: per(x.comptes_periodes), pseudos: (x.pseudos_historique || []).map(p => ({ pseudo: p.pseudo, debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' })) }; });
   CX = { membres, comptes, parId, comptesList: Object.values(comptes), creneaux: {}, matchsList: [] };
   CX.matchsList = (c.data || []).map(matchJS);
@@ -2922,6 +2831,164 @@ async function modalConsigne() {
 }
 document.addEventListener('change', e => { if (e.target && e.target.id === 'ma-s') { UI.matchSaison = e.target.value; afficherMatchs(); } });
 
+/* ----- Lot 3C : classements calculés sur les matchs validés et publiés dans Supabase ----- */
+let PUBS = [], CLC = null;
+function pubDepuisLigne(r) {
+  const c = r.contenu || {};
+  return Object.assign({}, c, { id: r.id, saison_id: r.saison_id, type: r.type === 'final' ? 'Final' : 'Provisoire', numero: r.numero, publie_le: isoLoc(r.publie_le), coupure: isoLoc(r.coupure) });
+}
+async function chargerPublic() {
+  if (!SB) return;
+  const [a, b] = await Promise.all([
+    SB.from('publications').select('*').order('publie_le', { ascending: false }),
+    SB.from('saisons').select('*').eq('active', true)
+  ]);
+  if (a.error || b.error) { console.warn('Classements illisibles :', (a.error || b.error).message); return; }
+  PUBS = (a.data || []).map(pubDepuisLigne);
+  const s = (b.data || [])[0] || null;
+  PUB = { saison: s ? saisonJS(s) : null, pub: (s && PUBS.find(p => String(p.saison_id) === String(s.id))) || PUBS[0] || null };
+}
+function nomMat(mat) { const m = CX && CX.membres[mat]; return (m && m.nom_gamer) || mat; }
+function pseudosMat(mat) { return CX ? CX.comptesList.filter(c => c.matricule === mat && c.statut !== 'remplace').map(c => c.pseudo) : []; }
+function datePubDefaut(s, R) {
+  const auj = now().slice(0, 10);
+  const pr = L.publicationsPrevues(s, auj, 1, R)[0];
+  if (pr) return pr;
+  let d = auj; for (let k = 0; k < 7 && L.dow(d) !== R.publication_jour; k++) d = L.addDays(d, 1);
+  return d;
+}
+
+TAB.classements = {
+  shell: () => '<div class="panel"><div class="grid-f"><div><label class="lab" for="cl-s">Saison</label><select id="cl-s"></select></div>'
+    + '<div><label class="lab" for="cl-type">Type</label><select id="cl-type"><option value="Provisoire">Provisoire</option><option value="Final">Final</option></select></div>'
+    + '<div id="cl-date-z"><label class="lab" for="cl-date">Date de publication (un dimanche)</label><input type="date" id="cl-date"></div></div>'
+    + '<p class="mute small" id="cl-coupure-txt"></p><div class="row-btns"><button class="btn" type="button" data-act="cl-calculer">Calculer le classement</button></div></div>'
+    + '<div id="cl-res"></div><div class="panel"><h3>Classements publiés</h3><div id="cl-liste"><p class="mute">Chargement…</p></div></div>',
+  body: () => '',
+  charger: initClassements
+};
+async function initClassements() {
+  try { await chargerSaisons(); } catch (e) { $('#cl-res').innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+  const R = reglesSite();
+  if (!SA.length) { $('#cl-res').innerHTML = note('Créez d’abord la saison (onglet « Saison »).', 'a'); return; }
+  if (!UI.clSaison || !saisonSB(UI.clSaison)) UI.clSaison = (saisonActiveSB() || SA[0]).id;
+  $('#cl-s').innerHTML = optSaisonsSB(UI.clSaison);
+  $('#cl-type').value = UI.clType === 'Final' ? 'Final' : 'Provisoire';
+  if (R) $('#cl-date').value = datePubDefaut(saisonJS(saisonSB(UI.clSaison)), R);
+  majCoupureTxt(); afficherPubliees();
+}
+function parametresCalcul() {
+  const R = reglesSite(), s = saisonJS(saisonSB(UI.clSaison)), type = v('cl-type') || 'Provisoire';
+  if (type === 'Final') return { R, s, type, coupure: L.coupureFinale(s), lim: now(), datePub: L.publicationFinale(s, R), finVerif: L.finVerificationFinale(s, R) };
+  const d = v('cl-date');
+  return { R, s, type, datePub: d, coupure: L.validD(d) ? L.coupurePour(d, R) : null, lim: L.validD(d) ? L.coupurePour(d, R) : null };
+}
+function majCoupureTxt() {
+  const z = $('#cl-coupure-txt'); if (!z) return;
+  const R = reglesSite(); if (!R || !UI.clSaison) { z.textContent = ''; return; }
+  const P = parametresCalcul();
+  $('#cl-date-z').hidden = P.type === 'Final';
+  z.innerHTML = P.type === 'Final'
+    ? 'Classement final : tous les matchs validés terminés jusqu’au ' + fD(P.s.fin) + ' inclus ; vérification jusqu’au ' + fDT(P.finVerif) + ' ; publication prévue le ' + fD(P.datePub) + '. Les décisions comptent jusqu’à la publication.'
+    : (P.coupure ? 'Coupure : <b>' + fDT(P.coupure) + '</b> (heure d’envoi de la capture). Vos matchs comptent s’ils sont validés avant la publication ; une ligne identifiée ou un match en attente tranché après la coupure compte pour le classement suivant.' : 'Choisissez la date de publication.');
+}
+function controleClassement(P, agg, cl) {
+  const items = [], inclus = CX.matchsList.filter(m => L.matchDansClassement(m, P.s, { coupure: P.coupure, limiteDecisions: P.lim }));
+  const pb = inclus.filter(m => L.controlesMatch(m, CX, P.s, P.R).bloquants.length);
+  items.push([!pb.length, pb.length ? 'Matchs validés qui ne passent plus les contrôles : ' + pb.map(m => m.id).join(', ') + '. Repassez-les en brouillon pour corriger.' : 'Les ' + inclus.length + ' match(s) inclus passent les contrôles du cahier.']);
+  items.push([agg.nbMatchs > 0, agg.nbMatchs ? agg.nbMatchs + ' match(s) compté(s).' : 'Aucun match validé à compter : rien à publier.']);
+  const attente = CX.matchsList.filter(m => (m.statut === 'Brouillon' || m.statut === 'En attente') && L.validDT(m.fin) && m.fin < (P.coupure || '9'));
+  if (attente.length) items.push([null, attente.length + ' match(s) en brouillon ou en attente, terminés avant la coupure, ne comptent pas : ' + attente.map(m => m.id).join(', ') + '.']);
+  const aid = inclus.reduce((n, m) => n + m.lignes.filter(l => l.res === 'à identifier').length, 0);
+  if (aid) items.push([null, aid + ' ligne(s) « à identifier » dans les matchs comptés : elles ne comptent pas tant qu’elles ne sont pas identifiées.']);
+  const actifs = {}; CX.comptesList.filter(c => c.statut === 'actif').forEach(c => { actifs[c.matricule] = (actifs[c.matricule] || 0) + 1; });
+  const multi = Object.keys(actifs).filter(k => actifs[k] > 1);
+  items.push([!multi.length, multi.length ? 'Plusieurs comptes actifs : ' + multi.join(', ') + '.' : 'Un seul compte actif par matricule.']);
+  if (P.type === 'Final') {
+    items.push([!!P.finVerif && now() >= P.finVerif, P.finVerif && now() >= P.finVerif ? 'Vérification de fin de saison terminée.' : 'Vérification de fin de saison en cours jusqu’au ' + fDT(P.finVerif) + ' : publication impossible avant.']);
+    if (P.datePub && now().slice(0, 10) !== P.datePub) items.push([null, 'Publication prévue le ' + fD(P.datePub) + '.']);
+    if (PUBS.some(p => String(p.saison_id) === String(P.s.id) && p.type === 'Final')) items.push([false, 'Le classement final de cette saison est déjà publié.']);
+  } else {
+    items.push([L.validD(P.datePub) && L.dow(P.datePub) === P.R.publication_jour, 'Publication un ' + JOURS[P.R.publication_jour].toLowerCase() + ' : ' + (L.validD(P.datePub) ? fD(P.datePub) : '—') + '.']);
+    items.push([!!P.coupure && P.coupure <= now(), P.coupure && P.coupure <= now() ? 'Coupure passée (' + fDT(P.coupure) + ').' : 'Coupure pas encore passée : attendez le ' + fDT(P.coupure) + '.']);
+    if (PUBS.some(p => String(p.saison_id) === String(P.s.id) && p.type === 'Provisoire' && p.coupure === P.coupure)) items.push([false, 'Un classement provisoire avec cette coupure est déjà publié.']);
+  }
+  items.push([true, 'Seuil BEST : médiane des matchs joués, arrondie au supérieur = ' + cl.seuil + '. Q1 du score moyen = ' + fN(cl.q1, 2) + '.']);
+  const co = cl.cats.filter(c => c.statut === 'Co-lauréats').map(c => c.label);
+  if (co.length) items.push([true, 'Égalité parfaite en tête (co-lauréats) : ' + co.join(', ') + '.']);
+  return items;
+}
+async function calculerClassement() {
+  const z = $('#cl-res'), R = reglesSite();
+  if (!R) { z.innerHTML = note('Réglages de la ligue non chargés.', 'r'); return; }
+  const P = parametresCalcul();
+  if (!P.coupure) { z.innerHTML = note('Choisissez une date de publication.', 'a'); return; }
+  z.innerHTML = '<p class="mute">Calcul en cours…</p>';
+  try { await chargerContexte(P.s.id); await chargerPublic(); } catch (e) { z.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+  const agg = L.agreger(CX, P.s, { coupure: P.coupure, limiteDecisions: P.lim });
+  const cl = L.classer(agg, CX.membres, P.coupure);
+  const ctl = controleClassement(P, agg, cl);
+  CLC = { P, agg, cl, ctl };
+  const numero = PUBS.filter(p => String(p.saison_id) === String(P.s.id) && p.type === 'Provisoire').length + 1;
+  let h = '<div class="kpis">' + [[agg.nbMatchs, 'matchs comptés'], [cl.pop.length, 'joueurs classés'], [cl.seuil, 'seuil BEST (matchs)'], [fN(cl.q1, 2), 'Q1 du score moyen']].map(([a, b]) => '<div class="kpi"><b>' + a + '</b><span>' + b + '</span></div>').join('') + '</div>';
+  h += '<p class="mute">Aperçu du classement ' + (P.type === 'Final' ? 'final' : 'provisoire n° ' + numero) + ' de ' + esc(P.s.nom) + '.</p>';
+  h += '<div class="panel"><h3>Contrôle avant publication</h3><ul class="chk">' + ctl.map(([ok, t]) => '<li class="' + (ok === true ? 'o' : ok === null ? 'w' : 'b') + '">' + esc(t) + '</li>').join('') + '</ul>'
+    + '<h3 style="margin-top:12px">Vérifications manuelles</h3><label class="coche"><input type="checkbox" id="cl-v1"><span>Les captures des matchs comptés ont été vérifiées.</span></label><label class="coche"><input type="checkbox" id="cl-v2"><span>Les réclamations en cours ont été traitées ou n’affectent pas ce classement.</span></label><label class="coche"><input type="checkbox" id="cl-v3"><span>La publication ne contient aucune donnée personnelle (seulement noms de gamer, pseudos, matricules et statistiques).</span></label>'
+    + '<div class="row-btns"><button class="btn" type="button" data-act="cl-publier"' + (ctl.some(([ok]) => ok === false) ? ' disabled' : '') + '>Publier ce classement</button><button class="btn ghost" type="button" data-act="cl-facebook">Texte pour Facebook</button></div></div>';
+  const apercu = { type: P.type, seuil: cl.seuil, q1: cl.q1 };
+  h += '<div class="cl-grid">' + contenuClassement(P, agg, cl).categories.map(c => carteCl(c, apercu, true)).join('') + '</div>';
+  z.innerHTML = h;
+}
+function contenuClassement(P, agg, cl) {
+  const R = P.R;
+  return {
+    saison: { id: P.s.id, nom: P.s.nom, debut: P.s.debut, fin: P.s.fin }, recours_jusqu: P.type === 'Final' ? null : L.addMinutes(now(), R.reclamation_h * 60),
+    nb_matchs: agg.nbMatchs, nb_joueurs: cl.pop.length, seuil: cl.seuil, q1: cl.q1,
+    categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut,
+      laureats: c.laureats.map(j => ({ mat: j.mat, nom: nomMat(j.mat), val: c.lignes.find(l => l.j === j).val })),
+      lignes: c.lignes.map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomMat(l.j.mat), pseudos: pseudosMat(l.j.mat), val: l.val, n: l.j.n })) }))
+  };
+}
+async function publierClassementSB(b) {
+  if (!CLC) return;
+  const { P, agg, cl, ctl } = CLC;
+  if (ctl.some(([ok]) => ok === false)) { toast('Contrôle non satisfait : corrigez les points en rouge avant de publier.', true); return; }
+  if (!coche('cl-v1') || !coche('cl-v2') || !coche('cl-v3')) { toast('Cochez les trois vérifications manuelles avant de publier.', true); return; }
+  if (!confirm('Publier ce classement ? Une fois publié, il ne peut plus être modifié ni supprimé.')) return;
+  b.disabled = true;
+  const { error } = await SB.from('publications').insert({ saison_id: P.s.id, type: P.type === 'Final' ? 'final' : 'provisoire', coupure: locISO(P.coupure), contenu: contenuClassement(P, agg, cl) });
+  b.disabled = false;
+  if (error) { toast('Publication impossible : ' + erreurRpc(error), true); return; }
+  await chargerPublic();
+  toast('Classement publié : il est visible sur la page Classements.');
+  CLC = null; $('#cl-res').innerHTML = ''; afficherPubliees();
+}
+function afficherPubliees() {
+  const z = $('#cl-liste'); if (!z) return;
+  const l = PUBS.filter(p => !UI.clSaison || String(p.saison_id) === String(UI.clSaison));
+  z.innerHTML = l.length ? '<ul class="taches">' + l.map(p => '<li><span>' + esc(libPub(p)) + ' · ' + p.nb_matchs + ' match(s), ' + p.nb_joueurs + ' joueur(s)</span><button class="btn sm ghost" type="button" data-act="cl-fb-pub" data-id="' + p.id + '">Texte pour Facebook</button></li>').join('') + '</ul>' : '<p class="mute small">Aucun classement publié pour cette saison.</p>';
+}
+function texteFacebook(p) {
+  const l = ['LEAGUE UV · ' + (p.type === 'Final' ? 'CLASSEMENT FINAL' : 'CLASSEMENT PROVISOIRE N° ' + p.numero), (p.saison ? p.saison.nom + ' · ' : '') + 'matchs jusqu’au ' + fDT(p.coupure), ''];
+  p.categories.forEach(c => { l.push(c.label + ' : ' + (c.laureats.length ? c.laureats.map(x => x.nom).join(' et ') + ' (' + fV(c.kind, c.laureats[0].val) + ')' + (c.laureats.length > 1 ? ', co-lauréats' : '') : 'aucun joueur éligible')); });
+  l.push('', p.type === 'Final' ? 'Félicitations à tous les participants.' : 'Réclamations en message privé à Katana jusqu’au ' + fDT(p.recours_jusqu) + '.', '', '#LeagueUV #DeltaForceMobile #DeltaForceMadagascar');
+  return l.join('\n');
+}
+ACTIONS['cl-calculer'] = () => calculerClassement();
+ACTIONS['cl-publier'] = b => publierClassementSB(b);
+ACTIONS['cl-facebook'] = () => {
+  if (!CLC || !CLC.agg.nbMatchs) { toast('Aucun classement calculé à résumer.', true); return; }
+  const num = PUBS.filter(p => String(p.saison_id) === String(CLC.P.s.id) && p.type === 'Provisoire').length + 1;
+  modalTexte('Texte pour Facebook', 'Aperçu (publiez d’abord le classement pour qu’il soit officiel).', texteFacebook(Object.assign(contenuClassement(CLC.P, CLC.agg, CLC.cl), { type: CLC.P.type, numero: num, coupure: CLC.P.coupure })));
+};
+ACTIONS['cl-fb-pub'] = b => { const p = PUBS.find(x => String(x.id) === b.dataset.id); if (p) modalTexte('Texte pour Facebook', 'Texte du classement publié, à copier sur Facebook.', texteFacebook(p)); };
+document.addEventListener('change', e => {
+  const t = e.target; if (!t) return;
+  if (t.id === 'cl-s') { UI.clSaison = t.value; const R = reglesSite(); if (R) $('#cl-date').value = datePubDefaut(saisonJS(saisonSB(UI.clSaison)), R); CLC = null; $('#cl-res').innerHTML = ''; majCoupureTxt(); afficherPubliees(); }
+  else if (t.id === 'cl-type') { UI.clType = t.value; CLC = null; $('#cl-res').innerHTML = ''; majCoupureTxt(); }
+  else if (t.id === 'cl-date') { CLC = null; $('#cl-res').innerHTML = ''; majCoupureTxt(); }
+});
+
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
   try { PUB = JSON.parse($('#pub-data').textContent || 'null'); } catch (e) { PUB = null; }
@@ -2932,6 +2999,7 @@ async function demarrer() {
   if (SB) {
     const { data } = await SB.auth.getSession();
     await chargerParametres();
+    try { await chargerPublic(); } catch (e) { console.warn('Classements illisibles :', e); }
     PRET = true;
     if (RECUP || RETOUR_LIEN.erreur) location.hash = '#compte';
     await majSession(data.session);
