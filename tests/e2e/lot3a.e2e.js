@@ -1,4 +1,4 @@
-// Essai de bout en bout des écrans Saison et Matchs (lot 3A), dans Chromium, avec une fausse base en mémoire
+// Essai de bout en bout des écrans Saison, Matchs (lot 3A) et Classements (lot 3C), dans Chromium, avec une fausse base en mémoire
 // (tests/e2e/faux-supabase.js) : aucune donnée réelle, aucun appel à Supabase.
 // Lancer : node tests/e2e/lot3a.e2e.js   (Playwright et Chromium requis)
 const { chromium } = require('playwright');
@@ -36,6 +36,7 @@ fs.writeFileSync(path.join(ICI, 'capture.png'), png);
 const srv = http.createServer((q, r) => { let f = path.join(WWW, decodeURIComponent(q.url.split('?')[0].split('#')[0])); if (f.endsWith('/')) f += 'index.html'; fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : f.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream' }); r.end(d); }); });
 srv.listen(8765, async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  await p.clock.setFixedTime(new Date('2026-11-22T07:00:00Z'));   // dimanche 22/11/2026, 10 h à Madagascar
   const erreurs = []; p.on('pageerror', e => erreurs.push('page : ' + e.message)); p.on('console', m => { if (m.type() === 'error') erreurs.push('console : ' + m.text()); });
   p.on('dialog', d => d.accept());
   const etape = async (nom, fn) => { try { await fn(); console.log('OK  ' + nom); } catch (e) { console.log('ÉCHEC ' + nom + ' : ' + e.message.split('\n')[0]); await p.screenshot({ path: path.join(ICI, 'echec.png'), fullPage: true }); throw e; } };
@@ -100,6 +101,39 @@ srv.listen(8765, async () => {
       await p.selectOption('#idf-16', '__ni'); await p.click('[data-act="ed-identifier"][data-i="16"]'); await p.waitForTimeout(600);
       const r = await p.textContent('#res-16'); if (!/confirmé/.test(r) || !/identifiée le/.test(r)) throw new Error(r);
       await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(400);
+    });
+    await etape('classement : coupure future refusée (premier provisoire du 29/11)', async () => {
+      await p.goto('http://localhost:8765/#admin-classements'); await p.waitForTimeout(700);
+      if (await p.inputValue('#cl-date') !== '2026-11-29') throw new Error('date ' + await p.inputValue('#cl-date'));
+      await p.click('[data-act="cl-calculer"]'); await p.waitForTimeout(700);
+      const t = await p.textContent('#cl-res'); if (!/pas encore passée/.test(t)) throw new Error(t.slice(0, 300));
+      if (!(await p.isDisabled('[data-act="cl-publier"]'))) throw new Error('bouton actif');
+    });
+    await etape('classement : calcul au 22/11 (coupure du samedi 21/11 à 16 h)', async () => {
+      await p.fill('#cl-date', '2026-11-22'); await p.dispatchEvent('#cl-date', 'change'); await p.waitForTimeout(200);
+      if (!/21\/11\/2026 à 16 h 00/.test(await p.textContent('#cl-coupure-txt'))) throw new Error(await p.textContent('#cl-coupure-txt'));
+      await p.click('[data-act="cl-calculer"]'); await p.waitForTimeout(700);
+      const t = await p.textContent('#cl-res'); console.log('     ' + t.replace(/\s+/g, ' ').slice(0, 240));
+      if (!/1matchscomptés/.test(t.replace(/\s+/g, '')) || !/8joueursclassés/.test(t.replace(/\s+/g, ''))) throw new Error('chiffres');
+      if (!/MOST Eliminator/.test(t) || !/Faux 7/.test(t)) throw new Error('catégories');
+      if (await p.isDisabled('[data-act="cl-publier"]')) throw new Error('bouton bloqué');
+    });
+    await etape('classement : publication (cases obligatoires)', async () => {
+      await p.click('[data-act="cl-publier"]'); await p.waitForTimeout(300);
+      if (!/Cochez/.test(await p.textContent('#toast'))) throw new Error('pas de rappel des cases');
+      for (const c of ['#cl-v1', '#cl-v2', '#cl-v3']) await p.check(c);
+      await p.click('[data-act="cl-publier"]'); await p.waitForTimeout(800);
+      const l = await p.textContent('#cl-liste'); if (!/Classement provisoire n°1/.test(l)) throw new Error(l);
+    });
+    await etape('page publique : classement visible', async () => {
+      await p.goto('http://localhost:8765/#classements'); await p.waitForTimeout(700);
+      const t = await p.textContent('#cl-body'), m = await p.textContent('#cl-meta');
+      if (!/Classement provisoire n°1/.test(m) || !/Aurora/.test(m)) throw new Error(m);
+      if (!/Faux 7/.test(t)) throw new Error(t.slice(0, 200));
+      await p.goto('http://localhost:8765/#accueil'); await p.waitForTimeout(500);
+      const b = await p.textContent('#home-board'); if (!/Faux 8/.test(b) || !/Aurora/.test(b)) throw new Error(b.slice(0, 200));
+      await p.screenshot({ path: path.join(ICI, 'classements.png'), fullPage: false });
+      await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
     });
     await etape('repasser en brouillon (motif obligatoire)', async () => {
       await p.click('[data-act="m-ouvrir"]'); await p.waitForTimeout(500);

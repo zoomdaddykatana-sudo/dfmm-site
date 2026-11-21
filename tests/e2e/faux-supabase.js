@@ -37,6 +37,7 @@
         const r = Object.assign({ id: ++seq }, o);
         if (this.t === 'captures') { r.envoyee_le = iso(); r.statut = 'recue'; DB.registre.push({ id: ++seq, match_id: r.match_id, type: 'capture_recue', detail: 'Capture reçue', date: iso() }); }
         if (this.t === 'saisons') { r.active = false; r.statut = r.statut || 'preparation'; }
+        if (this.t === 'publications') { r.publie_le = iso(); r.numero = r.type === 'provisoire' ? T.filter(x => x.saison_id === r.saison_id && x.type === 'provisoire').length + 1 : null; }
         T.push(r); return r;
       });
       return { data: this.one ? rows[0] : rows, error: null };
