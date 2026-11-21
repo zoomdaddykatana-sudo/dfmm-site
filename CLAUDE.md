@@ -45,7 +45,7 @@
 | 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | Fusionné (PR n° 4) ; migration 0004 exécutée, test 27/27 |
 | 2C | Pseudo avec volsever (compteur d'appels, repli manuel) ; effacement des données ; migration 0005 ; fonctions `pseudo-volsever` et `effacer-donnees` | Fusionné (PR n° 6) ; migration 0005 exécutée, test 21/21 dans le vrai projet ; 2 fonctions installées (« Verify JWT » activé) ; écrans administrateur vérifiés sur téléphone le 21/11/2026 |
 | 3 | Matchs et captures, registre | 3A (matchs de Katana) : **fusionné (PR n° 8)** le 21/11/2026 ; migration 0006 exécutée (test 8/8) ; migration 0007 (matchs, lignes, captures, registre, stockage « captures », colonne `saisons.fin_confirmee`) exécutée et test 0007 réussi (23/23) dans le vrai projet le 21/11/2026 ; onglets Saison et Matchs branchés sur Supabase. 3B (matchs libres : créneaux, captures des responsables, délai de 10 min, concordance, attente) à faire |
-| 3C Classements | Onglet Administration > Classements branché sur Supabase (calcul sur les matchs validés, contrôle avant publication, publication figée) ; page publique et accueil lisent `publications` ; migration 0008 (numéro automatique, un seul final, classement figé, journal) | **PR n° 9 ouverte** ; migration 0008 exécutée et test 0008 réussi (11/11) dans le vrai projet le 21/11/2026 ; premier provisoire d'Aurora renseigné (29/11/2026) |
+| 3C Classements | Onglet Administration > Classements branché sur Supabase (calcul sur les matchs validés, contrôle avant publication, publication figée) ; page publique et accueil lisent `publications` ; migration 0008 (numéro automatique, un seul final, classement figé, journal) | **Fusionné (PR n° 9)** le 21/11/2026 ; migration 0008 exécutée et test 0008 réussi (11/11) dans le vrai projet le 21/11/2026 ; premier provisoire d'Aurora renseigné (29/11/2026) |
 | 4 | Litiges, sanctions, captures écartées | À faire |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
 
@@ -96,7 +96,7 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Lot 3C (classements, PR n° 9) : migration 0008 et test 0008 faits ; premier provisoire renseigné ; fusion sur l'accord écrit de Katana.
+1. Lot 3C (classements) fusionné (PR n° 9). Premier provisoire d'Aurora le dimanche 29/11/2026 (coupure samedi 28/11 à 16 h) : guider Katana (Administration > Classements > Calculer > contrôles > 3 cases > Publier > Texte pour Facebook).
 2. Matchs déjà joués : saisis **en brouillon** (M-2 fait) ; règle des 50 % : valider quand les réinscriptions sont approuvées (ancien matricule). Premier provisoire le 29/11/2026 : les matchs doivent être validés avant la publication (ceux de Katana comptent s'ils sont validés avant).
 3. Lot 3B (matchs libres) ; puis titres et lots (ancien onglet « Titres et lots ») ; lot 4 (litiges, sanctions).
 4. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (`index.html`).
