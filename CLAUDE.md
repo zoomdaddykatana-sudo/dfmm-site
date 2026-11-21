@@ -44,7 +44,7 @@
 | 2A Inscriptions | Inscription, approbation, reprise des anciens matricules, membres, sauvegarde ; migrations 0002 et 0003 | Fusionné (PR n° 3) |
 | 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | Fusionné (PR n° 4) ; migration 0004 exécutée, test 27/27 |
 | 2C | Pseudo avec volsever (compteur d'appels, repli manuel) ; effacement des données ; migration 0005 ; fonctions `pseudo-volsever` et `effacer-donnees` | Fusionné (PR n° 6) ; migration 0005 exécutée, test 21/21 dans le vrai projet ; 2 fonctions installées (« Verify JWT » activé) ; écrans administrateur vérifiés sur téléphone le 21/11/2026 |
-| 3 | Matchs et captures, registre | En cours : migration 0006 (vérification finale 48 h, phase de démarrage) exécutée et test 0006 réussi (8/8) dans le vrai projet le 21/11/2026 ; lot 1 adapté (classement final). À faire : 3A matchs de Katana (saisons, saisie avec capture, registre), puis 3B matchs libres |
+| 3 | Matchs et captures, registre | 3A (matchs de Katana) : **PR ouverte** ; migration 0006 exécutée (test 8/8) ; migration 0007 (matchs, lignes, captures, registre, stockage « captures », colonne `saisons.fin_confirmee`) et test 0007 (23/23 en local) **à exécuter** ; onglets Saison et Matchs branchés sur Supabase. 3B (matchs libres : créneaux, captures des responsables, délai de 10 min, concordance, attente) à faire |
 | 4 | Litiges, sanctions, captures écartées | À faire |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
 
@@ -76,6 +76,8 @@ Points en suspens :
 - Environnement cloud « dfmm-site » : hôtes autorisés `ijpbplzbjohfrqwnvrqv.supabase.co`, `supabase.com`, `volsever.com`, `www.volsever.com`, `gate.volsever.com`, `docs.volsever.com` (documentation seulement : la clé volsever n'est jamais dans cet environnement).
 - Connecteur « Supabase DFMM » (limité au projet, outils base, journal et documentation ; pas d'outil de compte). Le connecteur standard « Supabase » (accès à tout le compte) est déconnecté : ne pas l'utiliser. Chaque requête : SQL et résultat attendu montrés à Katana, puis son « oui » écrit, puis le message exact de Supabase rapporté.
 - Tests locaux : `node --test tests/*.test.js` (40 tests) ; base imitée : PostgreSQL 16 avec `supabase/tests/emulation_locale.sql`, puis les migrations dans l'ordre, puis les fichiers de test.
+- Essai des écrans dans Chromium : `node tests/e2e/lot3a.e2e.js` (fausse base en mémoire `tests/e2e/faux-supabase.js`, aucune donnée réelle) : saison, nouveau match, capture, réponse de claude.ai, contrôles, validation, identification, retour en brouillon.
+- Matchs (lot 3A) : saisie dans Administration > Matchs ; capture rangée dans l'espace privé « captures » (`<match>/<horodatage>.jpg`), heure d'envoi fixée par le serveur (déclencheur) ; lecture par claude.ai avec la consigne `PROMPT_CLAUDE` (`index.html`, réponse JSON `{carte, mode, fin, lignes:[{faction, pseudo, score, elim, morts, assist, med, ing, obj, tac}]}`) collée dans l'éditeur ; contrôles `L.controlesMatch` côté site ; décisions par `decider_match` (valider, attente, refuser, annuler, brouillon ; motif obligatoire sauf pour valider) ; ligne « à identifier » après validation : `identifier_ligne` (datée, classements suivants) ; registre (section 5) jamais modifiable. Les écrans « Créneaux », « Classements », « Titres et lots », « Tableau de bord » de `index.html` restent l'ancien prototype local (non affichés) : à refaire.
 
 ## 6. Pièges déjà rencontrés
 
@@ -92,6 +94,7 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Lot 3A (matchs de Katana) : saisons dans la vraie base (Administration > Saison) ; nouveau match avec capture (rangée dans Supabase, heure d'envoi notée par le serveur) et données lues par claude.ai collées (format à fournir) ; liaison pseudo → compte (`L.resoudre`) ; contrôles (`L.controlesMatch`, sans délai de 10 min en phase de démarrage) ; lignes « à identifier » ; validation ; registre (section 5). Migration 0007 et son test. Les anciens écrans « Matchs », « Créneaux », « Saison », « Classements » de `index.html` travaillent encore en local (`ecrire`, `S.*`) et appellent `L.finCompetition`, qui n'existe plus : à remplacer.
-2. Si Katana écrit « ouvre les inscriptions » : montrer l'UPDATE exact du réglage `inscriptions_ouvertes`, attendre son « oui », puis le guider pour l'envoi des e-mails.
-3. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (lignes ~331, 520, 580, 707 de `index.html`).
+1. Lot 3A : montrer à Katana le SQL de la migration 0007 puis du test 0007 (23/23), les exécuter sur son « oui », vérifier qu'il ne reste rien. Puis guider Katana : Administration > Saison > Nouvelle saison « Aurora » (du 10/11/2026 au 21/01/2027, fin estimée, à corriger quand le jeu l'annonce), puis saisie des matchs déjà joués (Administration > Matchs > Nouveau match de Katana). Sur son accord écrit, fusionner la PR du lot 3A.
+2. E-mails de réinscription : inscriptions ouvertes le 21/11/2026 (à sa demande) ; guider Katana étape par étape (feuille Google prête → Extensions > Apps Script → coller `outils/envoi-reinscription.gs` → menu LEAGUE UV > essai → envoi à tous). Les membres doivent être réinscrits et approuvés (reprise de l'ancien matricule, date d'origine) pour que leurs lignes de match comptent ; une ligne identifiée après la validation ne compte que pour les classements suivants.
+3. Lot 3B (matchs libres), puis classements publiés depuis Supabase (remplacer l'ancien onglet « Classements »).
+4. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (`index.html`).
