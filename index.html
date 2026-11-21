@@ -1051,7 +1051,7 @@ function heureTxt(h) { return String(h).replace(':', ' h ').replace(/ h 00$/, ' 
 function calHtml() {
   const R = reglesSite(), s = PUB && PUB.saison;
   if (!R) return '<p class="mute small">Le calendrier s’affichera dès que les réglages de la ligue seront chargés.</p>';
-  const base = '<dt>Matchs de Katana</dt><dd>en général le mercredi et le samedi à 16 h</dd><dt>Classement provisoire</dt><dd>le ' + JOURS[R.publication_jour] + ', tous les ' + R.periodicite_jours + ' jours</dd><dt>Coupure</dt><dd>le ' + JOURS[R.coupure_jour] + ' qui précède, à ' + heureTxt(R.coupure_heure) + ', selon l’heure d’envoi de la capture</dd><dt>Classement final</dt><dd>dans les ' + R.classement_final_jours + ' jours après la fin de la saison</dd>';
+  const base = '<dt>Matchs de Katana</dt><dd>en général le mercredi et le samedi à 16 h</dd><dt>Classement provisoire</dt><dd>le ' + JOURS[R.publication_jour] + ', tous les ' + R.periodicite_jours + ' jours</dd><dt>Coupure</dt><dd>le ' + JOURS[R.coupure_jour] + ' qui précède, à ' + heureTxt(R.coupure_heure) + ', selon l’heure d’envoi de la capture</dd><dt>Classement final</dt><dd>les matchs comptent jusqu’à la fin officielle de la saison ; vérification pendant ' + R.verification_finale_h + ' h, puis publication le ' + JOURS[R.publication_jour] + ' qui suit</dd>';
   if (!s) return '<dl class="kv">' + base + '</dl><p class="mute small">Les dates de la saison seront annoncées par l’organisation.</p>';
   const prochaine = L.publicationsPrevues(s, now().slice(0, 10), 1, R)[0];
   return '<dl class="kv"><dt>Saison</dt><dd>' + esc(s.nom) + '</dd><dt>Dates</dt><dd>du ' + fD(s.debut) + ' au ' + fD(s.fin) + '</dd><dt>Prochain classement</dt><dd>' + (prochaine ? fD(prochaine) : '—') + '</dd>' + base + '</dl>';

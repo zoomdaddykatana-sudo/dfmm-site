@@ -44,7 +44,7 @@ var L = (function () {
   var PARAMS_REQUIS = [
     'participants_min', 'ecart_factions_max', 'seuil_membres_pct', 'delai_capture_min', 'delai_declaration_h',
     'plage_fin_h', 'coupure_jour', 'coupure_heure', 'publication_jour', 'periodicite_jours',
-    'classement_final_jours', 'reclamation_h', 'comptes_max', 'comptes_actifs_max',
+    'verification_finale_h', 'reclamation_h', 'comptes_max', 'comptes_actifs_max',
     'delai_changement_compte_jours', 'convocation_h', 'attente_h', 'recours_h', 'suspension_max_jours',
     'alerte_facteur', 'alerte_ecart_elim', 'alerte_ecart_score'
   ];
@@ -402,9 +402,23 @@ var L = (function () {
     }
     return null;
   }
-  // Coupure du classement final : tous les matchs de la saison, jusqu'au dernier jour inclus.
+  // Coupure du classement final : tous les matchs de la saison comptent, jusqu'à la fin officielle
+  // de la saison de Delta Force (dernier jour inclus) ; aucun gel avant la fin.
   function coupureFinale(saison) { return validD(saison && saison.fin) ? addDays(saison.fin, 1) + 'T00:00' : null; }
-  function limiteClassementFinal(saison, R) { return validD(saison && saison.fin) ? addDays(saison.fin, R.classement_final_jours) : null; }
+  // Vérification de fin de saison : « verification_finale_h » heures après la fin officielle.
+  function finVerificationFinale(saison, R) {
+    var c = coupureFinale(saison);
+    return c ? addMinutes(c, R.verification_finale_h * 60) : null;
+  }
+  // Publication du classement final : le premier « publication_jour » (dimanche) qui suit la fin de la vérification.
+  function publicationFinale(saison, R) {
+    var v = finVerificationFinale(saison, R);
+    if (!v) return null;
+    var d = v.slice(0, 10);
+    if (v > d + 'T00:00') d = addDays(d, 1);
+    for (var k = 0; k < 7; k++) { if (dow(d) === R.publication_jour) return d; d = addDays(d, 1); }
+    return null;
+  }
   function publicationsPrevues(saison, today, nb, R) {
     if (!saison || !validD(saison.premier_provisoire)) return [];
     var out = [], d = saison.premier_provisoire, guard = 0;
@@ -487,7 +501,7 @@ var L = (function () {
     bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, alertesPerformance: alertesPerformance,
     matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,
     agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots,
-    coupurePour: coupurePour, coupureFinale: coupureFinale, limiteClassementFinal: limiteClassementFinal,
+    coupurePour: coupurePour, coupureFinale: coupureFinale, finVerificationFinale: finVerificationFinale, publicationFinale: publicationFinale,
     publicationsPrevues: publicationsPrevues,
     encodeMsg: encodeMsg, decodeMsg: decodeMsg, parseLignes: parseLignes, nombre: nombre
   };
