@@ -9,6 +9,7 @@
     const re = /([a-z_]+)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g; let m;
     while ((m = re.exec(sel))) {
       const child = m[1]; const fk = FK[child];
+      if (child === 'membres') { const x = (DB.membres || []).find(r => r.id === row.membre_id); out.membres = x ? projeter('membres', x, m[2]) : null; continue; }
       out[child] = (DB[child] || []).filter(r => r[fk] === row.id).map(r => projeter(child, r, m[2]));
     }
     return out;
@@ -23,6 +24,7 @@
   Q.prototype.in = function (k, v) { this.f.push(r => v.map(String).includes(String(r[k]))); return this; };
   Q.prototype.not = function (k, op, v) { this.f.push(r => r[k] !== null && r[k] !== undefined); return this; };
   Q.prototype.order = function (k, o) { this.ord.push([k, !(o && o.ascending === false)]); return this; };
+  Q.prototype.is = function (k, v) { this.f.push(r => (r[k] === undefined ? null : r[k]) === v); return this; };
   Q.prototype.limit = function () { return this; };
   Q.prototype.range = function () { return this; };
   Q.prototype.single = function () { this.one = true; return this; };
@@ -70,6 +72,13 @@
       m.motif = p.p_motif; DB.registre.push({ id: ++seq, match_id: m.id, type: 'decision', detail: p.p_decision, date: iso() });
       return null;
     },
+    sanctionner: p => {
+      p = p.p; const t = new Date();
+      const fin = p.type === 'suspension' ? new Date(p.fin_jour + 'T00:00:00+03:00').getTime() + 86400000 : null;
+      const r = { id: ++seq, membre_id: p.membre_id, type: p.type, motif: p.motif, categorie: p.categorie, debut: t.toISOString(), fin: fin ? new Date(fin).toISOString() : null, match_id: p.match_id || null, recours_jusqu: new Date(t.getTime() + 48 * 3600000).toISOString(), statut: 'active', cree_le: t.toISOString() };
+      (DB.sanctions = DB.sanctions || []).push(r); return r.id;
+    },
+    decider_sanction: p => { const s = DB.sanctions.find(x => x.id === p.p_sanction); if (p.p_decision === 'lever') s.statut = 'levee'; else s.decision_recours = 'maintenue'; s.motif_recours = p.p_motif; s.recours_decide_le = iso(); return null; },
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {

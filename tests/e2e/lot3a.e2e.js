@@ -16,7 +16,7 @@ for (const f of fs.readdirSync(dm).sort()) {
 }
 PARAMS.inscriptions_ouvertes.valeur = true;
 const base = { parametres: Object.values(PARAMS), membres: [], periodes: [], comptes_jeu: [], comptes_periodes: [], pseudos_historique: [],
-  saisons: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
+  saisons: [], sanctions: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
 for (let i = 1; i <= 8; i++) {
   base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', date_approbation: '2026-11-18T00:00:00+03:00' });
   base.periodes.push({ id: 100 + i, membre_id: i, debut: '2026-11-17T21:00:00Z', fin: null });
@@ -133,6 +133,26 @@ srv.listen(8765, async () => {
       await p.goto('http://localhost:8765/#accueil'); await p.waitForTimeout(500);
       const b = await p.textContent('#home-board'); if (!/Faux 8/.test(b) || !/Aurora/.test(b)) throw new Error(b.slice(0, 200));
       await p.screenshot({ path: path.join(ICI, 'classements.png'), fullPage: false });
+      await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
+    });
+    const premierCl = async () => { await p.goto('http://localhost:8765/#admin-classements'); await p.waitForTimeout(600); await p.fill('#cl-date', '2026-11-22'); await p.dispatchEvent('#cl-date', 'change'); await p.click('[data-act="cl-calculer"]'); await p.waitForTimeout(700); return p.textContent('#cl-res .cl-card'); };
+    await etape('sanction : statistiques de DFMM-8 retirées dans le match', async () => {
+      await p.goto('http://localhost:8765/#admin-sanctions'); await p.waitForTimeout(600);
+      await p.click('[data-act="sa2-nouvelle"]'); await p.waitForTimeout(400);
+      await p.selectOption('#sn-m', '8'); await p.selectOption('#sn-cat', { index: 4 });
+      if (await p.inputValue('#sn-type') !== 'retrait_statistiques') throw new Error('type proposé ' + await p.inputValue('#sn-type'));
+      const mid = await p.evaluate(() => window.FAUSSE_BASE.matchs[0].id);
+      await p.fill('#sn-mid', String(mid)); await p.fill('#sn-motif', 'Compte prêté');
+      await p.click('#modal-f button:has-text("Appliquer")'); await p.waitForTimeout(600);
+      const t = await p.textContent('#sa2-liste'); if (!/Statistiques d’un match retirées/.test(t) || !/DFMM-8/.test(t)) throw new Error(t.slice(0, 200));
+      const c = await premierCl(); if (/Faux 8/.test(c.slice(0, 200)) && !/Faux 7/.test(c)) throw new Error(c.slice(0, 200));
+      if (!/Faux 7/.test(c)) throw new Error('MOST Eliminator : ' + c.slice(0, 200));
+    });
+    await etape('sanction levée : DFMM-8 recompté', async () => {
+      await p.goto('http://localhost:8765/#admin-sanctions'); await p.waitForTimeout(600);
+      await p.click('[data-act="sa2-lever"]'); await p.fill('#sd-motif', 'Erreur'); await p.click('#modal-f button:has-text("Enregistrer")'); await p.waitForTimeout(600);
+      if (!/Levée/.test(await p.textContent('#sa2-liste'))) throw new Error('pas levée');
+      const c = await premierCl(); if (!/Faux 8/.test(c)) throw new Error('MOST Eliminator : ' + c.slice(0, 200));
       await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
     });
     await etape('repasser en brouillon (motif obligatoire)', async () => {
