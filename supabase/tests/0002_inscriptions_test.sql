@@ -91,7 +91,8 @@ begin
   insert into resultats (test, ok, detail) values ('Candidat A : ne voit pas les anciens matricules', n = 0, n || ' ligne(s)');
   select count(*) into n from storage.objects where bucket_id = 'profils';
   insert into resultats (test, ok, detail) values ('Candidat A : ne voit pas les captures de profil', n = 0, n || ' fichier(s)');
-  update public.membres_prives set nom_reel = 'Pirate';
+  update public.membres_prives set nom_reel = 'Pirate'
+    where membre_id in (select id from public.membres where user_id = '00000000-0000-4000-8000-0000000000a1');
   get diagnostics n = row_count;
   insert into resultats (test, ok, detail) values ('Candidat A : ne modifie pas ses données lui-même', n = 0, n || ' ligne(s)');
   begin
