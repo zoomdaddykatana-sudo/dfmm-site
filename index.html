@@ -311,7 +311,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <li><b>8</b><span>statistiques suivies par match</span></li>
         </ul>
         <div class="cta">
-          <a class="btn" href="#participer">S’inscrire</a>
+          <a class="btn" href="#inscription">S’inscrire</a>
           <a class="btn ghost" href="#reglement">Lire le règlement</a>
         </div>
       </div>
@@ -766,6 +766,16 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   </div>
 </section>
 
+<!-- ============ INSCRIPTION ============ -->
+<section class="view" data-view="inscription" hidden>
+  <div class="band">
+    <div class="wrap" style="max-width:820px">
+      <div class="sec-head"><h1>Inscription</h1><p>Rejoindre DFMM et la LEAGUE UV. Chaque inscription est vérifiée puis approuvée par Katana.</p></div>
+      <div id="ins-zone"></div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ COMPTE ============ -->
 <section class="view" data-view="compte" hidden>
   <div class="band">
@@ -890,7 +900,7 @@ const S = {}; COLS.forEach(c => { S[c] = []; });
 const ETAT = { charge: {}, erreur: {} };
 const CAP = { db: null, user: null };
 let ADMIN = false, PRET = false, PUB = null, ED = null, MODE = '';
-const UI = { vue: 'accueil', tab: 'parametres', tabRendu: '', grp: 'tous', archive: '', membre: '', rech: '', filtreMb: 'tous', filtreInsc: 'attente', clSaison: '', clType: 'Provisoire', clCoupure: '', lotSaison: '', matchSaison: '', jRech: '', jMax: 100, demType: 'inscription', msg: null };
+const UI = { vue: 'accueil', tab: 'parametres', tabRendu: '', grp: 'tous', archive: '', membre: '', rech: '', filtreMb: 'tous', filtreInsc: 'attente', clSaison: '', clType: 'Provisoire', clCoupure: '', lotSaison: '', matchSaison: '', jRech: '', jMax: 100, demType: 'creneau', msg: null };
 
 const capCache = {};
 function cap(nom) {
@@ -1001,6 +1011,7 @@ function rendre() {
   if (UI.vue === 'classements') rendreClassementsPublic();
   if (UI.vue === 'admin') rendreAdmin();
   if (UI.vue === 'compte') rendreCompte();
+  if (UI.vue === 'inscription') rendreInscription();
 }
 function rendreChip() {
   const s = (ADMIN && saisonActive()) || (PUB && PUB.saison);
@@ -1167,7 +1178,7 @@ function verifierChamps(champs, o) {
   return manq.length ? 'À compléter : ' + manq.join(', ') + '.' : '';
 }
 function initParticiper() {
-  $('#dem-types').innerHTML = Object.keys(DEM).map(k => '<label><input type="radio" name="dem-type" value="' + k + '"' + (k === UI.demType ? ' checked' : '') + '><b>' + esc(DEM[k].lab) + '</b><span>' + esc(DEM[k].sous) + '</span></label>').join('');
+  $('#dem-types').innerHTML = Object.keys(DEM).filter(k => k !== 'inscription').map(k => '<label><input type="radio" name="dem-type" value="' + k + '"' + (k === UI.demType ? ' checked' : '') + '><b>' + esc(DEM[k].lab) + '</b><span>' + esc(DEM[k].sous) + '</span></label>').join('');
   afficherDemande();
 }
 function afficherDemande() {
@@ -1208,11 +1219,12 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'acces'];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'membres', 'acces', 'sauvegarde'];
 const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
-  if (k === 'inscriptions') return S.inscriptions.filter(enCours).length;
+  if (k === 'inscriptions') return ADM.nbInsc;
+  if (k === 'sauvegarde') return ADM.sauvegardeEnRetard ? 1 : 0;
   if (k === 'demandes') return S.demandes.filter(d => d.statut === 'En attente').length;
   if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
   if (k === 'matchs') return S.matchs.filter(m => m.statut === 'Brouillon').length;
@@ -1225,7 +1237,7 @@ function rendreAdmin() {
   att.hidden = true; $('#adm').hidden = false;
   $('#adm-tabs').innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, l]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(l) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
   const T = TAB[UI.tab] || TAB.bord;
-  if (UI.tabRendu !== UI.tab) { $('#adm-shell').innerHTML = T.shell ? T.shell() : ''; UI.tabRendu = UI.tab; if (T.apres) T.apres(); }
+  if (UI.tabRendu !== UI.tab) { $('#adm-shell').innerHTML = T.shell ? T.shell() : ''; UI.tabRendu = UI.tab; if (T.apres) T.apres(); if (T.charger) T.charger(); }
   const errs = Object.keys(ETAT.erreur);
   $('#adm-body').innerHTML = (errs.length ? note('Lecture impossible : ' + esc(errs.map(k => k + ' (' + ETAT.erreur[k] + ')').join(', ')), 'r') : '') + (T.body ? T.body() : '');
   $('#adm-decisions').hidden = UI.tab !== 'decisions';
@@ -2149,7 +2161,7 @@ const ACTIONS = {
 Object.keys(ACT_MB).forEach(k => { ACTIONS['mb-' + k] = b => ACT_MB[k](b.dataset.id); });
 
 /* ---------------- Navigation et démarrage ---------------- */
-const VUES = ['accueil', 'classements', 'reglement', 'processus', 'participer', 'compte', 'admin'];
+const VUES = ['accueil', 'classements', 'reglement', 'processus', 'participer', 'inscription', 'compte', 'admin'];
 function router() {
   const h = (location.hash || '').slice(1);
   let vue = h, t = '';
@@ -2162,6 +2174,8 @@ function router() {
   $$('#nav a').forEach(a => a.classList.toggle('on', a.dataset.nav === vue));
   rendre();
   if (chg) window.scrollTo(0, 0);
+  // Page Inscription : relit les réglages à chaque ouverture (jamais de copie périmée).
+  if (chg && vue === 'inscription' && SB && PRET) chargerParametres().then(() => { rendreBandeau(); if (UI.vue === 'inscription') rendreInscription(); });
 }
 function lierEvenements() {
   window.addEventListener('hashchange', router);
@@ -2200,7 +2214,7 @@ function lierEvenements() {
   document.addEventListener('input', saisie);
   document.addEventListener('change', saisie);
   $('#dem-form').addEventListener('submit', soumettreDemande);
-  document.addEventListener('submit', e => { if (e.target.id === 'f-connexion') seConnecter(e); else if (e.target.id === 'f-mdp') changerMdp(e); });
+  document.addEventListener('submit', e => { if (e.target.id === 'f-connexion') seConnecter(e); else if (e.target.id === 'f-inscription') soumettreInscription(e); else if (e.target.id === 'f-mdp') changerMdp(e); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) fermerModal(); });
 }
 /* ---------------- Supabase (lot socle) ---------------- */
@@ -2235,6 +2249,7 @@ async function majSession(session) {
   let adm = false;
   if (SB && SESSION) { const { data } = await SB.rpc('est_admin'); adm = data === true; }
   ADMIN = adm;
+  if (ADMIN) await chargerCompteursAdmin();
   $('#nav-admin').hidden = !ADMIN;
   $('#nav-compte').textContent = SESSION ? 'Mon compte' : 'Connexion';
   UI.tabRendu = '';
@@ -2250,7 +2265,8 @@ function rendreCompte() {
     return;
   }
   if (SESSION) {
-    z.innerHTML = '<div class="panel"><h3>Vous êtes connecté</h3><p>' + esc(SESSION.user.email) + (ADMIN ? ' · administrateur' : '') + '</p><div class="row-btns">' + (ADMIN ? '<a class="btn" href="#admin">Administration</a>' : '') + '<button class="btn ghost" type="button" data-act="deconnexion">Se déconnecter</button></div></div>' + (ADMIN ? '' : note('L’espace membre arrive dans une prochaine version du site.'));
+    z.innerHTML = '<div class="panel"><h3>Vous êtes connecté</h3><p>' + esc(SESSION.user.email) + (ADMIN ? ' · administrateur' : '') + '</p><div class="row-btns">' + (ADMIN ? '<a class="btn" href="#admin">Administration</a>' : '') + '<button class="btn ghost" type="button" data-act="deconnexion">Se déconnecter</button></div></div>' + (ADMIN ? '' : '<div id="mon-dossier" class="panel"><p class="mute">Chargement de votre dossier…</p></div>');
+    if (!ADMIN) chargerMonDossier();
     return;
   }
   z.innerHTML = (lienPerime ? note('Ce lien n’est plus valable : il a expiré ou a déjà servi. Demandez un nouveau lien à Katana sur Messenger.', 'r') : '') + '<form id="f-connexion" class="panel" novalidate><h3>Se connecter</h3><label class="lab" for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email"><label class="lab" for="c-mdp">Mot de passe</label><input type="password" id="c-mdp" autocomplete="current-password"><div id="c-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Se connecter</button></div><p class="mute small">Mot de passe oublié ? Écrivez à Katana sur Messenger : il vous enverra un lien pour en choisir un nouveau.</p></form>' + (PARAM.inscriptions_ouvertes === true ? '' : note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV.'));
@@ -2339,6 +2355,201 @@ async function creerLien(b) {
   }
   out.innerHTML = '<label class="lab" for="l-lien">Lien à envoyer au joueur</label><textarea id="l-lien" class="msg-out" rows="4" readonly>' + esc(data.lien) + '</textarea><div class="row-btns"><button class="btn" type="button" data-act="lien-copier">Copier le lien</button></div>';
 }
+
+/* ---------------- Lot 2A : inscription, membres, sauvegarde ---------------- */
+const ADM = { nbInsc: 0, derniereSauvegarde: null, sauvegardeEnRetard: false };
+let INS = { cands: [], anciens: [] }, MB = [];
+const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandées', actif: 'Actif', refuse: 'Refusée', retire: 'Retiré', exclu: 'Exclu' };
+const matTxt = n => n ? 'DFMM-' + n : '—';
+async function chargerCompteursAdmin() {
+  if (!SB) return;
+  const [a, b] = await Promise.all([
+    SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
+    SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1)
+  ]);
+  ADM.nbInsc = a.count || 0;
+  ADM.derniereSauvegarde = b.data && b.data[0] ? b.data[0].date : null;
+  ADM.sauvegardeEnRetard = !ADM.derniereSauvegarde || Date.now() - new Date(ADM.derniereSauvegarde).getTime() > 7 * 86400000;
+}
+
+/* ----- Formulaire public d'inscription ----- */
+function rendreInscription() {
+  const z = $('#ins-zone');
+  if (!PRET) { z.innerHTML = '<p class="mute">Chargement…</p>'; return; }
+  if (!SB) { z.innerHTML = note('Inscription impossible pour le moment : connexion à la base indisponible.', 'r'); return; }
+  if (PARAM.inscriptions_ouvertes !== true) { z.innerHTML = note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV. Les membres déjà approuvés (DFMM-1 à DFMM-25) se réinscriront à ce moment-là et garderont leur matricule.'); return; }
+  if (SESSION) { z.innerHTML = note('Vous êtes connecté : votre inscription est déjà enregistrée. Suivez-la dans « Mon compte ».') + '<a class="btn" href="#compte">Mon compte</a>'; return; }
+  if ($('#f-inscription')) return;
+  const D = DEM.inscription;
+  z.innerHTML = '<form id="f-inscription" class="panel" novalidate><p class="mute">' + esc(D.intro) + '</p><div class="grid-f" id="ins-champs">' + D.champs.map(f => champHtml(f, {}, 'i-')).join('') + '</div><div class="grid-f"><div><label class="lab" for="i-mdp">Mot de passe (8 caractères au moins) <span class="dim">*</span></label><input type="password" id="i-mdp" autocomplete="new-password"></div><div><label class="lab" for="i-mdp2">Le même, une seconde fois <span class="dim">*</span></label><input type="password" id="i-mdp2" autocomplete="new-password"></div></div><label class="lab" for="i-capture">Capture de votre profil de jeu, avec le pseudo et l’UID bien visibles <span class="dim">*</span></label><input type="file" id="i-capture" accept="image/*"><div id="i-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Envoyer mon inscription</button></div></form>';
+  majVisibilite(D.champs, 'i-', $('#ins-champs'));
+}
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#ins-champs')) majVisibilite(DEM.inscription.champs, 'i-', $('#ins-champs')); if (e.target.id === 'mb2-rech') afficherMembres(); });
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#ins-champs')) majVisibilite(DEM.inscription.champs, 'i-', $('#ins-champs')); });
+async function erreurFonction(data, error, defaut) {
+  let t = data && data.erreur;
+  if (!t && error && error.context && typeof error.context.json === 'function') { try { t = (await error.context.json()).erreur; } catch (x) { t = ''; } }
+  return t || defaut;
+}
+async function soumettreInscription(e) {
+  e.preventDefault();
+  const D = DEM.inscription, err = $('#i-err'), btn = e.submitter;
+  const o = lireChamps(D.champs, 'i-');
+  const mdp = $('#i-mdp').value, f = $('#i-capture').files[0];
+  let m = verifierChamps(D.champs, o) || (D.verif ? D.verif(o) : '');
+  if (!m && mdp.length < 8) m = 'Le mot de passe doit faire 8 caractères au moins.';
+  if (!m && mdp !== $('#i-mdp2').value) m = 'Les deux mots de passe ne sont pas identiques.';
+  if (!m && !f) m = 'Ajoutez la capture de votre profil de jeu.';
+  err.textContent = m;
+  if (m) return;
+  if (btn) btn.disabled = true;
+  try {
+    const img = await reduireImage(f, 1600, 0.85);
+    const fd = new FormData();
+    fd.append('donnees', JSON.stringify(Object.assign({}, o, { mot_de_passe: mdp })));
+    fd.append('capture', new File([img], 'profil.jpg', { type: 'image/jpeg' }));
+    const { data, error } = await SB.functions.invoke('inscription', { body: fd });
+    if (error || !data || !data.ok) throw new Error(await erreurFonction(data, error, 'Inscription impossible pour le moment. Réessayez plus tard.'));
+    $('#ins-zone').innerHTML = note('Inscription envoyée. Katana va la vérifier. Vous pouvez déjà vous connecter avec votre e-mail et votre mot de passe pour suivre son état.') + '<a class="btn" href="#compte">Me connecter</a>';
+    window.scrollTo(0, 0);
+  } catch (x) { err.textContent = x.message; }
+  finally { if (btn) btn.disabled = false; }
+}
+
+/* ----- Mon compte : dossier du membre ----- */
+async function chargerMonDossier() {
+  const z = $('#mon-dossier'); if (!z || !SB) return;
+  const { data, error } = await SB.from('membres').select('matricule, nom_gamer, statut, decision, comptes_jeu(uid, pseudo, statut)').maybeSingle();
+  if (!z.isConnected) return;
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  if (!data) { z.innerHTML = '<p class="mute">Aucune inscription n’est liée à ce compte.</p>'; return; }
+  const motif = esc((data.decision || {}).motif || '');
+  const etat = { en_attente: ['Votre inscription est en attente de vérification par Katana.', ''], precisions: ['Katana demande des précisions : ' + motif + '. Répondez-lui sur Messenger.', 'a'], refuse: ['Votre inscription n’a pas été acceptée. Motif : ' + motif + '.', 'r'], actif: ['Vous êtes membre de la LEAGUE UV.', ''], retire: ['Vous avez quitté la ligue.', ''], exclu: ['Votre accès à la ligue est fermé.', 'r'] }[data.statut] || ['', ''];
+  const cpts = (data.comptes_jeu || []).map(c => esc(c.pseudo) + ' · UID ' + esc(c.uid) + ' (' + ({ actif: 'actif', en_pause: 'en pause', remplace: 'remplacé' }[c.statut] || c.statut) + ')').join('<br>') || '—';
+  z.innerHTML = '<h3>Mon dossier</h3><dl class="kv"><dt>Nom de gamer</dt><dd>' + esc(data.nom_gamer) + '</dd><dt>Matricule</dt><dd>' + matTxt(data.matricule) + '</dd><dt>Comptes de jeu</dt><dd>' + cpts + '</dd></dl>' + (etat[0] ? note(etat[0], etat[1]) : '');
+}
+
+/* ----- Administration : inscriptions ----- */
+TAB.inscriptions = {
+  shell: () => '<div id="ins-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: chargerInscriptions
+};
+async function chargerInscriptions() {
+  const z = $('#ins-liste'); if (!z) return;
+  const [a, b] = await Promise.all([
+    SB.from('membres').select('id, nom_gamer, statut, cree_le, decision, membres_prives(*), comptes_jeu(uid, pseudo, statut)').in('statut', ['en_attente', 'precisions']).order('cree_le'),
+    SB.from('matricules_anciens').select('*').is('repris_par', null).order('matricule')
+  ]);
+  if (!$('#ins-liste')) return;
+  if (a.error || b.error) { z.innerHTML = note('Lecture impossible : ' + esc((a.error || b.error).message), 'r'); return; }
+  INS = { cands: a.data || [], anciens: b.data || [] };
+  z.innerHTML = (INS.anciens.length ? '' : note('Aucun ancien matricule disponible : si vous attendez des réinscriptions (DFMM-1 à DFMM-25), importez d’abord la liste dans Supabase.', 'a')) + (INS.cands.length ? INS.cands.map(carteInscription).join('') : note('Aucune candidature à traiter.'));
+  for (const c of INS.cands) {
+    const chemin = c.membres_prives && c.membres_prives.capture_profil; if (!chemin) continue;
+    const { data } = await SB.storage.from('profils').createSignedUrl(chemin, 600);
+    const img = $('#cap-' + c.id);
+    if (img && data && data.signedUrl) { img.src = data.signedUrl; img.parentElement.href = data.signedUrl; img.parentElement.hidden = false; }
+  }
+}
+function lienFb(u) { u = String(u || '').trim(); if (!u) return '—'; const h = /^https?:\/\//i.test(u) ? u : 'https://' + u; return '<a href="' + esc(h) + '" target="_blank" rel="noopener noreferrer">' + esc(u) + '</a>'; }
+function carteInscription(c) {
+  const p = c.membres_prives || {}, cpt = (c.comptes_jeu || [])[0] || {}, id = c.id;
+  const age = p.date_naissance ? Math.floor((Date.now() - new Date(p.date_naissance).getTime()) / 31557600000) + ' ans' : '';
+  const kv = [['Nom réel', esc(p.nom_reel)], ['E-mail', esc(p.email)], ['Naissance', p.date_naissance ? fDc(p.date_naissance) + ' (' + age + ')' : '—'], ['Genre', esc(p.genre)], ['Facebook', lienFb(p.facebook)], ['Clan', esc(p.clan || '—')], ['Pseudo en jeu', esc(cpt.pseudo)], ['UID', esc(cpt.uid) + (/^\d{5,20}$/.test(cpt.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Résidence', p.residence === 'Étranger' ? 'Étranger, ' + esc(p.pays) : 'Madagascar, ' + esc(p.province) + ', ' + esc(p.zone)], ['Comprend le malgache', p.comprend_mg ? 'Oui' : 'Non'], ['Parle le malgache', p.parle_mg ? 'Oui' : 'Non (information seulement)'], ['Origine malgache déclarée', p.origine_mg ? 'Oui' : 'Non'], ['Reçue le', fDT(L.versLocal(c.cree_le))]];
+  const sugg = INS.anciens.filter(x => x.nom_gamer && L.normPseudo(x.nom_gamer) === L.normPseudo(c.nom_gamer));
+  const autres = INS.anciens.filter(x => sugg.indexOf(x) < 0);
+  const opt = x => '<option value="' + x.matricule + '">DFMM-' + x.matricule + ' · ' + esc(x.nom_gamer || '') + ' · approuvé le ' + fDc(x.date_approbation) + '</option>';
+  return '<div class="card-l"><div class="t"><div><b>' + esc(c.nom_gamer) + '</b></div>' + badgeStatut(STATUTS_MB[c.statut]) + '</div>'
+    + (c.statut === 'precisions' ? note('Précisions demandées : ' + esc((c.decision || {}).motif || ''), 'a') : '')
+    + '<dl class="kv">' + kv.map(([k, x]) => '<dt>' + k + '</dt><dd>' + x + '</dd>').join('') + '</dl>'
+    + '<div class="thumbs"><a hidden target="_blank" rel="noopener"><img id="cap-' + id + '" alt="Capture du profil de ' + esc(c.nom_gamer) + '" style="width:220px;height:auto;max-height:none"></a></div>'
+    + '<h3 style="margin-top:12px">Vérifications</h3><label class="coche"><input type="checkbox" id="vc-' + id + '"><span>Capture du profil vérifiée : le pseudo et l’UID correspondent.</span></label><label class="coche"><input type="checkbox" id="vo-' + id + '"><span>Nationalité ou origine malgache vérifiée.</span></label>'
+    + '<h3 style="margin-top:12px">Décision</h3><div class="choix"><label><input type="radio" name="dec-' + id + '" value="approuver"> Approuver</label><label><input type="radio" name="dec-' + id + '" value="precisions"> Demander des précisions</label><label><input type="radio" name="dec-' + id + '" value="refuser"> Refuser</label></div>'
+    + '<label class="lab" for="ma-' + id + '">Matricule (si vous approuvez)</label><select id="ma-' + id + '"><option value="">Nouveau matricule (numéro suivant, à partir de DFMM-26)</option>' + (sugg.length ? '<optgroup label="Même nom de gamer">' + sugg.map(opt).join('') + '</optgroup>' : '') + (autres.length ? '<optgroup label="Autres anciens matricules">' + autres.map(opt).join('') + '</optgroup>' : '') + '</select>'
+    + '<label class="lab" for="mo-' + id + '">Motif ou commentaire (obligatoire pour refuser ou demander des précisions)</label><textarea id="mo-' + id + '" rows="2"></textarea><div id="er-' + id + '" class="err" role="alert"></div>'
+    + '<div class="row-btns"><button class="btn" type="button" data-act="ins-decider" data-id="' + id + '">Enregistrer la décision</button></div></div>';
+}
+function messageInscription(c, dec, motif, mat) {
+  const nom = c ? c.nom_gamer : '', cpt = c && (c.comptes_jeu || [])[0];
+  if (dec === 'approuver') return 'Bonjour ' + nom + ',\n\nVotre inscription à DFMM et à la LEAGUE UV est approuvée.\nVotre matricule : DFMM-' + mat + '\nCompte enregistré : ' + (cpt ? cpt.pseudo : '') + '\n\nGardez ce matricule : il vous sera demandé pour vos démarches.\n\nBienvenue dans la communauté !\nKatana, organisation DFMM';
+  if (dec === 'refuser') return 'Bonjour ' + nom + ',\n\nVotre demande d’inscription à DFMM et à la LEAGUE UV n’a pas été acceptée.\nMotif : ' + motif + '\n\nVous pouvez me répondre ici pour toute question.\nKatana, organisation DFMM';
+  return 'Bonjour ' + nom + ',\n\nPour terminer l’examen de votre inscription, il me manque une information :\n' + motif + '\n\nMerci de me répondre ici.\nKatana, organisation DFMM';
+}
+async function deciderInscriptionSB(b) {
+  const id = b.dataset.id, dec = radio('dec-' + id), motif = v('mo-' + id), anc = v('ma-' + id), err = $('#er-' + id);
+  err.textContent = '';
+  if (!dec) { err.textContent = 'Choisissez une décision.'; return; }
+  if (dec !== 'approuver' && !motif) { err.textContent = 'Le motif est obligatoire pour refuser ou demander des précisions.'; return; }
+  if (dec === 'approuver' && (!coche('vc-' + id) || !coche('vo-' + id))) { err.textContent = 'Cochez les deux vérifications avant d’approuver.'; return; }
+  b.disabled = true;
+  const { data, error } = await SB.rpc('decider_inscription', { p_membre: Number(id), p_decision: dec, p_motif: motif || null, p_matricule_ancien: dec === 'approuver' && anc ? Number(anc) : null });
+  b.disabled = false;
+  if (error) { err.textContent = error.message; return; }
+  const c = INS.cands.find(x => String(x.id) === String(id));
+  modalTexte('Message à envoyer au joueur', 'Envoyez ce message en privé sur Messenger.', messageInscription(c, dec, motif, data));
+  await chargerCompteursAdmin();
+  UI.tabRendu = ''; rendreAdmin();
+}
+
+/* ----- Administration : membres ----- */
+TAB.membres = {
+  shell: () => '<label class="lab" for="mb2-rech">Rechercher</label><input type="search" id="mb2-rech" placeholder="Nom de gamer, matricule, pseudo, UID…"><div id="mb2-liste" style="margin-top:12px"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: chargerMembres
+};
+async function chargerMembres() {
+  const { data, error } = await SB.from('membres').select('id, matricule, nom_gamer, statut, date_approbation, comptes_jeu(uid, pseudo, statut)').not('matricule', 'is', null).order('matricule');
+  const z = $('#mb2-liste'); if (!z) return;
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  MB = data || []; afficherMembres();
+}
+function afficherMembres() {
+  const z = $('#mb2-liste'); if (!z) return;
+  const q = L.normPseudo(v('mb2-rech'));
+  const l = MB.filter(m => !q || [matTxt(m.matricule), m.nom_gamer].concat((m.comptes_jeu || []).map(c => c.pseudo), (m.comptes_jeu || []).map(c => c.uid)).some(x => x && L.normPseudo(x).indexOf(q) >= 0));
+  if (!MB.length) { z.innerHTML = note('Aucun membre pour le moment. Les membres apparaissent ici une fois leur inscription approuvée.'); return; }
+  if (!l.length) { z.innerHTML = note('Aucun membre ne correspond.'); return; }
+  z.innerHTML = '<p class="mute small">' + l.length + ' membre(s)</p><div class="scroll"><table><thead><tr><th>Matricule</th><th>Nom de gamer</th><th>Statut</th><th>Compte actif</th><th>Approuvé le</th></tr></thead><tbody>' + l.map(m => { const c = (m.comptes_jeu || []).find(x => x.statut === 'actif'); return '<tr><td class="nowrap">' + matTxt(m.matricule) + '</td><td>' + esc(m.nom_gamer) + '</td><td>' + badgeStatut(STATUTS_MB[m.statut]) + '</td><td>' + (c ? esc(c.pseudo) + '<div class="dim small">UID ' + esc(c.uid) + '</div>' : '—') + '</td><td class="nowrap">' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+}
+
+/* ----- Administration : sauvegarde hebdomadaire ----- */
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins'];
+TAB.sauvegarde = {
+  shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
+  body: () => '',
+  charger: () => { const z = $('#sv-derniere'); if (z) z.innerHTML = 'Dernière sauvegarde : <b>' + (ADM.derniereSauvegarde ? fDT(L.versLocal(ADM.derniereSauvegarde)) : 'jamais') + '</b>' + (ADM.sauvegardeEnRetard ? ' · <span class="err">à faire</span>' : ''); }
+};
+async function telechargerSauvegarde(b) {
+  const etat = $('#sv-etat'); b.disabled = true;
+  const out = { format: 'DFMM-LEAGUE-UV', version: 2, exporte_le: new Date().toISOString(), tables: {} };
+  try {
+    for (const t of TABLES_SAUVEGARDE) {
+      etat.textContent = 'Lecture : ' + t + '…';
+      let rows = [], de = 0;
+      for (;;) {
+        const { data, error } = await SB.from(t).select('*').range(de, de + 999);
+        if (error) throw new Error(t + ' : ' + error.message);
+        rows = rows.concat(data || []);
+        if (!data || data.length < 1000) break;
+        de += 1000;
+      }
+      out.tables[t] = rows;
+    }
+    const blob = new Blob([JSON.stringify(out, null, 1)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'DFMM_LeagueUV_sauvegarde_' + now().slice(0, 10) + '.json';
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
+    const { error } = await SB.from('journal').insert({ type: 'Sauvegarde', decision: 'Sauvegarde complète téléchargée' });
+    etat.textContent = error ? 'Fichier téléchargé, mais la date n’a pas pu être notée : ' + error.message : 'Sauvegarde téléchargée.';
+    await chargerCompteursAdmin(); TAB.sauvegarde.charger();
+    $('#adm-tabs').innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, lb]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(lb) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
+  } catch (x) { etat.textContent = 'Échec : ' + x.message; }
+  finally { b.disabled = false; }
+}
+ACTIONS['ins-decider'] = b => deciderInscriptionSB(b);
+ACTIONS['sv2-json'] = b => telechargerSauvegarde(b);
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
