@@ -1,0 +1,16 @@
+{
+  "name": "LEAGUE UV — DFMM",
+  "short_name": "LEAGUE UV",
+  "description": "La ligue communautaire des joueurs malgaches de Delta Force Mobile (DFMM).",
+  "lang": "fr",
+  "start_url": "./#accueil",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#080A0A",
+  "theme_color": "#080A0A",
+  "icons": [
+    { "src": "icons/icone-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icone-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
