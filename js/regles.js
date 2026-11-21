@@ -1,4 +1,7 @@
-/* LEAGUE UV — DFMM : règles de calcul, sans affichage (testables à part). */
+/* LEAGUE UV — DFMM : règles de calcul, sans affichage (testables à part).
+   Référence : cahier « LEAGUE UV — Règles et sanctions » (21/11/2026).
+   Aucune valeur réglable n'est écrite ici : elles viennent toutes de la table
+   « parametres » de Supabase (section 10 du cahier), passées par regles(). */
 var L = (function () {
   'use strict';
 
@@ -14,26 +17,20 @@ var L = (function () {
     { k: 'tac', label: 'Contribution tactique', court: 'Tact.' }
   ];
 
-  // Ordre obligatoire de priorité des lots (guide, section 05)
+  // Ordre obligatoire de priorité des lots (cahier, section 8)
   var CATS = [
     { key: 'most_elim', kind: 'MOST', fam: 'elim', label: 'MOST Eliminator', prio: 1 },
     { key: 'most_med', kind: 'MOST', fam: 'med', label: 'MOST Medic', prio: 2 },
     { key: 'most_ing', kind: 'MOST', fam: 'ing', label: 'MOST Engineer', prio: 3 },
-    { key: 'most_tac', kind: 'MOST', fam: 'tac', label: 'MOST Tactician', prio: 4 },
-    { key: 'most_obj', kind: 'MOST', fam: 'obj', label: 'MOST Objective', prio: 5 },
+    { key: 'most_obj', kind: 'MOST', fam: 'obj', label: 'MOST Objective', prio: 4 },
+    { key: 'most_tac', kind: 'MOST', fam: 'tac', label: 'MOST Tactician', prio: 5 },
     { key: 'best_surv', kind: 'SURV', fam: 'morts', label: 'BEST Survivor', prio: 6 },
     { key: 'best_elim', kind: 'BEST', fam: 'elim', label: 'BEST Eliminator', prio: 7 },
     { key: 'best_med', kind: 'BEST', fam: 'med', label: 'BEST Medic', prio: 8 },
     { key: 'best_ing', kind: 'BEST', fam: 'ing', label: 'BEST Engineer', prio: 9 },
-    { key: 'best_tac', kind: 'BEST', fam: 'tac', label: 'BEST Tactician', prio: 10 },
-    { key: 'best_obj', kind: 'BEST', fam: 'obj', label: 'BEST Objective', prio: 11 }
+    { key: 'best_obj', kind: 'BEST', fam: 'obj', label: 'BEST Objective', prio: 10 },
+    { key: 'best_tac', kind: 'BEST', fam: 'tac', label: 'BEST Tactician', prio: 11 }
   ];
-
-  var DEFAULTS = {
-    min_participants: 16, ecart_max: 1, pct_membres: 30, delai_capture: 30,
-    duree_creneau_h: 6, periodicite: 14, coupure_jour: 6, coupure_heure: '17:00',
-    audit_jours: 7, recours_h: 48, delai_changement_jours: 7, max_comptes: 2
-  };
 
   var PROVINCES = [
     { p: 'Antananarivo', v: 'Antananarivo' }, { p: 'Antsiranana', v: 'Antsiranana' },
@@ -43,18 +40,38 @@ var L = (function () {
 
   var CARTES = ['Craqué', 'Ascension', 'Ligne de tranchées', 'Accident de train', "Canal d'Akh", 'Faille'];
 
-  function regles(saison) {
-    var R = {}, k;
-    for (k in DEFAULTS) R[k] = DEFAULTS[k];
-    if (saison) for (k in DEFAULTS) if (saison[k] !== undefined && saison[k] !== '' && saison[k] !== null) R[k] = typeof DEFAULTS[k] === 'number' ? Number(saison[k]) : saison[k];
+  // ---------- Paramètres (section 10) : tous obligatoires, aucune valeur par défaut ----------
+  var PARAMS_REQUIS = [
+    'participants_min', 'ecart_factions_max', 'seuil_membres_pct', 'delai_capture_min', 'delai_declaration_h',
+    'plage_fin_h', 'coupure_jour', 'coupure_heure', 'publication_jour', 'periodicite_jours',
+    'classement_final_jours', 'reclamation_h', 'comptes_max', 'comptes_actifs_max',
+    'delai_changement_compte_jours', 'convocation_h', 'attente_h', 'recours_h', 'suspension_max_jours',
+    'alerte_facteur', 'alerte_ecart_elim', 'alerte_ecart_score'
+  ];
+  function regles(params) {
+    var R = {}, manquants = [];
+    PARAMS_REQUIS.forEach(function (k) {
+      var v = params ? params[k] : undefined;
+      if (v === undefined || v === null || v === '') manquants.push(k); else R[k] = v;
+    });
+    if (manquants.length) throw new Error('Paramètre(s) manquant(s) : ' + manquants.join(', ') + '.');
     return R;
   }
 
-  // ---------- Dates (heure locale de Madagascar, chaînes AAAA-MM-JJTHH:MM) ----------
+  // ---------- Dates (heure de Madagascar, chaînes AAAA-MM-JJTHH:MM) ----------
   function pad(n) { return String(n).padStart(2, '0'); }
   function nowStr(d) {
     d = d || new Date();
     return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+  // Instant du serveur (ex. 2026-11-21T13:05:00Z) → heure de Madagascar « AAAA-MM-JJTHH:MM ».
+  function versLocal(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return '';
+    var p = {};
+    new Intl.DateTimeFormat('en-GB', { timeZone: 'Indian/Antananarivo', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' })
+      .formatToParts(d).forEach(function (x) { p[x.type] = x.value; });
+    return p.year + '-' + p.month + '-' + p.day + 'T' + p.hour + ':' + p.minute;
   }
   function validDT(s) { return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(s || '')); }
   function validD(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
@@ -77,7 +94,7 @@ var L = (function () {
     return (per || []).some(function (p) { return p && p.debut && p.debut <= t && (!p.fin || t < p.fin); });
   }
   function suspendedAt(m, t) {
-    return (m && m.suspensions || []).some(function (s) { return s && s.debut && s.debut <= t && (!s.fin || t < s.fin); });
+    return (m && m.suspensions || []).some(function (s) { return s && s.debut && !s.annulee && s.debut <= t && (!s.fin || t < s.fin); });
   }
   function statutAffiche(m, now) {
     if (!m) return '';
@@ -135,7 +152,7 @@ var L = (function () {
     return { mat: '', cpt: '', res: 'non inscrit' };
   }
 
-  // ---------- Comptabilisation d'une ligne ----------
+  // ---------- Une ligne rapporte-t-elle des points ? (= membre confirmé dans ce match) ----------
   function ligneCompte(l, match, ctx) {
     if (!l.mat) return { ok: false, raison: l.res === 'à identifier' ? 'à identifier' : 'joueur non inscrit' };
     var m = ctx.membres[l.mat];
@@ -148,36 +165,36 @@ var L = (function () {
     if (!c) return { ok: false, raison: 'compte non choisi' };
     if (c.matricule !== l.mat) return { ok: false, raison: 'compte d’un autre membre' };
     if (!inPeriods(c.periodes, t)) return { ok: false, raison: 'compte non actif à cette date' };
+    if ((l.exclue_sanction)) return { ok: false, raison: 'statistiques retirées par décision' };
     return { ok: true };
   }
 
-  function finCompetition(saison) {
-    if (!saison || !validD(saison.fin)) return null;
-    return addDays(saison.fin, -regles(saison).audit_jours);
-  }
+  // Seuil de membres confirmés : pourcentage du total des participants, arrondi vers le bas.
+  function membresRequis(total, R) { return Math.floor(total * R.seuil_membres_pct / 100 + 1e-9); }
 
+  // Plage de l'heure de fin d'un match libre : de l'heure annoncée à « plage_fin_h » heures après.
   function bornesCreneau(cr, R) {
     var deb = cr.date + 'T' + (cr.debut || '00:00');
-    var fin = cr.fin ? cr.date + 'T' + cr.fin : addMinutes(deb, R.duree_creneau_h * 60);
-    if (fin <= deb) fin = addMinutes(fin, 1440);
-    return { deb: deb, fin: fin };
+    return { deb: deb, fin: addMinutes(deb, R.plage_fin_h * 60) };
   }
 
   function valeurManquante(v) { return v === '' || v === null || v === undefined || isNaN(Number(v)); }
 
   // ---------- Contrôles d'un match ----------
-  function controlesMatch(match, ctx, saison) {
-    var R = regles(saison), B = [], W = [];
+  // bloquants : le match ne peut pas être validé ; attente : le match passe « en attente » (Katana tranche) ;
+  // alertes : information pour Katana, jamais de sanction automatique.
+  function controlesMatch(match, ctx, saison, R) {
+    var B = [], A = [], W = [];
     var lignes = match.lignes || [];
     var total = lignes.length;
     var h = lignes.filter(function (l) { return l.faction === 'HAAVK'; }).length;
     var g = lignes.filter(function (l) { return l.faction === 'GTI'; }).length;
     var sansF = total - h - g;
     if (!validDT(match.fin)) B.push('Date et heure de fin du match manquantes.');
-    if (total < R.min_participants) B.push(total + ' participant(s) : il en faut au moins ' + R.min_participants + '.');
+    if (total < R.participants_min) B.push(total + ' participant(s) : il en faut au moins ' + R.participants_min + '.');
     if (sansF) B.push(sansF + ' ligne(s) sans faction.');
     var ecart = Math.abs(h - g);
-    if (ecart > R.ecart_max) B.push('Écart d’effectif de ' + ecart + ' (HAAVK ' + h + ', GTI ' + g + ') : invalidation automatique, maximum ' + R.ecart_max + '.');
+    if (ecart > R.ecart_factions_max) B.push('Écart d’effectif de ' + ecart + ' (HAAVK ' + h + ', GTI ' + g + ') : maximum ' + R.ecart_factions_max + '.');
     var manq = [], neg = [];
     lignes.forEach(function (l, i) {
       STATS.forEach(function (s) {
@@ -194,52 +211,53 @@ var L = (function () {
     var vusM = {}, dupM = [];
     lignes.forEach(function (l) { if (l.mat) { if (vusM[l.mat]) dupM.push(l.mat); vusM[l.mat] = 1; } });
     if (dupM.length) B.push('Même joueur présent plusieurs fois (un seul passage par match, même avec deux comptes) : ' + uniq(dupM).join(', ') + '.');
+    // Membres confirmés : seules les lignes qui rapportent des points ; une ligne à identifier ne compte pas avant vérification.
+    var membres = lignes.filter(function (l) { return ligneCompte(l, match, ctx).ok; }).length;
+    var requis = membresRequis(total, R);
+    if (total && membres < requis) B.push(membres + ' membre(s) confirmé(s) sur ' + total + ' participants : il en faut au moins ' + requis + ' (' + R.seuil_membres_pct + ' %, arrondi vers le bas).');
     var aid = lignes.filter(function (l) { return l.res === 'à identifier'; }).length;
-    if (aid) B.push(aid + ' ligne(s) à identifier : choisir le bon compte ou confirmer « non inscrit ».');
-    var membres = lignes.filter(function (l) { return l.mat; }).length;
-    var requis = Math.ceil(total * R.pct_membres / 100 - 1e-9);
-    if (total && membres < requis) B.push(membres + ' membre(s) inscrit(s) sur ' + total + ' participants : il en faut au moins ' + requis + ' (' + R.pct_membres + ' %).');
+    if (aid) W.push(aid + ' ligne(s) à identifier : le match peut être validé sans elles ; une fois identifiées, elles compteront pour les classements suivants.');
     if (saison && validDT(match.fin)) {
       if (validD(saison.debut) && match.fin.slice(0, 10) < saison.debut) B.push('Match terminé avant le début de la saison (' + saison.debut + ').');
-      var lim = finCompetition(saison);
-      if (lim && match.fin.slice(0, 10) > lim) B.push('Match terminé après la date limite des matchs (' + lim + ') : les ' + R.audit_jours + ' derniers jours de la saison sont réservés à l’audit.');
+      if (validD(saison.fin) && match.fin.slice(0, 10) > saison.fin) B.push('Match terminé après la fin de la saison (' + saison.fin + ').');
     }
     if (!saison) B.push('Aucune saison choisie.');
+    // Délai d'envoi : pour tous les matchs (Katana compris), sauf la saisie de démarrage.
+    if (!match.demarrage) {
+      if (!validDT(match.envoi)) B.push('Heure d’envoi de la capture manquante.');
+      else if (validDT(match.fin)) {
+        var d = diffMinutes(match.fin, match.envoi);
+        if (d > R.delai_capture_min) B.push('Capture envoyée ' + d + ' min après la fin du match (maximum ' + R.delai_capture_min + ' min) : rejetée.');
+        if (d < 0) W.push('Heure d’envoi antérieure à l’heure de fin lue sur la capture : à vérifier.');
+      }
+    }
     var autres = (ctx.matchsList || []).filter(function (m) { return m.id !== match.id; });
     if (match.type === 'Libre') {
       var cr = match.creneau_id ? ctx.creneaux[match.creneau_id] : null;
-      if (!cr) B.push('Match libre sans créneau déclaré et accepté.');
+      if (!cr) B.push('Match libre sans créneau déclaré.');
       else {
-        if (cr.statut !== 'Accepté') B.push('Créneau ' + cr.id + ' non accepté (' + cr.statut + ').');
+        if (cr.statut === 'Annulé') B.push('Créneau ' + cr.id + ' annulé.');
         if (validDT(match.fin)) {
           var bo = bornesCreneau(cr, R);
-          if (match.fin < bo.deb || match.fin > bo.fin) B.push('Heure de fin hors du créneau accepté (' + bo.deb.replace('T', ' ') + ' → ' + bo.fin.replace('T', ' ') + ').');
+          if (match.fin < bo.deb || match.fin > bo.fin) A.push('Heure de fin hors de la plage du créneau (' + bo.deb.replace('T', ' ') + ' → ' + bo.fin.replace('T', ' ') + ') : match en attente.');
         }
         var deja = autres.filter(function (m) { return m.creneau_id === cr.id && m.statut === 'Validé'; });
         if (deja.length) B.push('Un match est déjà validé pour ce créneau (' + deja[0].id + ') : un seul match par créneau.');
       }
-      if (!validDT(match.recu)) B.push('Heure de réception de la capture manquante.');
-      else if (validDT(match.fin)) {
-        var d = diffMinutes(match.fin, match.recu);
-        if (d > R.delai_capture) B.push('Capture reçue ' + d + ' min après la fin du match (maximum ' + R.delai_capture + ' min).');
-        if (d < 0) W.push('Heure de réception antérieure à la fin du match : à vérifier.');
-      }
-    } else if (validDT(match.fin)) {
-      var memeJour = autres.filter(function (m) { return m.type !== 'Libre' && m.statut === 'Validé' && validDT(m.fin) && m.fin.slice(0, 10) === match.fin.slice(0, 10); });
-      if (memeJour.length) W.push('Un autre match officiel est déjà validé ce jour-là (' + memeJour.map(function (m) { return m.id; }).join(', ') + ') : un match par session.');
     }
     lignes.forEach(function (l, i) {
-      if (l.mat) { var st = ligneCompte(l, match, ctx); if (!st.ok) W.push('Ligne ' + (i + 1) + ' (' + l.pseudo + ') : non comptabilisée, ' + st.raison + '.'); }
+      if (l.mat) { var st = ligneCompte(l, match, ctx); if (!st.ok) W.push('Ligne ' + (i + 1) + ' (' + l.pseudo + ') : non comptée, ' + st.raison + '.'); }
     });
-    alertesPerformance(match, ctx).forEach(function (a) { W.push(a); });
+    alertesPerformance(match, ctx, R).forEach(function (a) { W.push(a); });
     if (!(match.captures && match.captures.length)) W.push('Aucune capture archivée pour ce match (preuve à conserver).');
-    return { bloquants: B, alertes: W, total: total, h: h, g: g, membres: membres, requis: requis };
+    return { bloquants: B, attente: A, alertes: W, total: total, h: h, g: g, membres: membres, requis: requis };
   }
 
-  // Alerte d'anomalie de performance : jamais une preuve ni une sanction automatique.
-  function alertesPerformance(match, ctx) {
+  // Alerte d'anomalie de performance : jamais une preuve ni une sanction automatique. Seuils réglables.
+  function alertesPerformance(match, ctx, R) {
     var out = [];
     if (!validDT(match.fin)) return out;
+    var ecartMin = { elim: R.alerte_ecart_elim, score: R.alerte_ecart_score };
     (match.lignes || []).forEach(function (l) {
       if (!l.mat) return;
       var hist = [];
@@ -251,7 +269,7 @@ var L = (function () {
       ['elim', 'score'].forEach(function (k) {
         var moy = hist.reduce(function (s, x) { return s + (Number(x[k]) || 0); }, 0) / hist.length;
         var v = Number(l[k]) || 0;
-        if (moy > 0 && v > 2.5 * moy && v - moy >= (k === 'elim' ? 10 : 1000)) {
+        if (moy > 0 && v > R.alerte_facteur * moy && v - moy >= ecartMin[k]) {
           out.push('Alerte performance à examiner : ' + l.pseudo + ', ' + (k === 'elim' ? 'éliminations' : 'score') + ' ' + v + ' contre ' + moy.toFixed(1) + ' en moyenne (une anomalie n’est pas une preuve de fraude).');
         }
       });
@@ -259,17 +277,35 @@ var L = (function () {
     return out;
   }
 
-  // ---------- Agrégation et classements ----------
-  function agreger(ctx, saison, coupure) {
-    var lim = finCompetition(saison), J = {}, nb = 0;
+  // ---------- Ce qui entre dans un classement ----------
+  // opts.coupure : samedi 16 h (provisoire) ou lendemain de la fin de saison (final).
+  // opts.limiteDecisions : instant après lequel une décision ou une identification compte pour le classement suivant
+  //   (la coupure pour un provisoire ; la publication pour le classement final).
+  function matchDansClassement(m, saison, opts) {
+    if (m.statut !== 'Validé' || !saison || m.saison_id !== saison.id || !validDT(m.fin)) return false;
+    if (validD(saison.debut) && m.fin.slice(0, 10) < saison.debut) return false;
+    if (validD(saison.fin) && m.fin.slice(0, 10) > saison.fin) return false;
+    var lim = opts.limiteDecisions || opts.coupure;
+    if (m.attente_decide_le && lim && !(m.attente_decide_le < lim)) return false; // tranché après la coupure → suivant
+    if (m.type === 'Katana' || m.demarrage) return true;                             // exempté de la coupure de 16 h
+    var envoi = validDT(m.envoi) ? m.envoi : null;
+    return !opts.coupure || (envoi !== null && envoi < opts.coupure);
+  }
+  function ligneDansClassement(l, m, ctx, opts) {
+    if (!ligneCompte(l, m, ctx).ok) return false;
+    var lim = opts.limiteDecisions || opts.coupure;
+    if (l.res === 'manuel' && l.identifie_le && lim && !(l.identifie_le < lim)) return false; // identifiée après → suivant
+    return true;
+  }
+
+  function agreger(ctx, saison, opts) {
+    opts = opts || {};
+    var J = {}, nb = 0;
     (ctx.matchsList || []).forEach(function (m) {
-      if (m.statut !== 'Validé' || !saison || m.saison_id !== saison.id || !validDT(m.fin)) return;
-      if (validD(saison.debut) && m.fin.slice(0, 10) < saison.debut) return;
-      if (lim && m.fin.slice(0, 10) > lim) return;
-      if (coupure && !(m.fin < coupure)) return;
+      if (!matchDansClassement(m, saison, opts)) return;
       nb++;
       (m.lignes || []).forEach(function (l) {
-        if (!ligneCompte(l, m, ctx).ok) return;
+        if (!ligneDansClassement(l, m, ctx, opts)) return;
         var j = J[l.mat];
         if (!j) { j = J[l.mat] = { mat: l.mat, n: 0 }; STATS.forEach(function (s) { j[s.k] = 0; }); }
         j.n++;
@@ -292,10 +328,12 @@ var L = (function () {
   }
   function valeur(c, j) { return c.kind === 'MOST' ? j[c.fam] : j[c.fam] / j.n; }
 
-  function classer(agg, membres) {
+  // Classement des 11 titres. Retirés, exclus et suspendus (à la date « aInstant ») : hors médiane, hors Q1, non candidats.
+  function classer(agg, membres, aInstant) {
     var pop = agg.joueurs.filter(function (j) {
       var m = membres[j.mat];
-      return m && m.statut !== 'Retiré' && m.statut !== 'Exclu' && j.n >= 1;
+      if (!m || m.statut === 'Retiré' || m.statut === 'Exclu' || j.n < 1) return false;
+      return !(aInstant && suspendedAt(m, aInstant));
     });
     var ns = pop.map(function (j) { return j.n; }).sort(function (a, b) { return a - b; });
     var seuil = ns.length ? Math.ceil(quantile(ns, 0.5) - 1e-9) : 0;
@@ -316,11 +354,10 @@ var L = (function () {
       lignes.forEach(function (r, i) {
         if ((i > 0 && lignes[i - 1].rang === r.rang) || (i < lignes.length - 1 && lignes[i + 1].rang === r.rang)) r.egal = true;
       });
-      var titre = null, statut;
-      if (!lignes.length) statut = 'Aucun candidat';
-      else if (lignes.length > 1 && lignes[1].rang === 1) statut = 'Non attribué';
-      else { titre = lignes[0].j; statut = 'Attribué'; }
-      return { key: c.key, kind: c.kind, fam: c.fam, label: c.label, prio: c.prio, lignes: lignes, titre: titre, statut: statut };
+      // Égalité parfaite en tête après les 3 critères : co-lauréats.
+      var laureats = lignes.filter(function (l) { return l.rang === 1; }).map(function (l) { return l.j; });
+      var statut = !laureats.length ? 'Aucun candidat' : laureats.length > 1 ? 'Co-lauréats' : 'Attribué';
+      return { key: c.key, kind: c.kind, fam: c.fam, label: c.label, prio: c.prio, lignes: lignes, laureats: laureats, statut: statut };
     });
     return { pop: pop, seuil: seuil, q1: q1, cats: cats };
   }
@@ -329,15 +366,13 @@ var L = (function () {
   function attribuerLots(cl, lotsDispo) {
     var loti = {}, res = [];
     cl.cats.slice().sort(function (a, b) { return a.prio - b.prio; }).forEach(function (c) {
-      var r = { key: c.key, label: c.label, prio: c.prio, lot: !!(lotsDispo && lotsDispo[c.key]), laureat: c.titre ? c.titre.mat : null, statutTitre: c.statut, dejaLoti: null, beneficiaire: null, statut: '', explication: '' };
+      var r = { key: c.key, label: c.label, prio: c.prio, lot: !!(lotsDispo && lotsDispo[c.key]), laureats: c.laureats.map(function (j) { return j.mat; }), statutTitre: c.statut, dejaLoti: null, beneficiaire: null, statut: '', explication: '' };
       if (!r.lot) { r.statut = 'Pas de lot confirmé'; res.push(r); return; }
-      if (!c.titre) {
-        r.statut = 'Non attribué';
-        r.explication = c.statut === 'Aucun candidat' ? 'Aucun joueur éligible.' : 'Égalité parfaite : pas de lauréat unique, le lot reste non attribué.';
-        res.push(r); return;
-      }
-      r.dejaLoti = !!loti[c.titre.mat];
-      if (!r.dejaLoti) { r.beneficiaire = c.titre.mat; loti[c.titre.mat] = 1; r.statut = 'Attribué'; r.explication = 'Lot remis au lauréat sportif.'; res.push(r); return; }
+      if (!c.laureats.length) { r.statut = 'Non attribué'; r.explication = 'Aucun joueur éligible.'; res.push(r); return; }
+      if (c.laureats.length > 1) { r.statut = 'Non attribué'; r.explication = 'Co-lauréats : le titre est partagé, sans lot.'; res.push(r); return; }
+      var laureat = c.laureats[0].mat;
+      r.dejaLoti = !!loti[laureat];
+      if (!r.dejaLoti) { r.beneficiaire = laureat; loti[laureat] = 1; r.statut = 'Attribué'; r.explication = 'Lot remis au lauréat sportif.'; res.push(r); return; }
       var groupes = [];
       c.lignes.forEach(function (l) {
         var gr = groupes[groupes.length - 1];
@@ -359,19 +394,22 @@ var L = (function () {
   }
 
   // ---------- Calendrier ----------
-  function derniereCoupure(now, saison) {
-    var R = regles(saison), d = now.slice(0, 10);
-    for (var k = 0; k < 8; k++) {
-      var c = addDays(d, -k);
-      if (dow(c) === R.coupure_jour) { var dt = c + 'T' + R.coupure_heure; if (dt <= now) return dt; }
+  // Coupure d'un provisoire : le dernier « coupure_jour » avant la date de publication, à « coupure_heure ».
+  function coupurePour(datePublication, R) {
+    for (var k = 1; k <= 7; k++) {
+      var d = addDays(datePublication, -k);
+      if (dow(d) === R.coupure_jour) return d + 'T' + R.coupure_heure;
     }
     return null;
   }
-  function publicationsPrevues(saison, today, nb) {
+  // Coupure du classement final : tous les matchs de la saison, jusqu'au dernier jour inclus.
+  function coupureFinale(saison) { return validD(saison && saison.fin) ? addDays(saison.fin, 1) + 'T00:00' : null; }
+  function limiteClassementFinal(saison, R) { return validD(saison && saison.fin) ? addDays(saison.fin, R.classement_final_jours) : null; }
+  function publicationsPrevues(saison, today, nb, R) {
     if (!saison || !validD(saison.premier_provisoire)) return [];
-    var R = regles(saison), out = [], d = saison.premier_provisoire, guard = 0;
-    while (d < today && guard++ < 500) d = addDays(d, R.periodicite);
-    while (out.length < nb && guard++ < 600) { if (validD(saison.fin) && d > saison.fin) break; out.push(d); d = addDays(d, R.periodicite); }
+    var out = [], d = saison.premier_provisoire, guard = 0;
+    while (d < today && guard++ < 500) d = addDays(d, R.periodicite_jours);
+    while (out.length < nb && guard++ < 600) { if (validD(saison.fin) && d > saison.fin) break; out.push(d); d = addDays(d, R.periodicite_jours); }
     return out;
   }
 
@@ -441,14 +479,16 @@ var L = (function () {
   }
 
   return {
-    STATS: STATS, CATS: CATS, DEFAULTS: DEFAULTS, PROVINCES: PROVINCES, CARTES: CARTES,
-    regles: regles, nowStr: nowStr, validDT: validDT, validD: validD, normDT: normDT,
+    STATS: STATS, CATS: CATS, PROVINCES: PROVINCES, CARTES: CARTES, PARAMS_REQUIS: PARAMS_REQUIS,
+    regles: regles, nowStr: nowStr, versLocal: versLocal, validDT: validDT, validD: validD, normDT: normDT,
     addDays: addDays, addMinutes: addMinutes, diffMinutes: diffMinutes, dow: dow,
     inPeriods: inPeriods, suspendedAt: suspendedAt, statutAffiche: statutAffiche,
-    normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte,
-    finCompetition: finCompetition, bornesCreneau: bornesCreneau, controlesMatch: controlesMatch,
+    normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte, membresRequis: membresRequis,
+    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, alertesPerformance: alertesPerformance,
+    matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,
     agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots,
-    derniereCoupure: derniereCoupure, publicationsPrevues: publicationsPrevues,
+    coupurePour: coupurePour, coupureFinale: coupureFinale, limiteClassementFinal: limiteClassementFinal,
+    publicationsPrevues: publicationsPrevues,
     encodeMsg: encodeMsg, decodeMsg: decodeMsg, parseLignes: parseLignes, nombre: nombre
   };
 })();
