@@ -94,7 +94,7 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Lot 3A (PR n° 8) : migration 0007 et test 0007 faits. Guider Katana : Administration > Saison > Nouvelle saison « Aurora » (du 10/11/2026 au 21/01/2027, fin estimée, à corriger quand le jeu l'annonce), puis saisie des matchs déjà joués (Administration > Matchs > Nouveau match de Katana). Sur son accord écrit, fusionner la PR du lot 3A.
+1. Lot 3A (PR n° 8) : migration 0007 et test 0007 faits ; saison « Aurora » créée le 21/11/2026 (du 10/11/2026 au 21/01/2027, fin estimée, à corriger quand le jeu l'annonce) ; premier match saisi en brouillon (M-2, 16 lignes, 1 capture). Les matchs déjà joués sont saisis **en brouillon** : 0 membre réinscrit, donc la règle des 50 % bloque la validation ; une fois les réinscriptions approuvées, rouvrir chaque brouillon (les pseudos se relient seuls) et valider. Sur son accord écrit, fusionner la PR du lot 3A.
 2. E-mails de réinscription : inscriptions ouvertes le 21/11/2026 (à sa demande) ; message envoyé aux 25 le 21/11/2026 (`outils/envoi-reinscription.md`) ; approuver chaque réinscription avec l'ancien matricule. Les membres doivent être réinscrits et approuvés (reprise de l'ancien matricule, date d'origine) pour que leurs lignes de match comptent ; une ligne identifiée après la validation ne compte que pour les classements suivants.
 3. Lot 3B (matchs libres), puis classements publiés depuis Supabase (remplacer l'ancien onglet « Classements »).
 4. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (`index.html`).
