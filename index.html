@@ -1221,7 +1221,7 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'lots', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
 const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
@@ -1748,25 +1748,6 @@ function reduireImage(file, max, q) {
 function extraireJSON(t) { const a = String(t).indexOf('{'), b = String(t).lastIndexOf('}'); return a >= 0 && b > a ? String(t).slice(a, b + 1) : t; }
 
 /* ----- Titres et lots ----- */
-TAB.lots = {
-  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="lo-s">Saison</label><select id="lo-s">' + optSaisons(UI.lotSaison || (saisonActive() || {}).id) + '</select></div></div>' + note('Calcul sur tous les matchs validés de la saison (avant la date limite des matchs). À confirmer sur le classement final publié. Les lots ne sont jamais publiés : cochez seulement les catégories dont le lot est confirmé.', 'a'),
-  apres: () => { UI.lotSaison = $('#lo-s').value; },
-  body: () => {
-    const s = saisonPar(UI.lotSaison) || saisonActive();
-    if (!s) return note('Créez d’abord une saison.', 'a');
-    const cx = ctx(), lim = L.finCompetition(s), cl = L.classer(L.agreger(cx, s, lim ? L.addDays(lim, 1) + 'T00:00' : null), cx.membres);
-    const r = L.attribuerLots(cl, s.lots || {});
-    const lotis = r.filter(x => x.beneficiaire).map(x => x.beneficiaire);
-    const unique = lotis.length === new Set(lotis).size;
-    let h = '<div class="scroll"><table><thead><tr><th>Ordre</th><th>Distinction</th><th>Lot confirmé</th><th>Lauréat sportif</th><th>Déjà loti ?</th><th>Bénéficiaire matériel</th><th>Statut</th></tr></thead><tbody>';
-    r.forEach(x => {
-      h += '<tr><td>' + x.prio + '</td><td><b>' + esc(x.label) + '</b></td><td><label class="coche" style="margin:0"><input type="checkbox" data-act="lot-toggle" data-k="' + x.key + '"' + (x.lot ? ' checked' : '') + ' aria-label="Lot confirmé pour ' + esc(x.label) + '"></label></td><td>' + (x.laureat ? esc(nomJoueur(x.laureat)) + '<div class="dim small">' + esc(x.laureat) + '</div>' : '<span class="dim">' + esc(x.statutTitre) + '</span>') + '</td><td>' + (x.dejaLoti === null ? '—' : x.dejaLoti ? 'Oui' : 'Non') + '</td><td>' + (x.beneficiaire ? esc(nomJoueur(x.beneficiaire)) + '<div class="dim small">' + esc(x.beneficiaire) + '</div>' : '—') + '</td><td>' + badge(x.statut, x.statut.indexOf('Attribué') === 0 ? 'g' : x.statut === 'Non attribué' ? 'r' : 'o') + (x.explication ? '<div class="dim small">' + esc(x.explication) + '</div>' : '') + '</td></tr>';
-    });
-    h += '</tbody></table></div><ul class="chk"><li class="' + (unique ? 'o' : 'b') + '">' + (unique ? 'Chaque joueur reçoit au maximum un lot (' + lotis.length + ' lot(s) attribué(s)).' : 'Un joueur reçoit plusieurs lots : anomalie.') + '</li><li class="o">Priorité des 11 catégories et redistribution appliquées dans l’ordre du règlement.</li><li class="o">Le bénéficiaire matériel ne remplace jamais le lauréat sportif dans le tableau des titres.</li></ul>';
-    return h;
-  }
-};
-
 /* ----- Journal ----- */
 TAB.journal = {
   shell: () => '<label class="lab" for="j-rech">Rechercher dans le journal</label><input type="search" id="j-rech" placeholder="Matricule, match, type, mot du motif…" style="margin-bottom:12px">',
@@ -1855,7 +1836,7 @@ function lierEvenements() {
   window.addEventListener('hashchange', router);
   document.addEventListener('click', e => {
     const a = e.target.closest('[data-act]');
-    if (a && a.dataset.act !== 'lot-toggle') { const H = ACTIONS[a.dataset.act]; if (H) { e.preventDefault(); H(a, e); } return; }
+    if (a) { const H = ACTIONS[a.dataset.act]; if (H) { e.preventDefault(); H(a, e); } return; }
     const g = e.target.closest('[data-goto]');
     if (g) { const el = document.getElementById(g.dataset.goto); if (el) el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); return; }
     const sg = e.target.closest('#cl-seg button');
@@ -1875,12 +1856,6 @@ function lierEvenements() {
     if (t.id === 'j-rech') { UI.jRech = t.value; UI.jMax = 100; $('#adm-body').innerHTML = TAB.journal.body(); return; }
     if (e.type !== 'change') return;
     if (t.id === 'ma-s') { UI.matchSaison = t.value; rendreAdmin(); }
-    else if (t.id === 'lo-s') { UI.lotSaison = t.value; rendreAdmin(); }
-    else if (t.dataset.act === 'lot-toggle') {
-      const s = saisonPar(UI.lotSaison) || saisonActive(); if (!s) return;
-      const lots = Object.assign({}, s.lots || {}); lots[t.dataset.k] = t.checked;
-      agir(async () => { await ecrire('saisons', s.id, Object.assign({}, s, { lots })); await noter('Lots', s.id, (t.checked ? 'Lot confirmé : ' : 'Lot retiré : ') + t.dataset.k, ''); });
-    }
   };
   document.addEventListener('input', saisie);
   document.addEventListener('change', saisie);
@@ -2431,7 +2406,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -3281,6 +3256,84 @@ async function afficherMesConvocations() {
 }
 ACTIONS['moi-confirmer'] = async b => { const { error } = await SB.rpc('confirmer_convocation', { p_dossier: Number(b.dataset.id) }); if (error) { toast(erreurRpc(error), true); return; } toast('Réception confirmée.'); afficherMesConvocations(); };
 ACTIONS['moi-ecrire-lit'] = async b => { const t = v('mc-' + b.dataset.id); if (!t) return; const { error } = await SB.rpc('ecrire_litige', { p_dossier: Number(b.dataset.id), p_texte: t }); if (error) { toast(erreurRpc(error), true); return; } toast('Message envoyé.'); afficherMesConvocations(); };
+
+/* ----- Titres et lots (jamais publiés tant que sponsors et moyens ne sont pas confirmés) ----- */
+let LOTS = [], LOTA = null;
+TAB.lots = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="lo2-s">Saison</label><select id="lo2-s"></select></div></div>'
+    + note('Les lots ne sont jamais publiés : cette page est réservée à l’administration. Un joueur reçoit au plus un lot, dans l’ordre de priorité du cahier ; des co-lauréats gardent le titre sans lot.', 'a')
+    + '<div id="lo-liste"><p class="mute">Chargement…</p></div><div id="lo-attr"></div>',
+  body: () => '',
+  charger: afficherLots
+};
+async function afficherLots() {
+  const z = $('#lo-liste'), za = $('#lo-attr'); if (!z) return;
+  try { await chargerSaisons(); } catch (e) { z.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+  if (!SA.length) { z.innerHTML = note('Créez d’abord la saison (onglet « Saison »).', 'a'); return; }
+  if (!UI.lotSaison || !saisonSB(UI.lotSaison)) UI.lotSaison = (saisonActiveSB() || SA[0]).id;
+  $('#lo2-s').innerHTML = optSaisonsSB(UI.lotSaison);
+  const [a, b] = await Promise.all([
+    SB.from('lots').select('*, membres(matricule, nom_gamer)').eq('saison_id', UI.lotSaison),
+    SB.from('publications').select('*').eq('saison_id', UI.lotSaison).eq('type', 'final')
+  ]);
+  if (a.error) { z.innerHTML = note('Lecture impossible : ' + esc(a.error.message), 'r'); return; }
+  LOTS = a.data || [];
+  const lot = k => LOTS.find(x => x.categorie === k) || {};
+  z.innerHTML = '<div class="panel"><h3>Lots de la saison</h3><p class="mute small">Décrivez chaque lot et cochez « confirmé » quand le sponsor ou les moyens sont sûrs. Seuls les lots confirmés sont attribués.</p><div class="scroll"><table><thead><tr><th>Ordre</th><th>Distinction</th><th>Lot</th><th>Confirmé</th></tr></thead><tbody>'
+    + L.CATS.map(c => '<tr><td>' + c.prio + '</td><td><b>' + esc(c.label) + '</b></td><td><input type="text" id="lo-d-' + c.key + '" value="' + esc(lot(c.key).description || '') + '" aria-label="Lot ' + esc(c.label) + '"></td><td><input type="checkbox" id="lo-c-' + c.key + '"' + (lot(c.key).confirme ? ' checked' : '') + ' aria-label="Lot confirmé ' + esc(c.label) + '"></td></tr>').join('')
+    + '</tbody></table></div><div class="row-btns"><button class="btn sm" type="button" data-act="lo-enregistrer">Enregistrer les lots</button></div></div>';
+  // Attribution : sur le classement final publié (figé), sinon prévision sur les matchs validés.
+  const pub = (b.data || [])[0] || null, sj = saisonJS(saisonSB(UI.lotSaison)), R = reglesSite();
+  let cl, noms = {}, source;
+  if (pub) {
+    cl = L.classementDepuisPublication(pub.contenu);
+    (pub.contenu.categories || []).forEach(c => (c.lignes || []).forEach(l => { noms[l.mat] = l.nom; }));
+    source = 'Classement final publié le ' + dateLoc(pub.publie_le) + '.';
+  } else {
+    try { await chargerContexte(UI.lotSaison); } catch (e) { za.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+    const coupure = L.coupureFinale(sj);
+    cl = L.classer(L.agreger(CX, sj, { coupure, limiteDecisions: now() }), CX.membres, coupure);
+    source = 'Prévision : le classement final n’est pas encore publié (prévu le ' + (R ? fD(L.publicationFinale(sj, R)) : '—') + '). L’attribution s’enregistrera après sa publication.';
+  }
+  const nom = mat => noms[mat] || nomMat(mat);
+  const dispo = {}; LOTS.filter(x => x.confirme).forEach(x => { dispo[x.categorie] = true; });
+  const r = L.attribuerLots(cl, dispo);
+  LOTA = { pub, r };
+  const lotis = r.filter(x => x.beneficiaire).map(x => x.beneficiaire), unique = lotis.length === new Set(lotis).size;
+  za.innerHTML = '<div class="panel"><h3>Attribution</h3><p class="mute small">' + esc(source) + '</p><div class="scroll"><table><thead><tr><th>Ordre</th><th>Distinction</th><th>Lot</th><th>Titre</th><th>Bénéficiaire du lot</th><th>Statut</th>' + (pub ? '<th>Remise</th>' : '') + '</tr></thead><tbody>'
+    + r.map(x => { const l = lot(x.key);
+      return '<tr><td>' + x.prio + '</td><td><b>' + esc(x.label) + '</b></td><td class="small">' + (x.lot ? esc(l.description || 'confirmé') : '<span class="dim">pas de lot confirmé</span>') + '</td>'
+        + '<td class="small">' + (x.laureats.length ? x.laureats.map(m => esc(nom(m)) + ' <span class="dim">' + esc(m) + '</span>').join('<br>') : '<span class="dim">' + esc(x.statutTitre) + '</span>') + '</td>'
+        + '<td class="small">' + (x.beneficiaire ? esc(nom(x.beneficiaire)) + ' <span class="dim">' + esc(x.beneficiaire) + '</span>' : '—') + '</td>'
+        + '<td>' + badge(x.statut, x.statut.indexOf('Attribué') === 0 ? 'g' : x.statut === 'Non attribué' ? 'r' : 'o') + (x.explication ? '<div class="dim small">' + esc(x.explication) + '</div>' : '') + '</td>'
+        + (pub ? '<td class="small">' + (l.remis_le ? 'remis le ' + dateLoc(l.remis_le) : l.beneficiaire_id ? '<button class="btn sm ghost" type="button" data-act="lo-remis" data-id="' + l.id + '">Marquer comme remis</button>' : '—') + '</td>' : '') + '</tr>';
+    }).join('') + '</tbody></table></div>'
+    + '<ul class="chk"><li class="' + (unique ? 'o' : 'b') + '">' + (unique ? 'Chaque joueur reçoit au plus un lot (' + lotis.length + ' lot(s) attribué(s)).' : 'Un joueur reçoit plusieurs lots : anomalie.') + '</li><li class="o">Ordre de priorité des 11 catégories et redistribution appliqués ; co-lauréats sans lot ; égalité entre bénéficiaires d’une redistribution : lot non attribué.</li></ul>'
+    + (pub ? '<div class="row-btns"><button class="btn" type="button" data-act="lo-attribuer">Enregistrer l’attribution</button></div>' + (LOTS.some(x => x.attribue_le) ? '<p class="dim small">Dernière attribution enregistrée le ' + dateLoc(LOTS.filter(x => x.attribue_le).map(x => x.attribue_le).sort().pop()) + '.</p>' : '') : '') + '</div>';
+}
+ACTIONS['lo-enregistrer'] = async () => {
+  const lignes = L.CATS.map(c => ({ saison_id: Number(UI.lotSaison), categorie: c.key, description: v('lo-d-' + c.key) || null, confirme: coche('lo-c-' + c.key) }))
+    .filter(x => x.description || x.confirme || LOTS.some(l => l.categorie === x.categorie));
+  const { error } = await SB.from('lots').upsert(lignes, { onConflict: 'saison_id,categorie' });
+  if (error) { toast('Enregistrement impossible : ' + error.message, true); return; }
+  await SB.from('journal').insert({ type: 'Lots', objet: (saisonSB(UI.lotSaison) || {}).nom, decision: 'Lots de la saison mis à jour : ' + lignes.filter(x => x.confirme).length + ' confirmé(s)' });
+  toast('Lots enregistrés.'); afficherLots();
+};
+ACTIONS['lo-attribuer'] = async () => {
+  if (!LOTA || !LOTA.pub) return;
+  const res = LOTA.r.filter(x => x.lot).map(x => ({ categorie: x.key, beneficiaire_matricule: x.beneficiaire ? Number(String(x.beneficiaire).replace(/\D/g, '')) : null, statut: x.statut, explication: x.explication }));
+  if (!confirm('Enregistrer l’attribution des ' + res.length + ' lot(s) confirmé(s) ?')) return;
+  const { data, error } = await SB.rpc('enregistrer_attribution', { p_publication: LOTA.pub.id, p_resultats: res });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Attribution enregistrée : ' + data + ' lot(s).'); afficherLots();
+};
+ACTIONS['lo-remis'] = async b => {
+  if (!confirm('Marquer ce lot comme remis au bénéficiaire ?')) return;
+  const { error } = await SB.rpc('marquer_lot_remis', { p_lot: Number(b.dataset.id) });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Lot marqué comme remis.'); afficherLots();
+};
+document.addEventListener('change', e => { if (e.target && e.target.id === 'lo2-s') { UI.lotSaison = e.target.value; afficherLots(); } });
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
