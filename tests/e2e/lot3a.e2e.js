@@ -16,7 +16,7 @@ for (const f of fs.readdirSync(dm).sort()) {
 }
 PARAMS.inscriptions_ouvertes.valeur = true;
 const base = { parametres: Object.values(PARAMS), membres: [], periodes: [], comptes_jeu: [], comptes_periodes: [], pseudos_historique: [],
-  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
+  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], lots: [], publications: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
 for (let i = 1; i <= 8; i++) {
   base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', date_approbation: '2026-11-18T00:00:00+03:00' });
   base.periodes.push({ id: 100 + i, membre_id: i, debut: '2026-11-17T21:00:00Z', fin: null });
@@ -185,6 +185,17 @@ srv.listen(8765, async () => {
       const t = await p.textContent('#modal-b'); if (!/Synthèse validée/.test(t)) throw new Error(t.slice(-300));
       await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(400);
       if (!/Archivé/.test(await p.textContent('#li-liste'))) throw new Error('pas archivé');
+      await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
+    });
+    await etape('titres et lots : lots confirmés, prévision d’attribution', async () => {
+      await p.goto('http://localhost:8765/#admin-lots'); await p.waitForTimeout(800);
+      await p.fill('#lo-d-most_elim', 'Lot test : 10 000 Ar'); await p.check('#lo-c-most_elim'); await p.check('#lo-c-most_med');
+      await p.click('[data-act="lo-enregistrer"]'); await p.waitForTimeout(800);
+      if (!(await p.isChecked('#lo-c-most_elim'))) throw new Error('lot non enregistré');
+      const t = await p.textContent('#lo-attr');
+      if (!/Prévision/.test(t) || !/Lot test : 10 000 Ar/.test(t) || !/Faux 8/.test(t)) throw new Error(t.slice(0, 400));
+      if (!/au plus un lot \(1 lot\(s\) attribué/.test(t)) throw new Error('contrôle : ' + t.slice(-300));
+      if (await p.$('[data-act="lo-attribuer"]')) throw new Error('bouton d’enregistrement visible sans classement final');
       await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
     });
     await etape('repasser en brouillon (motif obligatoire)', async () => {

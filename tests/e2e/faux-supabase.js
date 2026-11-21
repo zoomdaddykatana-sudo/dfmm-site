@@ -32,6 +32,7 @@
   Q.prototype.maybeSingle = function () { this.one = true; this.maybe = true; return this; };
   Q.prototype.insert = function (o) { this.op = 'insert'; this.val = Array.isArray(o) ? o : [o]; return this; };
   Q.prototype.update = function (o) { this.op = 'update'; this.val = o; return this; };
+  Q.prototype.upsert = function (o, opt) { this.op = 'upsert'; this.val = Array.isArray(o) ? o : [o]; this.cles = ((opt && opt.onConflict) || 'id').split(','); return this; };
   Q.prototype.then = function (res, rej) { return Promise.resolve(this.exec()).then(res, rej); };
   Q.prototype.exec = function () {
     const T = DB[this.t] = DB[this.t] || [];
@@ -44,6 +45,10 @@
         T.push(r); return r;
       });
       return { data: this.one ? rows[0] : rows, error: null };
+    }
+    if (this.op === 'upsert') {
+      const rows = this.val.map(o => { const x = T.find(r => this.cles.every(k => String(r[k]) === String(o[k]))); if (x) return Object.assign(x, o); const r = Object.assign({ id: ++seq }, o); T.push(r); return r; });
+      return { data: rows, error: null };
     }
     let rows = T.filter(r => this.f.every(f => f(r)));
     if (this.op === 'update') { rows.forEach(r => Object.assign(r, this.val)); return { data: rows, error: null }; }
