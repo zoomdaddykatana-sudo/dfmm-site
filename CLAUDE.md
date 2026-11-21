@@ -48,7 +48,7 @@
 | 3C Classements | Onglet Administration > Classements branché sur Supabase (calcul sur les matchs validés, contrôle avant publication, publication figée) ; page publique et accueil lisent `publications` ; migration 0008 (numéro automatique, un seul final, classement figé, journal) | **Fusionné (PR n° 9)** le 21/11/2026 ; migration 0008 exécutée et test 0008 réussi (11/11) dans le vrai projet le 21/11/2026 ; premier provisoire d'Aurora renseigné (29/11/2026) |
 | 4A Sanctions | Avertissement, suspension (≤ 14 j, dernier jour inclus fixé par Katana), exclusion, retrait des statistiques d'un joueur dans un match ; recours 48 h (contestation dans Mon compte) ; levée = matchs recomptés ; démarches bloquées pendant une suspension ; retrait soumis à Katana si sanction ou match en attente ; migration 0009 | **Fusionné (PR n° 10)** ; migration 0009 exécutée et test 0009 réussi (21/21) dans le vrai projet le 21/11/2026 |
 | 4B Litiges | Dossier ouvert tout seul pour chaque match en attente ; qualification ; convocations (confirmation sous 12 h) et témoins ; discussion confidentielle (Katana et convoqués) ; décision (vraie capture / match refusé / annulé) qui ferme la discussion ; sanctions liées ; export pour une synthèse par claude.ai validée puis archivée ; suppression des captures écartées (tout de suite sans sanction, après le recours avec sanction) ; migration 0010 | **Fusionné (PR n° 10, avec 4A)** ; migration 0010 exécutée et test 0010 réussi (23/23) dans le vrai projet le 21/11/2026 |
-| Titres et lots | Onglet Administration > Titres et lots : lots de la saison (description, confirmé), prévision d'attribution sur les matchs validés, attribution enregistrée sur le classement final publié (figé), remise ; jamais publiés ; migration 0011 | **PR ouverte** ; migration 0011 et test 0011 (12/12 en local) **à exécuter** |
+| Titres et lots | Onglet Administration > Titres et lots : lots de la saison (description, confirmé), prévision d'attribution sur les matchs validés, attribution enregistrée sur le classement final publié (figé), remise ; jamais publiés ; migration 0011 | **PR n° 11 ouverte** ; migration 0011 exécutée et test 0011 réussi (12/12) dans le vrai projet le 21/11/2026 |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
 
 Points en suspens :
@@ -72,7 +72,7 @@ Points en suspens :
 
 - Site : https://zoomdaddykatana-sudo.github.io/dfmm-site/ (Pages publie la branche `ccr-08840471-84tqcu`).
 - Supabase : projet `ijpbplzbjohfrqwnvrqv` (URL et clé publishable dans `config.js`, rien d'autre). Fonctions installées : `lien-reinitialisation`, `inscription` (« Verify JWT » désactivé), `pseudo-volsever` et `effacer-donnees` (« Verify JWT » **activé** : réservées aux personnes connectées). Secret déjà rangé : `VOLSEVER_API_KEY`.
-- Migrations (`supabase/migrations/`) : 0001 à 0010 exécutées dans le vrai projet (par le SQL, pas par l'outil de migrations : la liste des migrations de Supabase reste vide, c'est normal). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
+- Migrations (`supabase/migrations/`) : 0001 à 0011 exécutées dans le vrai projet (par le SQL, pas par l'outil de migrations : la liste des migrations de Supabase reste vide, c'est normal). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
 - Forfait gratuit Supabase : pause après 1 semaine sans activité, pas de sauvegarde automatique, 1 Go de fichiers, envoi d'e-mails limité à 2 par heure et aux membres de l'équipe du projet.
 - volsever : `GET https://gate.volsever.com/proxy/api/game/delta-force?id={UID}` ; réponse `data.username` ; environ 5 s ; forfait gratuit 45 requêtes par jour et 15 par minute ; clé envoyée dans l'en-tête `X-API-KEY` (documentation : docs.volsever.com, outil « Delta Force (Tencent) ») ; identifiant inconnu = code 404. Le compteur d'appels est tenu dans la table `volsever_appels` (24 h glissantes et dernière minute).
 - Pseudo et tag de clan : « ¬ » est un tag de clan validé, à conserver et comparer tel quel.
@@ -101,6 +101,6 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Titres et lots (PR ouverte) : montrer à Katana le SQL de la migration 0011 puis du test 0011 (12/12), les exécuter sur son « oui », vérifier qu'il ne reste rien ; fusion sur son accord écrit.
+1. Titres et lots (PR n° 11) : migration 0011 et test 0011 faits ; fusion sur l'accord écrit de Katana.
 2. Matchs saisis en brouillon : M-2 et M-3 (valider quand les réinscriptions sont approuvées). Premier provisoire d'Aurora le dimanche 29/11/2026 (coupure samedi 28/11 à 16 h) : guider Katana (Administration > Classements).
 3. Lot 3B (matchs libres) ; lot 5 (textes : « 7 derniers jours d'audit » / « gel » ; message rouge du lien de réinitialisation proposé le 21/11, non validé ; règlement ; processus).
