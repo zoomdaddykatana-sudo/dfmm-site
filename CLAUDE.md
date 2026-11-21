@@ -48,7 +48,7 @@ Points en suspens :
 - Nettoyage de la fausse fiche « EssaiTest » et du compte `essai1@dfmm.invalid` : fait, vérifié le 21/11/2026 (0 fiche, 0 compte).
 - Mise à jour du règlement du site (lot 5) et du guide PDF (ne pas toucher au PDF).
 - Message de réinscription pour les 25 membres déjà approuvés : à rédiger.
-- Sauvegarde : bouton dans Administration > Sauvegarde ; à faire chaque semaine (pas de sauvegarde automatique). **Manque** : la liste `TABLES_SAUVEGARDE` (`index.html`) n'inclut pas `demandes`, `notifications` (depuis le lot 2B) ni `volsever_appels` : petite PR à proposer.
+- Sauvegarde : bouton dans Administration > Sauvegarde ; à faire chaque semaine (pas de sauvegarde automatique). Depuis la PR n° 7, elle inclut `demandes`, `notifications` et `volsever_appels` ; le test `tests/sauvegarde.test.js` échoue si une nouvelle table de migration n'est pas ajoutée à `TABLES_SAUVEGARDE` (`index.html`).
 - Pseudo et effacement : jamais essayés de bout en bout avec un vrai compte (aucun membre encore). Premier essai réel avec le premier membre réinscrit (consomme 1 appel volsever).
 
 ## 4. Règles de travail
@@ -71,7 +71,7 @@ Points en suspens :
 - Pseudo et tag de clan : « ¬ » est un tag de clan validé, à conserver et comparer tel quel.
 - Environnement cloud « dfmm-site » : hôtes autorisés `ijpbplzbjohfrqwnvrqv.supabase.co`, `supabase.com`, `volsever.com`, `www.volsever.com`, `gate.volsever.com`, `docs.volsever.com` (documentation seulement : la clé volsever n'est jamais dans cet environnement).
 - Connecteur « Supabase DFMM » (limité au projet, outils base, journal et documentation ; pas d'outil de compte). Le connecteur standard « Supabase » (accès à tout le compte) est déconnecté : ne pas l'utiliser. Chaque requête : SQL et résultat attendu montrés à Katana, puis son « oui » écrit, puis le message exact de Supabase rapporté.
-- Tests locaux : `node --test tests/*.test.js` (34 tests) ; base imitée : PostgreSQL 16 avec `supabase/tests/emulation_locale.sql`, puis les migrations dans l'ordre, puis les fichiers de test.
+- Tests locaux : `node --test tests/*.test.js` (37 tests) ; base imitée : PostgreSQL 16 avec `supabase/tests/emulation_locale.sql`, puis les migrations dans l'ordre, puis les fichiers de test.
 
 ## 6. Pièges déjà rencontrés
 
@@ -88,5 +88,5 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Proposer à Katana la petite PR « sauvegarde complète » (ajouter `demandes`, `notifications`, `volsever_appels` à `TABLES_SAUVEGARDE`).
+1. PR n° 7 (CLAUDE.md et sauvegarde complète) : Katana vérifie sur téléphone (Administration > Sauvegarde > Télécharger : le fichier contient `demandes`, `notifications`, `volsever_appels`), puis fusion sur son accord écrit.
 2. Lot 3 (matchs et captures) : relire les sections 4 et 5 du cahier et les décisions Q6 à Q8 et Q19 avant de coder ; repartir de `main` sur la branche `ccr-08840471-84tqcu`.
