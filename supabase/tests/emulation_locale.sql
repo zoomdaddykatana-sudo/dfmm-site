@@ -27,3 +27,7 @@ create table storage.objects (id uuid primary key default gen_random_uuid(), buc
 alter table storage.objects enable row level security;
 grant select, insert, update, delete on storage.objects to anon, authenticated, service_role;
 grant usage on schema public to service_role;
+-- Lot 2B : outil de Supabase Storage qui donne les dossiers d'un chemin (« a/b/c.jpg » → {a,b}).
+create function storage.foldername(name text) returns text[] language sql immutable as $$
+  select (string_to_array(name, '/'))[1:array_length(string_to_array(name, '/'), 1) - 1] $$;
+grant execute on function storage.foldername(text) to anon, authenticated, service_role;

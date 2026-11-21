@@ -265,6 +265,8 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 /* Lot socle : connexion et version de test */
 input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px solid var(--line2);padding:9px 11px;font-size:16px;border-radius:0;color:var(--ink)}
 .banner.test{border-color:var(--red);background:var(--redbg);color:var(--ink)}
+.nav a .cpt{display:inline-block;min-width:18px;margin-left:5px;padding:0 5px;background:var(--red);color:#fff;font-size:12px;text-align:center;border-radius:9px}
+.notif-nouv{border-left:3px solid var(--red);padding-left:8px}
 </style>
 </head>
 <body>
@@ -1219,13 +1221,13 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'membres', 'acces', 'sauvegarde'];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'acces', 'sauvegarde'];
 const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
   if (k === 'sauvegarde') return ADM.sauvegardeEnRetard ? 1 : 0;
-  if (k === 'demandes') return S.demandes.filter(d => d.statut === 'En attente').length;
+  if (k === 'demandes') return ADM.nbDem || 0;
   if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
   if (k === 'matchs') return S.matchs.filter(m => m.statut === 'Brouillon').length;
   return 0;
@@ -2251,7 +2253,7 @@ async function majSession(session) {
   ADMIN = adm;
   if (ADMIN) await chargerCompteursAdmin();
   $('#nav-admin').hidden = !ADMIN;
-  $('#nav-compte').textContent = SESSION ? 'Mon compte' : 'Connexion';
+  await majPastilleCompte();
   UI.tabRendu = '';
   rendre();
 }
@@ -2363,11 +2365,13 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b] = await Promise.all([
+  const [a, b, c] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
-    SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1)
+    SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
+    SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente')
   ]);
   ADM.nbInsc = a.count || 0;
+  ADM.nbDem = c.count || 0;
   ADM.derniereSauvegarde = b.data && b.data[0] ? b.data[0].date : null;
   ADM.sauvegardeEnRetard = !ADM.derniereSauvegarde || Date.now() - new Date(ADM.derniereSauvegarde).getTime() > 7 * 86400000;
 }
@@ -2417,17 +2421,178 @@ async function soumettreInscription(e) {
 }
 
 /* ----- Mon compte : dossier du membre ----- */
+/* ----- Mon compte (lot 2B) : comptes, notifications, demandes, démarches ----- */
+let DOS = null;
+const TYPES_DEM = { compte2: 'Ajout d’un 2e compte', compte_actif: 'Changement de compte actif', retrait: 'Retrait', pseudo: 'Changement de pseudo', effacement: 'Effacement des données' };
+const STATUTS_DEM = { en_attente: 'En attente', precisions: 'Précisions demandées', acceptee: 'Acceptée', refusee: 'Refusée', annulee: 'Annulée' };
+const STATUTS_CPT = { actif: 'actif', en_pause: 'en pause', remplace: 'remplacé' };
+const dateLoc = iso => iso ? fDT(L.versLocal(iso)) : '—';
+async function majPastilleCompte() {
+  const lien = $('#nav-compte');
+  if (!SESSION) { lien.textContent = 'Connexion'; return; }
+  let n = 0;
+  if (SB && !ADMIN) { const r = await SB.from('notifications').select('id', { count: 'exact', head: true }).eq('lu', false); n = r.count || 0; }
+  lien.innerHTML = 'Mon compte' + (n ? '<span class="cpt" aria-label="' + n + ' notification(s) non lue(s)">' + n + '</span>' : '');
+}
+function historiquePseudos(c) {
+  const anciens = (c.pseudos_historique || []).filter(h => h.fin).sort((a, b) => String(b.fin).localeCompare(String(a.fin)));
+  return anciens.length ? anciens.map(h => esc(h.pseudo) + ' (jusqu’au ' + fDc(L.versLocal(h.fin)) + ')').join(', ') : '—';
+}
 async function chargerMonDossier() {
   const z = $('#mon-dossier'); if (!z || !SB) return;
-  const { data, error } = await SB.from('membres').select('matricule, nom_gamer, statut, decision, comptes_jeu(uid, pseudo, statut)').maybeSingle();
+  const [a, b, c] = await Promise.all([
+    SB.from('membres').select('id, matricule, nom_gamer, statut, decision, dernier_changement_compte, comptes_jeu(id, uid, pseudo, statut, pseudos_historique(pseudo, debut, fin))').maybeSingle(),
+    SB.from('demandes').select('id, type, statut, motif_decision, cree_le, decide_le').order('cree_le', { ascending: false }).limit(20),
+    SB.from('notifications').select('id, texte, lu, cree_le').order('cree_le', { ascending: false }).limit(20)
+  ]);
   if (!z.isConnected) return;
-  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
-  if (!data) { z.innerHTML = '<p class="mute">Aucune inscription n’est liée à ce compte.</p>'; return; }
-  const motif = esc((data.decision || {}).motif || '');
-  const etat = { en_attente: ['Votre inscription est en attente de vérification par Katana.', ''], precisions: ['Katana demande des précisions : ' + motif + '. Répondez-lui sur Messenger.', 'a'], refuse: ['Votre inscription n’a pas été acceptée. Motif : ' + motif + '.', 'r'], actif: ['Vous êtes membre de la LEAGUE UV.', ''], retire: ['Vous avez quitté la ligue.', ''], exclu: ['Votre accès à la ligue est fermé.', 'r'] }[data.statut] || ['', ''];
-  const cpts = (data.comptes_jeu || []).map(c => esc(c.pseudo) + ' · UID ' + esc(c.uid) + ' (' + ({ actif: 'actif', en_pause: 'en pause', remplace: 'remplacé' }[c.statut] || c.statut) + ')').join('<br>') || '—';
-  z.innerHTML = '<h3>Mon dossier</h3><dl class="kv"><dt>Nom de gamer</dt><dd>' + esc(data.nom_gamer) + '</dd><dt>Matricule</dt><dd>' + matTxt(data.matricule) + '</dd><dt>Comptes de jeu</dt><dd>' + cpts + '</dd></dl>' + (etat[0] ? note(etat[0], etat[1]) : '');
+  if (a.error) { z.innerHTML = note('Lecture impossible : ' + esc(a.error.message), 'r'); return; }
+  const m = a.data;
+  if (!m) { z.innerHTML = '<p class="mute">Aucune inscription n’est liée à ce compte.</p>'; return; }
+  DOS = { m, dem: b.data || [], notif: c.data || [] };
+  const motif = esc((m.decision || {}).motif || '');
+  const etat = { en_attente: ['Votre inscription est en attente de vérification par Katana.', ''], precisions: ['Katana demande des précisions : ' + motif + '. Répondez-lui sur Messenger.', 'a'], refuse: ['Votre inscription n’a pas été acceptée. Motif : ' + motif + '.', 'r'], actif: ['', ''], retire: ['Vous avez quitté la ligue. Pour revenir, demandez votre réintégration à Katana sur Messenger : vous garderez votre matricule.', ''], exclu: ['Votre accès à la ligue est fermé.', 'r'] }[m.statut] || ['', ''];
+  const cpts = m.comptes_jeu || [];
+  let h = '<h3>Mon dossier</h3><dl class="kv"><dt>Nom de gamer</dt><dd>' + esc(m.nom_gamer) + '</dd><dt>Matricule</dt><dd>' + matTxt(m.matricule) + '</dd></dl>' + (etat[0] ? note(etat[0], etat[1]) : '');
+  if (cpts.length) h += '<h3 style="margin-top:12px">Mes comptes de jeu</h3><div class="scroll"><table><thead><tr><th>Pseudo</th><th>UID</th><th>Statut</th><th>Anciens pseudos</th></tr></thead><tbody>' + cpts.map(x => '<tr><td><b>' + esc(x.pseudo) + '</b></td><td>' + esc(x.uid) + '</td><td>' + (STATUTS_CPT[x.statut] || x.statut) + '</td><td class="small">' + historiquePseudos(x) + '</td></tr>').join('') + '</tbody></table></div>';
+  if (m.statut === 'actif') {
+    const encours = t => DOS.dem.some(d => d.type === t && (d.statut === 'en_attente' || d.statut === 'precisions'));
+    const nb = cpts.filter(x => x.statut !== 'remplace').length, pause = cpts.filter(x => x.statut === 'en_pause');
+    const R = reglesSite();
+    const prochain = R && m.dernier_changement_compte ? new Date(new Date(m.dernier_changement_compte).getTime() + R.delai_changement_compte_jours * 86400000) : null;
+    const attente = prochain && prochain > new Date();
+    h += '<h3 style="margin-top:12px">Mes démarches</h3><div class="row-btns">'
+      + (R && nb < R.comptes_max && !encours('compte2') ? '<button class="btn sm" type="button" data-act="moi-compte2">Ajouter un 2e compte</button>' : '')
+      + (pause.length && !encours('compte_actif') && !attente ? '<button class="btn sm" type="button" data-act="moi-actif">Changer de compte actif</button>' : '')
+      + '<button class="btn sm ghost" type="button" data-act="moi-retrait">Demander mon retrait</button></div>'
+      + (attente ? '<p class="mute small">Prochain changement de compte actif possible le ' + fDT(L.versLocal(prochain.toISOString())) + '.</p>' : '');
+  }
+  const nonLues = DOS.notif.filter(n => !n.lu).length;
+  h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
+  if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
+  z.innerHTML = h;
 }
+function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
+function moiCompte2() {
+  const R = reglesSite();
+  modal('Ajouter un 2e compte', '<p class="mute small">' + (R ? R.comptes_max : 2) + ' comptes au maximum par matricule, un seul actif à la fois. Katana examine la demande.</p><label class="lab" for="d-pseudo">Pseudo exact du nouveau compte</label><input id="d-pseudo" type="text"><label class="lab" for="d-uid">UID du nouveau compte</label><input id="d-uid" type="text" inputmode="numeric"><label class="lab" for="d-capture">Capture du profil du nouveau compte (pseudo et UID visibles)</label><input id="d-capture" type="file" accept="image/*"><label class="lab" for="d-motif">Motif</label><textarea id="d-motif" rows="2"></textarea><label class="coche"><input type="checkbox" id="d-activer"><span>Je veux jouer avec ce compte dès son approbation. Le délai de ' + (R ? R.delai_changement_compte_jours : 7) + ' jours avant le changement suivant commence alors.</span></label><div id="d-err" class="err" role="alert"></div>',
+    [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer la demande', onClick: async () => {
+      const err = $('#d-err'), f = $('#d-capture').files[0], pseudo = $('#d-pseudo').value.trim(), uid = v('d-uid'), motif = v('d-motif');
+      err.textContent = '';
+      if (!pseudo || !uid || !motif || !f) { err.textContent = 'Pseudo, UID, capture et motif sont obligatoires.'; return false; }
+      const img = await reduireImage(f, 1600, 0.85);
+      const chemin = SESSION.user.id + '/compte2-' + Date.now() + '.jpg';
+      const up = await SB.storage.from('profils').upload(chemin, img, { contentType: 'image/jpeg' });
+      if (up.error) { err.textContent = 'Envoi de la capture impossible : ' + up.error.message; return false; }
+      const { error } = await SB.rpc('demander_compte2', { p_pseudo: pseudo, p_uid: uid, p_motif: motif, p_capture: chemin, p_activer: coche('d-activer') });
+      if (error) { err.textContent = erreurRpc(error); return false; }
+      toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
+    } }]);
+}
+function moiActif() {
+  const pause = ((DOS && DOS.m.comptes_jeu) || []).filter(x => x.statut === 'en_pause');
+  modal('Changer de compte actif', '<p class="mute small">Seul le compte actif est comptabilisé. Katana approuve le changement.</p><label class="lab" for="d-cpt">Compte à activer</label><select id="d-cpt">' + pause.map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="d-motif">Motif court</label><input id="d-motif" type="text"><div id="d-err" class="err" role="alert"></div>',
+    [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer la demande', onClick: async () => {
+      const err = $('#d-err'), motif = v('d-motif'); err.textContent = '';
+      if (!motif) { err.textContent = 'Le motif est obligatoire.'; return false; }
+      const { error } = await SB.rpc('demander_compte_actif', { p_compte: Number(v('d-cpt')), p_motif: motif });
+      if (error) { err.textContent = erreurRpc(error); return false; }
+      toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
+    } }]);
+}
+function moiRetrait() {
+  modal('Demander mon retrait', note('Si vous confirmez : votre période active se ferme, vos comptes de jeu deviennent inactifs et vos autres demandes sont annulées. Vous n’apparaissez plus dans les classements ni pour les lots. Votre matricule, vos statistiques et votre pseudo sont conservés, et vous pouvez demander votre réintégration à Katana à tout moment.', 'a') + '<label class="lab" for="d-motif">Motif (facultatif)</label><textarea id="d-motif" rows="2"></textarea><label class="coche"><input type="checkbox" id="d-ok"><span>J’ai compris les conséquences de mon retrait.</span></label><div id="d-err" class="err" role="alert"></div>',
+    [{ label: 'Annuler', cls: 'ghost' }, { label: 'Confirmer mon retrait', cls: 'danger', onClick: async () => {
+      const err = $('#d-err'); err.textContent = '';
+      if (!coche('d-ok')) { err.textContent = 'Cochez la case pour confirmer.'; return false; }
+      const { error } = await SB.rpc('demander_retrait', { p_motif: v('d-motif') || null });
+      if (error) { err.textContent = erreurRpc(error); return false; }
+      toast('Votre retrait est enregistré.'); chargerMonDossier(); majPastilleCompte(); return true;
+    } }]);
+}
+async function notifLues() {
+  const { error } = await SB.from('notifications').update({ lu: true }).eq('lu', false);
+  if (error) { toast('Impossible : ' + error.message, true); return; }
+  chargerMonDossier(); majPastilleCompte();
+}
+
+/* ----- Administration : demandes des membres ----- */
+TAB.demandes = { shell: () => '<div id="dem-liste"><p class="mute">Chargement…</p></div>', body: () => '', charger: chargerDemandes };
+let DEMS = [];
+async function chargerDemandes() {
+  const z = $('#dem-liste'); if (!z) return;
+  const [a, b] = await Promise.all([
+    SB.from('demandes').select('*, membres(matricule, nom_gamer, dernier_changement_compte, comptes_jeu(id, uid, pseudo, statut))').in('statut', ['en_attente', 'precisions']).order('cree_le'),
+    SB.from('demandes').select('id, type, statut, motif_decision, decide_le, membres(matricule, nom_gamer)').in('statut', ['acceptee', 'refusee', 'annulee']).order('decide_le', { ascending: false }).limit(20)
+  ]);
+  if (!$('#dem-liste')) return;
+  if (a.error || b.error) { z.innerHTML = note('Lecture impossible : ' + esc((a.error || b.error).message), 'r'); return; }
+  DEMS = a.data || [];
+  const faites = b.data || [];
+  z.innerHTML = (DEMS.length ? DEMS.map(carteDemande).join('') : note('Aucune demande en attente.'))
+    + (faites.length ? '<div class="panel"><h3>Demandes traitées récemment</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Membre</th><th>État</th><th>Décidée le</th><th>Motif</th></tr></thead><tbody>' + faites.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap">' + matTxt(d.membres && d.membres.matricule) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="nowrap small">' + dateLoc(d.decide_le) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div></div>' : '');
+  for (const d of DEMS) {
+    if (!d.details || !d.details.capture) continue;
+    const { data } = await SB.storage.from('profils').createSignedUrl(d.details.capture, 600);
+    const img = $('#dcap-' + d.id);
+    if (img && data && data.signedUrl) { img.src = data.signedUrl; img.parentElement.href = data.signedUrl; img.parentElement.hidden = false; }
+  }
+}
+function carteDemande(d) {
+  const m = d.membres || {}, x = d.details || {}, id = d.id, cpts = m.comptes_jeu || [];
+  const actif = cpts.find(c => c.statut === 'actif');
+  let det = [];
+  if (d.type === 'compte2') det = [['Pseudo du nouveau compte', esc(x.pseudo)], ['UID', esc(x.uid) + (/^\d{5,20}$/.test(x.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Actif dès l’approbation', x.activer ? 'Oui' : 'Non'], ['Motif', esc(x.motif)], ['Comptes actuels', cpts.map(c => esc(c.pseudo) + ' (' + (STATUTS_CPT[c.statut] || c.statut) + ')').join(', ') || '—']];
+  else if (d.type === 'compte_actif') det = [['Compte à activer', esc(x.pseudo) + ' · UID ' + esc(x.uid)], ['Compte actif actuel', actif ? esc(actif.pseudo) + ' · UID ' + esc(actif.uid) : '—'], ['Dernier changement', dateLoc(m.dernier_changement_compte)], ['Motif', esc(x.motif)]];
+  else det = Object.keys(x).map(k => [k, esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])]);
+  return '<div class="card-l"><div class="t"><div><b>' + esc(TYPES_DEM[d.type] || d.type) + '</b> · ' + matTxt(m.matricule) + ' ' + esc(m.nom_gamer || '') + '<div class="small dim">déposée le ' + dateLoc(d.cree_le) + '</div></div>' + badgeStatut(STATUTS_DEM[d.statut]) + '</div>'
+    + (d.statut === 'precisions' ? note('Précisions demandées : ' + esc(d.motif_decision || ''), 'a') : '')
+    + '<dl class="kv">' + det.map(([k, val]) => '<dt>' + k + '</dt><dd>' + val + '</dd>').join('') + '</dl>'
+    + (x.capture ? '<div class="thumbs"><a hidden target="_blank" rel="noopener"><img id="dcap-' + id + '" alt="Capture du profil du nouveau compte" style="width:220px;height:auto;max-height:none"></a></div>' : '')
+    + (d.type === 'pseudo' ? '<label class="lab" for="dp-' + id + '">Pseudo vérifié (si vous acceptez)</label><input id="dp-' + id + '" type="text" value="' + esc(x.pseudo_declare || '') + '">' : '')
+    + '<div class="choix" style="margin-top:10px"><label><input type="radio" name="dd-' + id + '" value="accepter"> Accepter</label><label><input type="radio" name="dd-' + id + '" value="precisions"> Demander des précisions</label><label><input type="radio" name="dd-' + id + '" value="refuser"> Refuser</label></div>'
+    + '<label class="lab" for="dm-' + id + '">Motif (obligatoire pour refuser ou demander des précisions)</label><textarea id="dm-' + id + '" rows="2"></textarea><div id="de-' + id + '" class="err" role="alert"></div>'
+    + '<div class="row-btns"><button class="btn" type="button" data-act="dem-decider" data-id="' + id + '">Enregistrer la décision</button></div></div>';
+}
+async function deciderDemandeSB(b) {
+  const id = b.dataset.id, dec = radio('dd-' + id), motif = v('dm-' + id), err = $('#de-' + id);
+  err.textContent = '';
+  if (!dec) { err.textContent = 'Choisissez une décision.'; return; }
+  if (dec !== 'accepter' && !motif) { err.textContent = 'Le motif est obligatoire pour refuser ou demander des précisions.'; return; }
+  b.disabled = true;
+  const { error } = await SB.rpc('decider_demande', { p_demande: Number(id), p_decision: dec, p_motif: motif || null, p_pseudo_valide: $('#dp-' + id) ? v('dp-' + id) : null });
+  b.disabled = false;
+  if (error) { err.textContent = erreurRpc(error); return; }
+  toast('Décision enregistrée. Le membre est notifié.');
+  await chargerCompteursAdmin(); UI.tabRendu = ''; rendreAdmin();
+}
+
+/* ----- Administration : fiche d'un membre ----- */
+async function ouvrirFiche(id) {
+  const { data: m, error } = await SB.from('membres').select('*, membres_prives(*), comptes_jeu(id, uid, pseudo, statut, ajoute_le, pseudos_historique(pseudo, debut, fin)), periodes(debut, fin), demandes(type, statut, cree_le, motif_decision)').eq('id', id).single();
+  if (error) { toast('Lecture impossible : ' + error.message, true); return; }
+  const p = m.membres_prives || {}, cpts = m.comptes_jeu || [];
+  let h = '<dl class="kv"><dt>Statut</dt><dd>' + badgeStatut(STATUTS_MB[m.statut]) + '</dd><dt>Nom réel</dt><dd>' + esc(p.nom_reel || '—') + '</dd><dt>E-mail</dt><dd>' + esc(p.email || '—') + '</dd><dt>Facebook</dt><dd>' + lienFb(p.facebook) + '</dd><dt>Approuvé le</dt><dd>' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</dd><dt>Dernier changement de compte</dt><dd>' + dateLoc(m.dernier_changement_compte) + '</dd><dt>Périodes actives</dt><dd>' + ((m.periodes || []).sort((a, b) => String(a.debut).localeCompare(String(b.debut))).map(x => 'du ' + dateLoc(x.debut) + (x.fin ? ' au ' + dateLoc(x.fin) : ' à aujourd’hui')).join('<br>') || '—') + '</dd></dl>';
+  h += '<h3 style="margin-top:12px">Comptes de jeu</h3><div class="scroll"><table><thead><tr><th>Pseudo</th><th>UID</th><th>Statut</th><th>Anciens pseudos</th></tr></thead><tbody>' + cpts.map(x => '<tr><td><b>' + esc(x.pseudo) + '</b></td><td>' + esc(x.uid) + '</td><td>' + (STATUTS_CPT[x.statut] || x.statut) + '</td><td class="small">' + historiquePseudos(x) + '</td></tr>').join('') + '</tbody></table></div>';
+  const dem = (m.demandes || []).sort((a, b) => String(b.cree_le).localeCompare(String(a.cree_le))).slice(0, 15);
+  if (dem.length) h += '<h3 style="margin-top:12px">Demandes</h3><ul class="taches">' + dem.map(d => '<li><span>' + esc(TYPES_DEM[d.type] || d.type) + (d.motif_decision ? '<br><span class="mute small">' + esc(d.motif_decision) + '</span>' : '') + '</span><span class="nowrap">' + badgeStatut(STATUTS_DEM[d.statut]) + ' <span class="dim small">' + dateLoc(d.cree_le) + '</span></span></li>').join('') + '</ul>';
+  const boutons = [{ label: 'Fermer', cls: 'ghost' }];
+  if (m.statut === 'retire') {
+    h += '<h3 style="margin-top:12px">Réintégration</h3><p class="mute small">Même matricule et même historique ; une nouvelle période commence maintenant.</p><label class="lab" for="fi-cpt">Compte à réactiver</label><select id="fi-cpt">' + cpts.filter(x => x.statut !== 'remplace').map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="fi-motif">Motif ou commentaire</label><textarea id="fi-motif" rows="2"></textarea><div id="fi-err" class="err" role="alert"></div>';
+    boutons.push({ label: 'Réintégrer', onClick: async () => {
+      const { error: e } = await SB.rpc('reintegrer_membre', { p_membre: m.id, p_compte: Number(v('fi-cpt')), p_motif: v('fi-motif') || null });
+      if (e) { $('#fi-err').textContent = erreurRpc(e); return false; }
+      toast('Membre réintégré. Il est notifié.'); UI.tabRendu = ''; rendreAdmin(); return true;
+    } });
+  }
+  modal(matTxt(m.matricule) + ' · ' + m.nom_gamer, h, boutons, { large: true });
+}
+ACTIONS['moi-compte2'] = () => moiCompte2();
+ACTIONS['moi-actif'] = () => moiActif();
+ACTIONS['moi-retrait'] = () => moiRetrait();
+ACTIONS['notif-lues'] = () => notifLues();
+ACTIONS['dem-decider'] = b => deciderDemandeSB(b);
+ACTIONS['fiche-ouvrir'] = b => ouvrirFiche(Number(b.dataset.id));
 
 /* ----- Administration : inscriptions ----- */
 TAB.inscriptions = {
@@ -2510,7 +2675,7 @@ function afficherMembres() {
   const l = MB.filter(m => !q || [matTxt(m.matricule), m.nom_gamer].concat((m.comptes_jeu || []).map(c => c.pseudo), (m.comptes_jeu || []).map(c => c.uid)).some(x => x && L.normPseudo(x).indexOf(q) >= 0));
   if (!MB.length) { z.innerHTML = note('Aucun membre pour le moment. Les membres apparaissent ici une fois leur inscription approuvée.'); return; }
   if (!l.length) { z.innerHTML = note('Aucun membre ne correspond.'); return; }
-  z.innerHTML = '<p class="mute small">' + l.length + ' membre(s)</p><div class="scroll"><table><thead><tr><th>Matricule</th><th>Nom de gamer</th><th>Statut</th><th>Compte actif</th><th>Approuvé le</th></tr></thead><tbody>' + l.map(m => { const c = (m.comptes_jeu || []).find(x => x.statut === 'actif'); return '<tr><td class="nowrap">' + matTxt(m.matricule) + '</td><td>' + esc(m.nom_gamer) + '</td><td>' + badgeStatut(STATUTS_MB[m.statut]) + '</td><td>' + (c ? esc(c.pseudo) + '<div class="dim small">UID ' + esc(c.uid) + '</div>' : '—') + '</td><td class="nowrap">' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</td></tr>'; }).join('') + '</tbody></table></div>';
+  z.innerHTML = '<p class="mute small">' + l.length + ' membre(s)</p><div class="scroll"><table><thead><tr><th>Matricule</th><th>Nom de gamer</th><th>Statut</th><th>Compte actif</th><th>Approuvé le</th><th></th></tr></thead><tbody>' + l.map(m => { const c = (m.comptes_jeu || []).find(x => x.statut === 'actif'); return '<tr><td class="nowrap">' + matTxt(m.matricule) + '</td><td>' + esc(m.nom_gamer) + '</td><td>' + badgeStatut(STATUTS_MB[m.statut]) + '</td><td>' + (c ? esc(c.pseudo) + '<div class="dim small">UID ' + esc(c.uid) + '</div>' : '—') + '</td><td class="nowrap">' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</td><td><button class="btn sm ghost" type="button" data-act="fiche-ouvrir" data-id="' + m.id + '">Ouvrir</button></td></tr>'; }).join('') + '</tbody></table></div>';
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
