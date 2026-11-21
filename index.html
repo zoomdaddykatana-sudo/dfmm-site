@@ -1227,6 +1227,7 @@ const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions dema
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
   if (k === 'sauvegarde') return ADM.sauvegardeEnRetard ? 1 : 0;
+  if (k === 'acces') return ADM.vsAlerte ? 1 : 0;
   if (k === 'demandes') return ADM.nbDem || 0;
   if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
   if (k === 'matchs') return S.matchs.filter(m => m.statut === 'Brouillon').length;
@@ -2340,7 +2341,8 @@ async function chargerHistorique() {
 
 /* ----- Administration : accès des joueurs ----- */
 TAB.acces = {
-  shell: () => '<div class="panel"><h3>Lien de réinitialisation du mot de passe</h3><p class="mute small">Aucun e-mail n’est envoyé. Copiez le lien et envoyez-le au joueur en privé sur Messenger. Il ne sert qu’une fois et expire vite (1 heure par défaut).</p><label class="lab" for="l-email">E-mail du compte du joueur</label><input type="email" id="l-email" autocomplete="off"><div class="row-btns"><button class="btn" type="button" data-act="lien-creer">Créer le lien</button></div><div id="l-sortie"></div></div>',
+  charger: () => chargerVolsever(),
+  shell: () => '<div class="panel" id="vs-panneau"><h3>Appels à volsever</h3><p class="mute small">Chargement…</p></div><div class="panel"><h3>Lien de réinitialisation du mot de passe</h3><p class="mute small">Aucun e-mail n’est envoyé. Copiez le lien et envoyez-le au joueur en privé sur Messenger. Il ne sert qu’une fois et expire vite (1 heure par défaut).</p><label class="lab" for="l-email">E-mail du compte du joueur</label><input type="email" id="l-email" autocomplete="off"><div class="row-btns"><button class="btn" type="button" data-act="lien-creer">Créer le lien</button></div><div id="l-sortie"></div></div>',
   body: () => ''
 };
 async function creerLien(b) {
@@ -2365,13 +2367,17 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c] = await Promise.all([
+  const [a, b, c, vs] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
-    SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente')
+    SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
+    SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString())
   ]);
   ADM.nbInsc = a.count || 0;
   ADM.nbDem = c.count || 0;
+  ADM.vsJour = vs.count || 0;
+  const limJ = Number(PARAM.volsever_max_jour), pctA = Number(PARAM.volsever_alerte_pct);
+  ADM.vsAlerte = limJ > 0 && pctA > 0 && ADM.vsJour >= limJ * pctA / 100;
   ADM.derniereSauvegarde = b.data && b.data[0] ? b.data[0].date : null;
   ADM.sauvegardeEnRetard = !ADM.derniereSauvegarde || Date.now() - new Date(ADM.derniereSauvegarde).getTime() > 7 * 86400000;
 }
@@ -2441,7 +2447,7 @@ function historiquePseudos(c) {
 async function chargerMonDossier() {
   const z = $('#mon-dossier'); if (!z || !SB) return;
   const [a, b, c] = await Promise.all([
-    SB.from('membres').select('id, matricule, nom_gamer, statut, decision, dernier_changement_compte, comptes_jeu(id, uid, pseudo, statut, pseudos_historique(pseudo, debut, fin))').maybeSingle(),
+    SB.from('membres').select('id, matricule, nom_gamer, statut, decision, dernier_changement_compte, donnees_effacees, comptes_jeu(id, uid, pseudo, statut, pseudos_historique(pseudo, debut, fin))').maybeSingle(),
     SB.from('demandes').select('id, type, statut, motif_decision, cree_le, decide_le').order('cree_le', { ascending: false }).limit(20),
     SB.from('notifications').select('id, texte, lu, cree_le').order('cree_le', { ascending: false }).limit(20)
   ]);
@@ -2464,9 +2470,11 @@ async function chargerMonDossier() {
     h += '<h3 style="margin-top:12px">Mes démarches</h3><div class="row-btns">'
       + (R && nb < R.comptes_max && !encours('compte2') ? '<button class="btn sm" type="button" data-act="moi-compte2">Ajouter un 2e compte</button>' : '')
       + (pause.length && !encours('compte_actif') && !attente ? '<button class="btn sm" type="button" data-act="moi-actif">Changer de compte actif</button>' : '')
+      + (cpts.some(x => x.statut !== 'remplace') ? '<button class="btn sm" type="button" data-act="moi-pseudo">Déclarer un nouveau pseudo</button>' : '')
       + '<button class="btn sm ghost" type="button" data-act="moi-retrait">Demander mon retrait</button></div>'
       + (attente ? '<p class="mute small">Prochain changement de compte actif possible le ' + fDT(L.versLocal(prochain.toISOString())) + '.</p>' : '');
   }
+  if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
   h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
@@ -2544,12 +2552,14 @@ function carteDemande(d) {
   let det = [];
   if (d.type === 'compte2') det = [['Pseudo du nouveau compte', esc(x.pseudo)], ['UID', esc(x.uid) + (/^\d{5,20}$/.test(x.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Actif dès l’approbation', x.activer ? 'Oui' : 'Non'], ['Motif', esc(x.motif)], ['Comptes actuels', cpts.map(c => esc(c.pseudo) + ' (' + (STATUTS_CPT[c.statut] || c.statut) + ')').join(', ') || '—']];
   else if (d.type === 'compte_actif') det = [['Compte à activer', esc(x.pseudo) + ' · UID ' + esc(x.uid)], ['Compte actif actuel', actif ? esc(actif.pseudo) + ' · UID ' + esc(actif.uid) : '—'], ['Dernier changement', dateLoc(m.dernier_changement_compte)], ['Motif', esc(x.motif)]];
+  else if (d.type === 'pseudo') det = [['Compte', 'UID ' + esc(x.uid)], ['Pseudo déclaré', esc(x.pseudo_declare)], ['Pseudo lu par volsever', x.pseudo_volsever ? esc(x.pseudo_volsever) + ' (déjà appliqué)' : '—'], ['Raison', esc(x.raison || '')], ['Pseudo actuel', esc((cpts.find(c => String(c.id) === String(x.compte_id)) || {}).pseudo || '—')]];
+  else if (d.type === 'effacement') return carteEffacement(d);
   else det = Object.keys(x).map(k => [k, esc(typeof x[k] === 'object' ? JSON.stringify(x[k]) : x[k])]);
   return '<div class="card-l"><div class="t"><div><b>' + esc(TYPES_DEM[d.type] || d.type) + '</b> · ' + matTxt(m.matricule) + ' ' + esc(m.nom_gamer || '') + '<div class="small dim">déposée le ' + dateLoc(d.cree_le) + '</div></div>' + badgeStatut(STATUTS_DEM[d.statut]) + '</div>'
     + (d.statut === 'precisions' ? note('Précisions demandées : ' + esc(d.motif_decision || ''), 'a') : '')
     + '<dl class="kv">' + det.map(([k, val]) => '<dt>' + k + '</dt><dd>' + val + '</dd>').join('') + '</dl>'
     + (x.capture ? '<div class="thumbs"><a hidden target="_blank" rel="noopener"><img id="dcap-' + id + '" alt="Capture du profil du nouveau compte" style="width:220px;height:auto;max-height:none"></a></div>' : '')
-    + (d.type === 'pseudo' ? '<label class="lab" for="dp-' + id + '">Pseudo vérifié (si vous acceptez)</label><input id="dp-' + id + '" type="text" value="' + esc(x.pseudo_declare || '') + '">' : '')
+    + (d.type === 'pseudo' ? '<label class="lab" for="dp-' + id + '">Pseudo vérifié (si vous acceptez)</label><input id="dp-' + id + '" type="text" value="' + esc(x.pseudo_volsever || x.pseudo_declare || '') + '">' : '')
     + '<div class="choix" style="margin-top:10px"><label><input type="radio" name="dd-' + id + '" value="accepter"> Accepter</label><label><input type="radio" name="dd-' + id + '" value="precisions"> Demander des précisions</label><label><input type="radio" name="dd-' + id + '" value="refuser"> Refuser</label></div>'
     + '<label class="lab" for="dm-' + id + '">Motif (obligatoire pour refuser ou demander des précisions)</label><textarea id="dm-' + id + '" rows="2"></textarea><div id="de-' + id + '" class="err" role="alert"></div>'
     + '<div class="row-btns"><button class="btn" type="button" data-act="dem-decider" data-id="' + id + '">Enregistrer la décision</button></div></div>';
@@ -2593,6 +2603,72 @@ ACTIONS['moi-retrait'] = () => moiRetrait();
 ACTIONS['notif-lues'] = () => notifLues();
 ACTIONS['dem-decider'] = b => deciderDemandeSB(b);
 ACTIONS['fiche-ouvrir'] = b => ouvrirFiche(Number(b.dataset.id));
+
+/* ----- Lot 2C : pseudo avec volsever, effacement des données ----- */
+function moiPseudo() {
+  const cpts = ((DOS && DOS.m.comptes_jeu) || []).filter(x => x.statut !== 'remplace');
+  modal('Déclarer un nouveau pseudo', '<p class="mute small">Le site lit votre pseudo officiel à partir de votre UID. Le pseudo trouvé sur votre profil remplace l’actuel ; s’il diffère de celui que vous tapez, Katana vérifie.</p><label class="lab" for="d-cpt">Compte</label><select id="d-cpt">' + cpts.map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="d-pseudo">Nouveau pseudo exact (avec le tag de clan)</label><input id="d-pseudo" type="text"><div id="d-err" class="err" role="alert"></div><div id="d-ok"></div>',
+    [{ label: 'Fermer', cls: 'ghost' }, { label: 'Déclarer', onClick: async b => {
+      const err = $('#d-err'), ok = $('#d-ok'), pseudo = $('#d-pseudo').value.trim();
+      err.textContent = ''; ok.innerHTML = '';
+      if (!pseudo) { err.textContent = 'Tapez votre nouveau pseudo.'; return false; }
+      ok.innerHTML = '<p class="mute small">Vérification auprès de volsever… (quelques secondes)</p>';
+      const { data, error } = await SB.functions.invoke('pseudo-volsever', { body: { compte_id: Number(v('d-cpt')), pseudo } });
+      if (error || !data || !data.issue) { ok.innerHTML = ''; err.textContent = await erreurFonction(data, error, 'Déclaration impossible pour le moment. Réessayez plus tard.'); return false; }
+      ok.innerHTML = note(esc(data.message) + (data.pseudo_retenu ? ' Pseudo retenu : <b>' + esc(data.pseudo_retenu) + '</b>.' : ''), data.issue === 'conforme' || data.issue === 'modifie' ? '' : 'a');
+      b.hidden = true; chargerMonDossier(); majPastilleCompte();
+      return false;
+    } }]);
+}
+function moiEffacement() {
+  modal('Demander l’effacement de mes données', note('Seront effacés : nom réel, date de naissance, genre, résidence, langues, e-mail, lien Facebook et captures de profil. Votre accès au site sera fermé.', 'r') + '<p class="mute small">Seront gardés : votre matricule, vos pseudos et votre UID, vos statistiques, et une empreinte codée de votre e-mail et de votre lien Facebook (pour éviter une double inscription). Vos apparitions passées dans les classements restent publiques avec votre pseudo.</p><label class="coche"><input type="checkbox" id="d-ok"><span>J’ai compris ce qui est effacé et ce qui est gardé. Je sais que c’est définitif.</span></label><div id="d-err" class="err" role="alert"></div>',
+    [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer la demande', cls: 'danger', onClick: async () => {
+      const err = $('#d-err'); err.textContent = '';
+      if (!coche('d-ok')) { err.textContent = 'Cochez la case pour confirmer.'; return false; }
+      const { error } = await SB.rpc('demander_effacement');
+      if (error) { err.textContent = erreurRpc(error); return false; }
+      toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
+    } }]);
+}
+function carteEffacement(d) {
+  const m = d.membres || {}, id = d.id;
+  return '<div class="card-l"><div class="t"><div><b>Effacement des données</b> · ' + matTxt(m.matricule) + ' ' + esc(m.nom_gamer || '') + '<div class="small dim">déposée le ' + dateLoc(d.cree_le) + '</div></div>' + badgeStatut(STATUTS_DEM[d.statut]) + '</div>'
+    + note('Effacement définitif : nom réel, date de naissance, genre, résidence, langues, e-mail, lien Facebook, captures de profil ; le compte de connexion est supprimé (accès fermé). Gardés : empreintes, matricule, UID, pseudos, statistiques.', 'r')
+    + '<label class="coche"><input type="checkbox" id="ef-' + id + '"><span>Je confirme l’effacement définitif des données de ce membre.</span></label><div class="row-btns"><button class="btn danger" type="button" data-act="dem-effacer" data-id="' + id + '">Effacer définitivement</button></div>'
+    + '<p class="mute small" style="margin-top:12px">Ou bien :</p><div class="choix"><label><input type="radio" name="dd-' + id + '" value="precisions"> Demander des précisions</label><label><input type="radio" name="dd-' + id + '" value="refuser"> Refuser</label></div>'
+    + '<label class="lab" for="dm-' + id + '">Motif</label><textarea id="dm-' + id + '" rows="2"></textarea><div id="de-' + id + '" class="err" role="alert"></div>'
+    + '<div class="row-btns"><button class="btn ghost" type="button" data-act="dem-decider" data-id="' + id + '">Enregistrer la décision</button></div></div>';
+}
+async function effacerDemande(b) {
+  const id = b.dataset.id, err = $('#de-' + id);
+  err.textContent = '';
+  if (!coche('ef-' + id)) { err.textContent = 'Cochez la case de confirmation.'; return; }
+  b.disabled = true;
+  const { data, error } = await SB.functions.invoke('effacer-donnees', { body: { demande_id: Number(id) } });
+  b.disabled = false;
+  if (error || !data || !data.ok) { err.textContent = await erreurFonction(data, error, 'Effacement impossible. La fonction « effacer-donnees » est-elle installée ?'); return; }
+  toast('Données effacées. Captures supprimées : ' + data.fichiers_supprimes + '. Accès fermé : ' + (data.compte_supprime ? 'oui' : 'non, à vérifier') + '.', !data.compte_supprime);
+  await chargerCompteursAdmin(); UI.tabRendu = ''; rendreAdmin();
+}
+async function chargerVolsever() {
+  const z = $('#vs-panneau'); if (!z || !SB) return;
+  const [j, mn, der] = await Promise.all([
+    SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString()),
+    SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 60000).toISOString()),
+    SB.from('volsever_appels').select('cree_le, resultat').order('cree_le', { ascending: false }).limit(5)
+  ]);
+  if (!$('#vs-panneau')) return;
+  if (j.error) { z.innerHTML = '<h3>Appels à volsever</h3>' + note('Lecture impossible : ' + esc(j.error.message), 'r'); return; }
+  const maxJ = Number(PARAM.volsever_max_jour), maxM = Number(PARAM.volsever_max_minute), pct = Number(PARAM.volsever_alerte_pct);
+  const alerte = maxJ > 0 && (j.count || 0) >= maxJ * pct / 100;
+  const nomR = { trouve: 'pseudo trouvé', introuvable: 'UID introuvable', erreur: 'erreur', delai: 'sans réponse', quota: 'limite atteinte (pas d’appel)' };
+  z.innerHTML = '<h3>Appels à volsever</h3><dl class="kv"><dt>Sur 24 heures</dt><dd><b>' + (j.count || 0) + '</b> sur ' + maxJ + '</dd><dt>Dernière minute</dt><dd>' + (mn.count || 0) + ' sur ' + maxM + '</dd></dl>'
+    + (alerte ? note('Attention : ' + pct + ' % de la limite de 24 heures est atteinte. Au-delà, les déclarations de pseudo passent en validation manuelle.', 'r') : '')
+    + ((der.data || []).length ? '<p class="mute small">Derniers appels : ' + der.data.map(x => dateLoc(x.cree_le) + ' (' + (nomR[x.resultat] || x.resultat) + ')').join(' ; ') + '</p>' : '<p class="mute small">Aucun appel pour l’instant.</p>');
+}
+ACTIONS['moi-pseudo'] = () => moiPseudo();
+ACTIONS['moi-effacement'] = () => moiEffacement();
+ACTIONS['dem-effacer'] = b => effacerDemande(b);
 
 /* ----- Administration : inscriptions ----- */
 TAB.inscriptions = {
