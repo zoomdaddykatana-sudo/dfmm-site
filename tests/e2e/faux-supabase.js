@@ -3,12 +3,14 @@
   const iso = () => new Date().toISOString();
   let seq = 100;
   const DB = window.FAUSSE_BASE;
-  const FK = { periodes: 'membre_id', comptes_jeu: 'membre_id', comptes_periodes: 'compte_id', pseudos_historique: 'compte_id', match_lignes: 'match_id', captures: 'match_id', membres_prives: 'membre_id', demandes: 'membre_id' };
+  const FK = { convocations: 'dossier_id', messages_litige: 'dossier_id', periodes: 'membre_id', comptes_jeu: 'membre_id', comptes_periodes: 'compte_id', pseudos_historique: 'compte_id', match_lignes: 'match_id', captures: 'match_id', membres_prives: 'membre_id', demandes: 'membre_id' };
   function projeter(table, row, sel) {
     const out = Object.assign({}, row);
     const re = /([a-z_]+)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g; let m;
     while ((m = re.exec(sel))) {
       const child = m[1]; const fk = FK[child];
+      const fkUn = child.replace(/s$/, '') + '_id';
+      if (fkUn in row && !FK[child + '__inverse']) { const x = (DB[child] || []).find(r => r.id === row[fkUn]); out[child] = x ? projeter(child, x, m[2]) : null; continue; }
       out[child] = (DB[child] || []).filter(r => r[fk] === row.id).map(r => projeter(child, r, m[2]));
     }
     return out;
@@ -23,6 +25,7 @@
   Q.prototype.in = function (k, v) { this.f.push(r => v.map(String).includes(String(r[k]))); return this; };
   Q.prototype.not = function (k, op, v) { this.f.push(r => r[k] !== null && r[k] !== undefined); return this; };
   Q.prototype.order = function (k, o) { this.ord.push([k, !(o && o.ascending === false)]); return this; };
+  Q.prototype.is = function (k, v) { this.f.push(r => (r[k] === undefined ? null : r[k]) === v); return this; };
   Q.prototype.limit = function () { return this; };
   Q.prototype.range = function () { return this; };
   Q.prototype.single = function () { this.one = true; return this; };
@@ -67,9 +70,30 @@
       const caps = DB.captures.filter(c => c.match_id === m.id);
       if (p.p_decision === 'valider') { if (!caps.length) throw new Error('Ajoutez au moins une capture avant de valider.'); m.statut = 'valide'; m.valide_le = iso(); caps.forEach(c => { c.statut = 'retenue'; }); }
       else m.statut = { attente: 'attente', refuser: 'refuse', annuler: 'annule', brouillon: 'brouillon' }[p.p_decision];
+      if (m.statut === 'attente' && !(DB.dossiers || []).some(d => d.match_id === m.id)) (DB.dossiers = DB.dossiers || []).push({ id: ++seq, match_id: m.id, ouvert_le: iso(), statut: 'ouvert', est_litige: null });
       m.motif = p.p_motif; DB.registre.push({ id: ++seq, match_id: m.id, type: 'decision', detail: p.p_decision, date: iso() });
       return null;
     },
+    sanctionner: p => {
+      p = p.p; const t = new Date();
+      const fin = p.type === 'suspension' ? new Date(p.fin_jour + 'T00:00:00+03:00').getTime() + 86400000 : null;
+      const r = { id: ++seq, membre_id: p.membre_id, type: p.type, motif: p.motif, categorie: p.categorie, debut: t.toISOString(), fin: fin ? new Date(fin).toISOString() : null, match_id: p.match_id || null, recours_jusqu: new Date(t.getTime() + 48 * 3600000).toISOString(), statut: 'active', cree_le: t.toISOString() };
+      (DB.sanctions = DB.sanctions || []).push(r); return r.id;
+    },
+    decider_sanction: p => { const s = DB.sanctions.find(x => x.id === p.p_sanction); if (p.p_decision === 'lever') s.statut = 'levee'; else s.decision_recours = 'maintenue'; s.motif_recours = p.p_motif; s.recours_decide_le = iso(); return null; },
+    qualifier_dossier: p => { const d = DB.dossiers.find(x => x.id === p.p_dossier); d.est_litige = p.p_litige; d.faits = p.p_faits; return null; },
+    convoquer: p => { (DB.convocations = DB.convocations || []).push({ id: ++seq, dossier_id: p.p_dossier, membre_id: p.p_membre, role: p.p_role, convoque_le: iso(), confirme_le: null }); return null; },
+    ecrire_litige: p => { const d = DB.dossiers.find(x => x.id === p.p_dossier); if (d.statut !== 'ouvert') throw new Error('La discussion est fermée'); (DB.messages_litige = DB.messages_litige || []).push({ id: ++seq, dossier_id: p.p_dossier, membre_id: null, texte: p.p_texte, cree_le: iso() }); return null; },
+    trancher_dossier: p => {
+      const d = DB.dossiers.find(x => x.id === p.p_dossier), m = DB.matchs.find(x => x.id === d.match_id);
+      DB.captures.filter(c => c.match_id === m.id).forEach(c => { c.statut = p.p_decision === 'capture_retenue' && c.id === p.p_capture ? 'retenue' : 'ecartee'; });
+      m.statut = { capture_retenue: 'valide', match_refuse: 'refuse', match_annule: 'annule' }[p.p_decision];
+      Object.assign(d, { statut: 'tranche', decision: p.p_decision, capture_retenue_id: p.p_capture, motif_decision: p.p_motif, decide_le: iso() }); return null;
+    },
+    valider_synthese: p => { const d = DB.dossiers.find(x => x.id === p.p_dossier); Object.assign(d, { synthese: p.p_synthese, synthese_validee_le: iso(), statut: 'archive' }); return null; },
+    captures_a_supprimer: p => { const d = DB.dossiers.find(x => x.id === p.p_dossier); return DB.captures.filter(c => c.match_id === d.match_id && c.statut === 'ecartee').map(c => c.chemin); },
+    noter_captures_supprimees: p => { DB.dossiers.find(x => x.id === p.p_dossier).captures_supprimees_le = iso(); return null; },
+    sanctionner_dossier: p => { DB.sanctions.find(x => x.id === p.p_sanction).dossier_id = p.p_dossier; return null; },
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {
@@ -80,7 +104,7 @@
     },
     from: t => new Q(t),
     rpc: async (n, p) => { window.APPELS = (window.APPELS || []).concat([[n, p]]); try { return { data: RPC[n] ? RPC[n](p || {}) : null, error: null }; } catch (e) { return { data: null, error: { message: e.message } }; } },
-    storage: { from: () => ({ upload: async () => ({ data: {}, error: null }), createSignedUrl: async () => ({ data: { signedUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' } }) }) },
+    storage: { from: () => ({ remove: async () => ({ data: [], error: null }), upload: async () => ({ data: {}, error: null }), createSignedUrl: async () => ({ data: { signedUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' } }) }) },
     functions: { invoke: async () => ({ data: null, error: null }) }
   };
   window.supabase = { createClient: () => client };
