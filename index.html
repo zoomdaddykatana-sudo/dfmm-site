@@ -2651,9 +2651,16 @@ function lierEvenements() {
 }
 /* ---------------- Supabase (lot socle) ---------------- */
 const CFG = window.DFMM_CONFIG || null;
+// Lien de réinitialisation : lu AVANT que la bibliothèque n'efface l'adresse.
+const RETOUR_LIEN = (() => { const h = new URLSearchParams((location.hash || '').replace(/^#/, '')); return { recup: h.get('type') === 'recovery', erreur: h.get('error_code') || h.get('error') || '' }; })();
 const SB = (window.supabase && CFG) ? window.supabase.createClient(CFG.supabaseUrl, CFG.supabasePublishableKey, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } }) : null;
 const PARAM = {};
-let PARAMS = [], SESSION = null, RECUP = false;
+let PARAMS = [], SESSION = null, RECUP = RETOUR_LIEN.recup;
+// Écoute branchée tout de suite, pour ne pas manquer le signal « réinitialisation ».
+if (SB) SB.auth.onAuthStateChange((evt, session) => {
+  if (evt === 'PASSWORD_RECOVERY') { RECUP = true; if (PRET) location.hash = '#compte'; }
+  if (PRET) setTimeout(() => { majSession(session); }, 0);
+});
 
 async function chargerParametres() {
   if (!SB) return;
@@ -2683,6 +2690,7 @@ function rendreCompte() {
   const z = $('#compte-zone');
   if (!SB) { z.innerHTML = note('Connexion impossible pour le moment.', 'r'); return; }
   if (!PRET) { z.innerHTML = '<p class="mute">Chargement…</p>'; return; }
+  const lienPerime = !SESSION && (RETOUR_LIEN.erreur || RECUP);
   if (SESSION && RECUP) {
     z.innerHTML = '<form id="f-mdp" class="panel" novalidate><h3>Choisir un nouveau mot de passe</h3><label class="lab" for="n-mdp">Nouveau mot de passe (8 caractères au moins)</label><input type="password" id="n-mdp" autocomplete="new-password"><label class="lab" for="n-mdp2">Le même, une seconde fois</label><input type="password" id="n-mdp2" autocomplete="new-password"><div id="n-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Enregistrer</button></div></form>';
     return;
@@ -2691,7 +2699,7 @@ function rendreCompte() {
     z.innerHTML = '<div class="panel"><h3>Vous êtes connecté</h3><p>' + esc(SESSION.user.email) + (ADMIN ? ' · administrateur' : '') + '</p><div class="row-btns">' + (ADMIN ? '<a class="btn" href="#admin">Administration</a>' : '') + '<button class="btn ghost" type="button" data-act="deconnexion">Se déconnecter</button></div></div>' + (ADMIN ? '' : note('L’espace membre arrive dans une prochaine version du site.'));
     return;
   }
-  z.innerHTML = '<form id="f-connexion" class="panel" novalidate><h3>Se connecter</h3><label class="lab" for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email"><label class="lab" for="c-mdp">Mot de passe</label><input type="password" id="c-mdp" autocomplete="current-password"><div id="c-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Se connecter</button></div><p class="mute small">Mot de passe oublié ? Écrivez à Katana sur Messenger : il vous enverra un lien pour en choisir un nouveau.</p></form>' + (PARAM.inscriptions_ouvertes === true ? '' : note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV.'));
+  z.innerHTML = (lienPerime ? note('Ce lien n’est plus valable : il a expiré ou a déjà servi. Demandez un nouveau lien à Katana sur Messenger.', 'r') : '') + '<form id="f-connexion" class="panel" novalidate><h3>Se connecter</h3><label class="lab" for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email"><label class="lab" for="c-mdp">Mot de passe</label><input type="password" id="c-mdp" autocomplete="current-password"><div id="c-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Se connecter</button></div><p class="mute small">Mot de passe oublié ? Écrivez à Katana sur Messenger : il vous enverra un lien pour en choisir un nouveau.</p></form>' + (PARAM.inscriptions_ouvertes === true ? '' : note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV.'));
 }
 async function seConnecter(e) {
   e.preventDefault();
@@ -2786,13 +2794,10 @@ async function demarrer() {
   router();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   if (SB) {
-    await chargerParametres();
-    SB.auth.onAuthStateChange((evt, session) => {
-      if (evt === 'PASSWORD_RECOVERY') { RECUP = true; location.hash = '#compte'; }
-      setTimeout(() => { majSession(session); }, 0);
-    });
     const { data } = await SB.auth.getSession();
+    await chargerParametres();
     PRET = true;
+    if (RECUP || RETOUR_LIEN.erreur) location.hash = '#compte';
     await majSession(data.session);
   } else PRET = true;
   rendreBandeau();
