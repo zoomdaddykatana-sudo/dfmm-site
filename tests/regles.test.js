@@ -7,10 +7,15 @@ const fs = require('node:fs');
 const path = require('node:path');
 const L = require('../js/regles.js');
 
-// ---------- Paramètres : lus dans supabase/migrations/0001_socle.sql ----------
-const sql = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'migrations', '0001_socle.sql'), 'utf8');
+// ---------- Paramètres : lus dans les migrations Supabase ----------
+// Toutes les migrations, dans l'ordre : paramètres ajoutés, puis retirés (« delete from public.parametres where cle = … »).
+const dossierMig = path.join(__dirname, '..', 'supabase', 'migrations');
 const PARAM = {};
-for (const m of sql.matchAll(/^\s*\('([a-z0-9_]+)',\s*'((?:[^']|'')*)',\s*'(entier|decimal|heure|jour|booleen|texte)'/gm)) PARAM[m[1]] = JSON.parse(m[2]);
+for (const f of fs.readdirSync(dossierMig).filter(x => x.endsWith('.sql')).sort()) {
+  const sql = fs.readFileSync(path.join(dossierMig, f), 'utf8');
+  for (const m of sql.matchAll(/^\s*\('([a-z0-9_]+)',\s*'((?:[^']|'')*)',\s*'(entier|decimal|heure|jour|booleen|texte)'/gm)) PARAM[m[1]] = JSON.parse(m[2]);
+  for (const m of sql.matchAll(/delete from public\.parametres where cle = '([a-z0-9_]+)'/g)) delete PARAM[m[1]];
+}
 const R = L.regles(PARAM);
 
 // ---------- Données fictives ----------
@@ -94,6 +99,25 @@ test('l’ancienne alerte « un match par session » n’existe plus', () => {
   const ctx = ctxAvec(16); ctx.matchsList = [match(16, 8, { id: 'M0' })];
   const c = L.controlesMatch(match(16, 8), ctx, SAISON, R);
   assert.ok(!c.alertes.join().includes('session'));
+});
+
+// ---------- Fin de saison (décision du 21/11/2026) ----------
+test('classement final : tous les matchs jusqu’à la fin officielle, puis 48 h de vérification et le dimanche qui suit', () => {
+  // Fin un dimanche (31/01/2027) : vérification jusqu’au mercredi 03/02 à 0 h, publication le dimanche 07/02.
+  assert.equal(L.coupureFinale(SAISON), '2027-02-01T00:00');
+  assert.equal(L.finVerificationFinale(SAISON, R), '2027-02-03T00:00');
+  assert.equal(L.publicationFinale(SAISON, R), '2027-02-07');
+});
+test('classement final : fin un samedi → vérification jusqu’au lundi → publication le dimanche d’après', () => {
+  const s = Object.assign({}, SAISON, { fin: '2027-01-30' });
+  assert.equal(L.finVerificationFinale(s, R), '2027-02-02T00:00');
+  assert.equal(L.publicationFinale(s, R), '2027-02-07');
+});
+test('classement final : vérification finie un dimanche à 0 h → publication ce dimanche-là ; durée réglable', () => {
+  const jeudi = Object.assign({}, SAISON, { fin: '2027-01-28' });
+  assert.equal(L.publicationFinale(jeudi, R), '2027-01-31');
+  assert.equal(L.publicationFinale(jeudi, Object.assign({}, R, { verification_finale_h: 72 })), '2027-02-07');
+  assert.equal(L.publicationFinale({ id: 9, nom: 'Sans fin' }, R), null);
 });
 
 // ---------- Section 7 : coupure ----------
