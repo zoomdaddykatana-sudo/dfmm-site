@@ -29,6 +29,10 @@
   - Couleurs : ambre remplacé par le rouge #E53935 ; gris en tertiaire seulement. Icône : tête du logo original recadrée. Hashtag : « #LeagueUV » gardé.
   - Pas d'API Claude pour l'instant : Katana fait lire les captures dans claude.ai et colle les données dans l'écran de vérification (format à lui fournir au lot 3).
   - Pas d'e-mail aux joueurs, pas de confirmation d'adresse ; mot de passe oublié = lien créé par Katana (Administration > Accès des joueurs), envoyé par Messenger.
+  - Saisons : elles portent le nom de la saison du jeu (par exemple « Aurora ») ; les matchs comptent jusqu'à la fin officielle de la saison de Delta Force, sans gel avant la fin ; vérification pendant 48 h après la fin (réglage `verification_finale_h`), puis classement final publié le premier dimanche qui suit la fin de ces 48 h (fin un samedi → vérification jusqu'au lundi → dimanche d'après). Remplace « 7 jours après la fin ».
+  - Phase de démarrage : réglage `phase_demarrage` (oui/non, Administration > Paramètres), passé à « non » par Katana le jour du lancement.
+  - Matchs déjà joués : tous à saisir (saisie de démarrage) ; Katana a toutes les captures.
+  - Réinscription des 25 anciens membres : par e-mail depuis le Gmail de Katana (exception à « pas d'e-mail aux joueurs »), avec `outils/envoi-reinscription.gs` (Google Apps Script) et une feuille Google qu'il remplit lui-même (adresses dans l'ancien classeur ; jamais dans le dépôt ni le chat). Texte du message validé le 21/11/2026. Envoi seulement après ouverture des inscriptions (demande écrite « ouvre les inscriptions »).
   - Anciens membres : DFMM-1 à DFMM-25 (approuvés les 18 et 19/11/2026), importés dans `matricules_anciens` (date seule) ; à la réinscription, ils gardent leur matricule et leur date d'origine à 0 h (Madagascar). Nouveaux membres : à partir de DFMM-26. Les 2 lignes sans matricule du fichier d'origine ne sont pas des membres. Le caractère « 么 » des pseudos TDM est gardé tel quel.
 
 ## 3. État d'avancement
@@ -40,14 +44,14 @@
 | 2A Inscriptions | Inscription, approbation, reprise des anciens matricules, membres, sauvegarde ; migrations 0002 et 0003 | Fusionné (PR n° 3) |
 | 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | Fusionné (PR n° 4) ; migration 0004 exécutée, test 27/27 |
 | 2C | Pseudo avec volsever (compteur d'appels, repli manuel) ; effacement des données ; migration 0005 ; fonctions `pseudo-volsever` et `effacer-donnees` | Fusionné (PR n° 6) ; migration 0005 exécutée, test 21/21 dans le vrai projet ; 2 fonctions installées (« Verify JWT » activé) ; écrans administrateur vérifiés sur téléphone le 21/11/2026 |
-| 3 | Matchs et captures, registre | À faire |
+| 3 | Matchs et captures, registre | En cours : migration 0006 (vérification finale 48 h, phase de démarrage) exécutée et test 0006 réussi (8/8) dans le vrai projet le 21/11/2026 ; lot 1 adapté (classement final). À faire : 3A matchs de Katana (saisons, saisie avec capture, registre), puis 3B matchs libres |
 | 4 | Litiges, sanctions, captures écartées | À faire |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
 
 Points en suspens :
 - Nettoyage de la fausse fiche « EssaiTest » et du compte `essai1@dfmm.invalid` : fait, vérifié le 21/11/2026 (0 fiche, 0 compte).
 - Mise à jour du règlement du site (lot 5) et du guide PDF (ne pas toucher au PDF).
-- Message de réinscription pour les 25 membres déjà approuvés : à rédiger.
+- Message de réinscription pour les 25 : rédigé et validé ; reste l'ouverture des inscriptions (demande écrite de Katana), puis l'envoi (guider Katana : feuille Google, Extensions > Apps Script, essai à soi-même, puis envoi à tous).
 - Sauvegarde : bouton dans Administration > Sauvegarde ; à faire chaque semaine (pas de sauvegarde automatique). Depuis la PR n° 7, elle inclut `demandes`, `notifications` et `volsever_appels` ; le test `tests/sauvegarde.test.js` échoue si une nouvelle table de migration n'est pas ajoutée à `TABLES_SAUVEGARDE` (`index.html`).
 - Pseudo et effacement : jamais essayés de bout en bout avec un vrai compte (aucun membre encore). Premier essai réel avec le premier membre réinscrit (consomme 1 appel volsever).
 
@@ -65,13 +69,13 @@ Points en suspens :
 
 - Site : https://zoomdaddykatana-sudo.github.io/dfmm-site/ (Pages publie la branche `ccr-08840471-84tqcu`).
 - Supabase : projet `ijpbplzbjohfrqwnvrqv` (URL et clé publishable dans `config.js`, rien d'autre). Fonctions installées : `lien-reinitialisation`, `inscription` (« Verify JWT » désactivé), `pseudo-volsever` et `effacer-donnees` (« Verify JWT » **activé** : réservées aux personnes connectées). Secret déjà rangé : `VOLSEVER_API_KEY`.
-- Migrations (`supabase/migrations/`) : 0001 à 0005 exécutées dans le vrai projet (par le SQL, pas par l'outil de migrations : la liste des migrations de Supabase reste vide, c'est normal). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
+- Migrations (`supabase/migrations/`) : 0001 à 0006 exécutées dans le vrai projet (par le SQL, pas par l'outil de migrations : la liste des migrations de Supabase reste vide, c'est normal). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
 - Forfait gratuit Supabase : pause après 1 semaine sans activité, pas de sauvegarde automatique, 1 Go de fichiers, envoi d'e-mails limité à 2 par heure et aux membres de l'équipe du projet.
 - volsever : `GET https://gate.volsever.com/proxy/api/game/delta-force?id={UID}` ; réponse `data.username` ; environ 5 s ; forfait gratuit 45 requêtes par jour et 15 par minute ; clé envoyée dans l'en-tête `X-API-KEY` (documentation : docs.volsever.com, outil « Delta Force (Tencent) ») ; identifiant inconnu = code 404. Le compteur d'appels est tenu dans la table `volsever_appels` (24 h glissantes et dernière minute).
 - Pseudo et tag de clan : « ¬ » est un tag de clan validé, à conserver et comparer tel quel.
 - Environnement cloud « dfmm-site » : hôtes autorisés `ijpbplzbjohfrqwnvrqv.supabase.co`, `supabase.com`, `volsever.com`, `www.volsever.com`, `gate.volsever.com`, `docs.volsever.com` (documentation seulement : la clé volsever n'est jamais dans cet environnement).
 - Connecteur « Supabase DFMM » (limité au projet, outils base, journal et documentation ; pas d'outil de compte). Le connecteur standard « Supabase » (accès à tout le compte) est déconnecté : ne pas l'utiliser. Chaque requête : SQL et résultat attendu montrés à Katana, puis son « oui » écrit, puis le message exact de Supabase rapporté.
-- Tests locaux : `node --test tests/*.test.js` (37 tests) ; base imitée : PostgreSQL 16 avec `supabase/tests/emulation_locale.sql`, puis les migrations dans l'ordre, puis les fichiers de test.
+- Tests locaux : `node --test tests/*.test.js` (40 tests) ; base imitée : PostgreSQL 16 avec `supabase/tests/emulation_locale.sql`, puis les migrations dans l'ordre, puis les fichiers de test.
 
 ## 6. Pièges déjà rencontrés
 
@@ -88,5 +92,6 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. PR n° 7 (CLAUDE.md et sauvegarde complète) : Katana vérifie sur téléphone (Administration > Sauvegarde > Télécharger : le fichier contient `demandes`, `notifications`, `volsever_appels`), puis fusion sur son accord écrit.
-2. Lot 3 (matchs et captures) : relire les sections 4 et 5 du cahier et les décisions Q6 à Q8 et Q19 avant de coder ; repartir de `main` sur la branche `ccr-08840471-84tqcu`.
+1. Lot 3A (matchs de Katana) : saisons dans la vraie base (Administration > Saison) ; nouveau match avec capture (rangée dans Supabase, heure d'envoi notée par le serveur) et données lues par claude.ai collées (format à fournir) ; liaison pseudo → compte (`L.resoudre`) ; contrôles (`L.controlesMatch`, sans délai de 10 min en phase de démarrage) ; lignes « à identifier » ; validation ; registre (section 5). Migration 0007 et son test. Les anciens écrans « Matchs », « Créneaux », « Saison », « Classements » de `index.html` travaillent encore en local (`ecrire`, `S.*`) et appellent `L.finCompetition`, qui n'existe plus : à remplacer.
+2. Si Katana écrit « ouvre les inscriptions » : montrer l'UPDATE exact du réglage `inscriptions_ouvertes`, attendre son « oui », puis le guider pour l'envoi des e-mails.
+3. Textes du site à corriger au lot 5 (à proposer à Katana) : « 7 derniers jours d'audit » / « gel » (lignes ~331, 520, 580, 707 de `index.html`).
