@@ -38,8 +38,8 @@
 | 0 Socle | Supabase, connexion, paramètres, application installable | Fusionné (PR n° 1) |
 | 1 Calculs | Règles de classement conformes au cahier, 24 tests | Fusionné (PR n° 2) |
 | 2A Inscriptions | Inscription, approbation, reprise des anciens matricules, membres, sauvegarde ; migrations 0002 et 0003 | Fusionné (PR n° 3) |
-| 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | **PR n° 4 ouverte** : migration 0004 exécutée et test 0004 réussi (27/27) dans le vrai projet le 21/11/2026 ; reste la vérification sur téléphone et l'accord de Katana pour fusionner |
-| 2C | Pseudo avec volsever ; effacement des données | À faire |
+| 2B Comptes et demandes | 2e compte, compte actif, retrait, réintégration, notifications, onglet Demandes, fiche membre ; migration 0004 | Fusionné (PR n° 4) ; migration 0004 exécutée, test 27/27 |
+| 2C | Pseudo avec volsever (compteur d'appels, repli manuel) ; effacement des données ; migration 0005 ; fonctions `pseudo-volsever` et `effacer-donnees` | **PR n° 6 ouverte** : migration 0005, test 0005 (21/21) et installation des 2 fonctions à faire |
 | 3 | Matchs et captures, registre | À faire |
 | 4 | Litiges, sanctions, captures écartées | À faire |
 | 5 | Textes et pages (règlement, processus, actualités, messagerie, couleurs) | À faire ; proposer les textes à Katana avant de réécrire |
@@ -63,12 +63,12 @@ Points en suspens :
 ## 5. Infos de référence
 
 - Site : https://zoomdaddykatana-sudo.github.io/dfmm-site/ (Pages publie la branche `ccr-08840471-84tqcu`).
-- Supabase : projet `ijpbplzbjohfrqwnvrqv` (URL et clé publishable dans `config.js`, rien d'autre). Fonctions installées : `lien-reinitialisation`, `inscription`. Secret déjà rangé : `VOLSEVER_API_KEY`.
-- Migrations (`supabase/migrations/`) : 0001 à 0004 exécutées dans le vrai projet. Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
+- Supabase : projet `ijpbplzbjohfrqwnvrqv` (URL et clé publishable dans `config.js`, rien d'autre). Fonctions installées : `lien-reinitialisation`, `inscription` (« Verify JWT » désactivé). À installer (PR n° 6) : `pseudo-volsever` et `effacer-donnees`, avec « Verify JWT » **activé** (réservées aux personnes connectées). Secret déjà rangé : `VOLSEVER_API_KEY`.
+- Migrations (`supabase/migrations/`) : 0001 à 0004 exécutées dans le vrai projet ; 0005 à exécuter (PR n° 6). Chaque migration a son test dans `supabase/tests/` (il finit par un message rouge « FIN DU TEST » voulu, qui annule tout).
 - Forfait gratuit Supabase : pause après 1 semaine sans activité, pas de sauvegarde automatique, 1 Go de fichiers, envoi d'e-mails limité à 2 par heure et aux membres de l'équipe du projet.
-- volsever : `GET https://gate.volsever.com/proxy/api/game/delta-force?id={UID}` ; réponse `data.username` ; environ 5 s ; forfait gratuit 45 requêtes par jour et 15 par minute ; mode d'envoi de la clé (en-tête ou paramètre) à vérifier dans sa documentation.
+- volsever : `GET https://gate.volsever.com/proxy/api/game/delta-force?id={UID}` ; réponse `data.username` ; environ 5 s ; forfait gratuit 45 requêtes par jour et 15 par minute ; clé envoyée dans l'en-tête `X-API-KEY` (documentation : docs.volsever.com, outil « Delta Force (Tencent) ») ; identifiant inconnu = code 404. Le compteur d'appels est tenu dans la table `volsever_appels` (24 h glissantes et dernière minute).
 - Pseudo et tag de clan : « ¬ » est un tag de clan validé, à conserver et comparer tel quel.
-- Environnement cloud « dfmm-site » : hôtes autorisés `ijpbplzbjohfrqwnvrqv.supabase.co` et `supabase.com`.
+- Environnement cloud « dfmm-site » : hôtes autorisés `ijpbplzbjohfrqwnvrqv.supabase.co`, `supabase.com`, `volsever.com`, `www.volsever.com`, `gate.volsever.com`, `docs.volsever.com` (documentation seulement : la clé volsever n'est jamais dans cet environnement).
 - Connecteur « Supabase DFMM » (limité au projet, outils base, journal et documentation ; pas d'outil de compte). Le connecteur standard « Supabase » (accès à tout le compte) est déconnecté : ne pas l'utiliser. Chaque requête : SQL et résultat attendu montrés à Katana, puis son « oui » écrit, puis le message exact de Supabase rapporté.
 - Tests locaux : `node --test tests/*.test.js` (29 tests) ; base imitée : PostgreSQL 16 avec `supabase/tests/emulation_locale.sql`, puis les migrations dans l'ordre, puis les fichiers de test.
 
@@ -85,8 +85,6 @@ Points en suspens :
 
 ## 7. Prochaine étape
 
-1. Demander à Katana s'il a vérifié la PR n° 4 sur son téléphone (onglet Demandes, bouton Ouvrir dans Membres).
-2. Si Katana écrit « fusionne la PR n° 4 » : vérifier, fusionner, puis repartir de `main` sur la branche `ccr-08840471-84tqcu`.
-3. Commencer le lot 2C :
-   - lire d'abord la documentation de volsever (mode d'envoi de la clé ; ajouter l'hôte à l'environnement si besoin) ;
-   - puis coder le pseudo (compteur d'appels, délai d'attente, repli manuel) et l'effacement (décision Q10).
+1. PR n° 6 (lot 2C) : avec l'accord de Katana, lancer la migration 0005 puis le test 0005 (21/21) par le connecteur « Supabase DFMM » (SQL montré, « oui », message exact rapporté) ; Katana installe les fonctions `pseudo-volsever` et `effacer-donnees`.
+2. Si Katana écrit « fusionne la PR n° 6 » : vérifier, fusionner, puis repartir de `main` sur la branche `ccr-08840471-84tqcu`.
+3. Lot 3 (matchs et captures) : relire les sections 4 et 5 du cahier et les décisions Q6 à Q8 et Q19 avant de coder.
