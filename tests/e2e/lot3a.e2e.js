@@ -423,6 +423,42 @@ srv.listen(8765, async () => {
     await p.screenshot({ path: path.join(ICI, 'editeur.png'), fullPage: false });
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
     await p.screenshot({ path: path.join(ICI, 'editeur-telephone.png'), fullPage: false });
+    await p.setViewportSize({ width: 1280, height: 900 });
+    await etape('inscription : réponses gardées sur l’appareil (sauf mot de passe), lien cliquable vers la page DFMM', async () => {
+      await p.evaluate(() => localStorage.setItem('faux-visiteur', '1'));
+      await p.goto('http://localhost:8765/#inscription'); await p.reload(); await p.waitForTimeout(800);
+      const lien = await p.getAttribute('#f-inscription a[href*="facebook.com"]', 'href');
+      if (lien !== 'https://www.facebook.com/profile.php?id=61596920126729') throw new Error('lien : ' + lien);
+      await p.fill('#i-nom_reel', 'Faux Nom'); await p.fill('#i-email', 'faux@test.invalid'); await p.check('#i-genre');
+      await p.check('input[name="i-residence"][value="Madagascar"]'); await p.check('#i-acc_dfmm'); await p.fill('#i-mdp', 'secret123');
+      await p.reload(); await p.waitForTimeout(800);
+      const r = await p.evaluate(() => ({ nom: document.getElementById('i-nom_reel').value, mail: document.getElementById('i-email').value, genre: document.getElementById('i-genre').checked,
+        prov: !document.querySelector('.fld[data-k="province"]').hidden, acc: document.getElementById('i-acc_dfmm').checked, mdp: document.getElementById('i-mdp').value,
+        note: !!document.querySelector('#f-inscription .br-note'), stock: JSON.stringify(localStorage) }));
+      if (r.nom !== 'Faux Nom' || r.mail !== 'faux@test.invalid' || !r.genre || !r.prov || !r.acc || r.mdp || !r.note) throw new Error(JSON.stringify(r).slice(0, 300));
+      if (/secret123/.test(r.stock)) throw new Error('mot de passe gardé');
+      await p.click('#f-inscription [data-act="br-effacer"]'); await p.waitForTimeout(200);
+      const vide = await p.evaluate(() => !document.getElementById('i-nom_reel').value && !Object.keys(localStorage).some(k => k.indexOf('dfmm-brouillon|') === 0));
+      if (!vide) throw new Error('« Effacer mes réponses » n’a pas tout effacé');
+      await p.setViewportSize({ width: 390, height: 844 }); await p.fill('#i-nom_reel', 'Faux Nom'); await p.reload(); await p.waitForTimeout(800);
+      await p.screenshot({ path: path.join(ICI, 'inscription-brouillon-telephone.png'), fullPage: false });
+      if (await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) throw new Error('la page déborde sur téléphone');
+      await p.setViewportSize({ width: 1280, height: 900 });
+      // Envoi réussi : brouillon effacé, code Messenger avec le lien vers la page DFMM.
+      for (const [k, x] of [['nom_gamer', 'Faux'], ['email', 'faux@test.invalid'], ['date_naissance', '2000-01-01'], ['facebook', 'https://facebook.com/faux'], ['pseudo', 'Faux'], ['uid', '99123456']]) await p.fill('#i-' + k, x);
+      for (const [k, x] of [['genre', 'Homme'], ['residence', 'Madagascar'], ['zone', 'Ville principale'], ['comprend_mg', 'Oui'], ['parle_mg', 'Oui']]) await p.check('input[name="i-' + k + '"][value="' + x + '"]');
+      await p.selectOption('#i-province', { index: 1 });
+      for (const k of ['origine_mg', 'acc_dfmm', 'acc_uv', 'acc_donnees', 'acc_approbation']) await p.check('#i-' + k);
+      await p.fill('#i-mdp', 'secret123'); await p.fill('#i-mdp2', 'secret123'); await p.setInputFiles('#i-capture', path.join(ICI, 'capture.png'));
+      await p.evaluate(() => { window.FAUX_INVOKE = n => n === 'inscription' ? { data: { ok: true, code_messenger: 'UV-ABC123' }, error: null } : { data: null, error: null }; });
+      await p.click('#f-inscription button[type="submit"]'); await p.waitForTimeout(800);
+      const fin = await p.evaluate(() => ({ t: document.getElementById('ins-zone').textContent, liens: Array.from(document.querySelectorAll('#ins-zone a[href*="facebook.com"]')).map(a => a.href + '|' + a.target),
+        reste: Object.keys(localStorage).filter(k => k.indexOf('dfmm-brouillon|') === 0) }));
+      if (!/UV-ABC123/.test(fin.t) || !/Ouvrir la page DFMM/.test(fin.t) || fin.liens.length < 2 || fin.liens.some(l => l !== 'https://www.facebook.com/profile.php?id=61596920126729|_blank')) throw new Error(JSON.stringify(fin).slice(0, 300));
+      if (fin.reste.length) throw new Error('brouillon gardé après l’envoi : ' + fin.reste);
+      await p.screenshot({ path: path.join(ICI, 'inscription-code-messenger.png'), fullPage: false });
+      await p.evaluate(() => { localStorage.clear(); });
+    });
   } catch (e) { process.exitCode = 1; }
   if (erreurs.length) process.exitCode = 1;
   console.log(erreurs.length ? 'ERREURS JS :\n' + erreurs.join('\n') : 'Aucune erreur JavaScript.');

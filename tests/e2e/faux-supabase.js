@@ -169,7 +169,7 @@
   const client = {
     auth: {
       onAuthStateChange: () => ({ data: { subscription: { unsubscribe() {} } } }),
-      getSession: async () => ({ data: { session: { user: { id: 'admin-faux', email: 'admin@test.invalid' } } } }),
+      getSession: async () => ({ data: { session: localStorage.getItem('faux-visiteur') ? null : { user: { id: 'admin-faux', email: 'admin@test.invalid' } } } }),   // faux-visiteur : personne n'est connecté
       signOut: async () => ({})
     },
     from: t => new Q(t),
