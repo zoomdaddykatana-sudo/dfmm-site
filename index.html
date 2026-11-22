@@ -239,7 +239,7 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 .res.ni{color:var(--dim)}
 .thumbs{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
 .thumbs a img{width:90px;height:90px;object-fit:cover;border:1px solid var(--line2)}
-.ctrl-box{position:sticky;bottom:0;background:var(--panel2);border:1px solid var(--line2);padding:10px 12px;margin-top:12px;max-height:40vh;overflow:auto}
+.ctrl-box{background:var(--panel2);border:1px solid var(--line2);padding:10px 12px;margin-top:8px}
 
 /* Modale */
 .modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.72);display:flex;align-items:flex-end;justify-content:center}
@@ -2432,7 +2432,7 @@ async function afficherMatchs() {
 }
 
 /* Éditeur d'un match */
-const PROMPT_CLAUDE = 'Tu lis une ou plusieurs captures d’écran du tableau de fin de match de Delta Force Mobile, avec les factions HAAVK et GTI.\nExtrais :\n- "carte" : le nom de la carte affiché dans l’en-tête, ou null ;\n- "mode" : le mode affiché, ou null ;\n- "fin" : la date et l’heure de fin affichées, au format AAAA-MM-JJTHH:MM, ou null si elles ne sont pas visibles ;\n- "vainqueur" : "HAAVK" ou "GTI" selon la faction indiquée gagnante (victoire), ou null si ce n’est pas visible ;\n- "lisible" : false si une partie de la capture est floue, coupée ou illisible, sinon true ;\n- "lignes" : un objet par joueur visible, avec "faction" ("HAAVK" ou "GTI", selon le côté du tableau où il apparaît), "pseudo" (recopié exactement, caractère par caractère : majuscules, chiffres, symboles et tags de clan comme ¬ ou 么), puis les 8 colonnes chiffrées dans l’ordre de gauche à droite : "score", "elim" (éliminations), "morts", "assist" (assistances), "med" (contribution médicale), "ing" (contribution ingénieur), "obj" (contribution aux objectifs), "tac" (contribution tactique).\nRègles : n’invente rien ; si une valeur est illisible, mets null. Ignore les médailles et les badges. Si deux captures montrent le même joueur (haut et bas du tableau), ne le répète pas.\nRéponds uniquement avec un objet JSON de la forme {"carte":…,"mode":…,"fin":…,"vainqueur":…,"lisible":…,"lignes":[…]}, sans aucun texte autour.';
+const PROMPT_CLAUDE = 'Tu lis une ou plusieurs captures d’écran du tableau de fin de match de Delta Force Mobile, avec les factions HAAVK et GTI.\nExtrais :\n- "carte" : le nom de la carte affiché dans l’en-tête, ou null ;\n- "mode" : le mode affiché, ou null ;\n- "fin" : la date et l’heure de fin affichées, au format AAAA-MM-JJTHH:MM, ou null si elles ne sont pas visibles ;\n- "vainqueur" : "HAAVK" ou "GTI" selon la faction indiquée gagnante (victoire), ou null si ce n’est pas visible ;\n- "lisible" : false si une partie de la capture est floue, coupée ou illisible, sinon true ;\n- "effectif" : le nombre de lignes de chaque tableau, d’après les numéros affichés à gauche (1, 2, 3…), sous la forme {"HAAVK": n, "GTI": n}, en comptant aussi les joueurs grisés (sur deux captures, le plus grand numéro de chaque tableau) ;\n- "lignes" : un objet par ligne numérotée de chaque tableau, SANS EN SAUTER AUCUNE : les joueurs grisés (partis pendant le match) comptent aussi, et un pseudo fait de points, de symboles ou d’écriture étrangère (par exemple « · · · · · · ˎ ») est un vrai pseudo à recopier tel quel. Chaque objet a "faction" ("HAAVK" ou "GTI", selon le côté du tableau où il apparaît), "pseudo" (recopié exactement, caractère par caractère : majuscules, chiffres, symboles et tags de clan comme ¬ ou 么), puis les 8 colonnes chiffrées dans l’ordre de gauche à droite : "score", "elim" (éliminations), "morts", "assist" (assistances), "med" (contribution médicale), "ing" (contribution ingénieur), "obj" (contribution aux objectifs), "tac" (contribution tactique).\nAjoute "parti": true pour un joueur grisé, sinon false.\nRègles : n’invente rien ; si une valeur est illisible, mets null, et si le pseudo est vraiment illisible, mets "pseudo": null mais garde la ligne. Vérifie avant de répondre que le nombre de lignes de chaque faction est égal à "effectif". Ignore les médailles et les badges. Si deux captures montrent le même joueur (haut et bas du tableau), ne le répète pas.\nRéponds uniquement avec un objet JSON de la forme {"carte":…,"mode":…,"fin":…,"vainqueur":…,"lisible":…,"effectif":{"HAAVK":…,"GTI":…},"lignes":[…]}, sans aucun texte autour.';
 function resoudreLigne(l) {
   if (!CX || l.res === 'manuel' || l.res === 'non inscrit confirmé') return;
   const r = L.resoudre(l, CX.comptesList, L.validDT(ED && ED.fin) ? ED.fin : now());
@@ -2476,11 +2476,13 @@ function majControles() {
   const R = reglesSite(); if (!R) { box.innerHTML = note('Réglages de la ligue non chargés.', 'r'); return; }
   const c = L.controlesMatch(matchCourant(), CX, saisonJS(saisonSB(ED.saison_id)), R);
   const ETAT_C = { ok: 'o', non: 'b', attente: 'w', sans_objet: 's' };
+  if (ED.lectureR) ED.lecture = L.verifierLecture(ED.lectureR, ED.lignes);
   const crit = '<ul class="chk crit" id="ed-criteres">' + c.criteres.map(x => '<li class="' + ETAT_C[x.etat] + '">' + esc(x.nom) + (x.detail ? ' <span class="dim">(' + esc(x.detail) + ')</span>' : '')
     + (x.etat === 'attente' ? ' <span class="dim">— match en attente</span>' : x.etat === 'sans_objet' ? ' <span class="dim">— non exigé</span>' : '') + '</li>').join('') + '</ul>';
   const echec = c.bloquants.length || c.attente.length;
   box.innerHTML = '<b>' + c.total + ' participant(s)</b> · HAAVK ' + c.h + ' · GTI ' + c.g + ' · membres confirmés ' + c.membres + ' (minimum ' + c.requis + ')'
-    + '<h4 style="margin:10px 0 0">Critères du match</h4>' + crit
+    + (ED.lecture && ED.lecture.problemes.length ? '<h4 style="margin:10px 0 0">Lecture de la capture à corriger</h4>' + chk({ B: ED.lecture.problemes }) : '')
+    + crit
     + (echec ? chk({ B: c.bloquants.concat(c.attente) }) + (ED.lock ? '' : '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-motif-auto">Mettre les critères non remplis dans le motif</button></div>')
       : '<ul class="chk"><li class="o">Tous les critères automatiques sont remplis. Vérifiez la capture, puis validez.</li></ul>')
     + (c.alertes.length ? '<h4 style="margin:10px 0 0">Alertes</h4>' + chk({ W: c.alertes }) : '');
@@ -2576,9 +2578,10 @@ function editeurHtmlSB() {
     + htmlLecturesLibre();
   h += '<h3 style="margin-top:16px">' + (ED.lock ? 'Participants' : '3. Vérifier chaque ligne avec la capture') + '</h3><div class="scroll"><table class="lignes-t" id="ed-table">' + tableLignes(ED.lock) + '</table></div>';
   if (!ED.lock) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-ajout-ligne">Ajouter une ligne</button><button class="btn sm ghost" type="button" data-act="ed-vider">Effacer toutes les lignes</button></div>';
-  h += '<div class="ctrl-box" id="ed-ctrl" aria-live="polite"></div>';
-  h += '<label class="lab" for="e-motif">Motif (obligatoire pour mettre en attente, refuser, annuler ou repasser en brouillon)</label><textarea id="e-motif" rows="2"></textarea><div id="ed-err" class="err" role="alert"></div>';
   if (ED.reg.length) h += '<h3 style="margin-top:16px">Registre</h3><ul class="taches">' + ED.reg.map(r => '<li><span>' + esc(TYPES_REG[r.type] || r.type) + (r.detail ? ' : ' + esc(r.detail) : '') + '</span><span class="dim small nowrap">' + dateLoc(r.date) + '</span></li>').join('') + '</ul>';
+  // Critères et motif tout en bas de la fenêtre (demande de Katana du 22/11/2026 : le cadre collé cachait le tableau).
+  h += '<h3 style="margin-top:16px">' + (ED.lock ? 'Critères du match' : '4. Critères du match') + '</h3><div class="ctrl-box" id="ed-ctrl" aria-live="polite"></div>';
+  h += '<label class="lab" for="e-motif">Motif (obligatoire pour mettre en attente, refuser, annuler ou repasser en brouillon)</label><textarea id="e-motif" rows="2"></textarea><div id="ed-err" class="err" role="alert"></div>';
   return h;
 }
 async function afficherCaptures() {
@@ -2645,7 +2648,8 @@ function lireReponseClaude() {
   }
   ED.lignes.forEach(resoudreLigne);
   ED.modifie = true; redessinerLignes(); $('#e-coller').value = '';
-  toast(n + ' ligne(s) ajoutée(s)' + (ign.length ? ', ' + ign.length + ' ignorée(s) : ' + ign[0] : '. Vérifiez chaque valeur avec la capture.'), !!ign.length || !n);
+  const pb = ED.lecture && ED.lecture.problemes.length ? ED.lecture.problemes : [];
+  toast(n + ' ligne(s) ajoutée(s)' + (ign.length ? ', ' + ign.length + ' ignorée(s) : ' + ign[0] : pb.length ? '. ATTENTION : ' + pb[0] : '. Vérifiez chaque valeur avec la capture.'), !!ign.length || !n || !!pb.length);
 }
 // Remplir l'éditeur avec une lecture de claude.ai (objet JSON) ; renvoie le nombre de lignes ajoutées.
 function remplirDepuisLecture(r, sansRedessin) {
@@ -2653,10 +2657,10 @@ function remplirDepuisLecture(r, sansRedessin) {
   let n = 0;
   {
     (r.lignes || []).forEach(x => {
-      const l = { faction: /gti/i.test(x.faction) ? 'GTI' : /haavk/i.test(x.faction) ? 'HAAVK' : '', pseudo: String(x.pseudo || '').trim() };
-      if (!l.pseudo) return;
+      const l = { faction: /gti/i.test(x.faction) ? 'GTI' : /haavk/i.test(x.faction) ? 'HAAVK' : '', pseudo: x.pseudo === null || x.pseudo === undefined ? '' : String(x.pseudo).trim() };
       L.STATS.forEach(s => { l[s.k] = val(x[s.k]); });
-      if (ED.lignes.some(e => L.normPseudo(e.pseudo) === L.normPseudo(l.pseudo) && e.faction === l.faction)) return;
+      // Une ligne sans pseudo lisible est gardée (le joueur compte dans l'effectif) : pseudo à recopier depuis la capture.
+      if (l.pseudo && ED.lignes.some(e => L.normPseudo(e.pseudo) === L.normPseudo(l.pseudo) && e.faction === l.faction)) return;
       ED.lignes.push(l); n++;
     });
     const fin = L.normDT(r.fin || '');
@@ -2664,6 +2668,7 @@ function remplirDepuisLecture(r, sansRedessin) {
     if (!ED.carte && r.carte) { const c = L.CARTES.find(x => L.normPseudo(x) === L.normPseudo(r.carte)); ED.carte = c || String(r.carte); $('#e-carte').innerHTML = $('#e-carte').innerHTML + (c ? '' : '<option>' + esc(r.carte) + '</option>'); $('#e-carte').value = ED.carte; }
     if (!ED.mode && r.mode) { ED.mode = String(r.mode); $('#e-mode').value = ED.mode; }
   }
+  ED.lectureR = r; ED.lecture = L.verifierLecture(r, ED.lignes);
   if (!sansRedessin) { ED.lignes.forEach(resoudreLigne); ED.modifie = true; redessinerLignes(); }
   return n;
 }
