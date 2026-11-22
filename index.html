@@ -17,7 +17,7 @@
    COLOUR ground #080A0A, ink #FFFFFF, green #35D66F leads, red #E53935 for alerts, helmet greys
    TYPE Exo 2 italic 800 (from the logo lettering) + system sans for text
    LAYOUT laptop: logo and title left, scoreboard right; phone: logo, title, scoreboard stacked */
-:root{color-scheme:dark;--bg:#080A0A;--bg2:#0B100E;--panel:#0F1513;--panel2:#141C19;--line:#1E2924;--line2:#2C3B34;--ink:#FFFFFF;--mute:#AAB5AF;--dim:#7B8781;--green:#35D66F;--green2:#27B15A;--greenbg:rgba(53,214,111,.10);--red:#E53935;--redbg:rgba(229,57,53,.13);--amber:#F2A93B;--amberbg:rgba(242,169,59,.13);--steel:#8C9692;--display:"Exo 2","Arial Narrow",system-ui,sans-serif;--text:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--cut:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);--plate:polygon(6px 0,calc(100% - 6px) 0,100% 6px,100% calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,0 calc(100% - 6px),0 6px)}
+:root{color-scheme:dark;--bg:#080A0A;--bg2:#0B100E;--panel:#0F1513;--panel2:#141C19;--line:#1E2924;--line2:#2C3B34;--ink:#FFFFFF;--mute:#AAB5AF;--dim:#7B8781;--green:#35D66F;--green2:#27B15A;--greenbg:rgba(53,214,111,.10);--red:#E53935;--redbg:rgba(229,57,53,.13);--amber:#E53935;--amberbg:rgba(229,57,53,.07);--steel:#8C9692;--display:"Exo 2","Arial Narrow",system-ui,sans-serif;--text:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;--cut:polygon(10px 0,100% 0,100% calc(100% - 10px),calc(100% - 10px) 100%,0 100%,0 10px);--plate:polygon(6px 0,calc(100% - 6px) 0,100% 6px,100% calc(100% - 6px),calc(100% - 6px) 100%,6px 100%,0 calc(100% - 6px),0 6px)}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0;background:var(--bg);color:var(--ink)}
 body{font:16px/1.55 var(--text);overflow-x:clip;-webkit-text-size-adjust:100%}
@@ -104,7 +104,7 @@ p{margin:.5em 0}
 .badge{display:inline-block;font-size:12px;font-weight:700;padding:3px 9px;clip-path:var(--plate);background:var(--line2);color:var(--ink);white-space:nowrap}
 .badge.g{background:var(--green);color:#04110A}
 .badge.r{background:var(--red);color:#fff}
-.badge.a{background:var(--amber);color:#1D1302}
+.badge.a{background:transparent;box-shadow:inset 0 0 0 1px var(--amber);color:#FF8A86;clip-path:none}
 .badge.o{background:transparent;box-shadow:inset 0 0 0 1px var(--line2);color:var(--mute);clip-path:none}
 .grp{padding:6px 16px 2px;font-size:13px;color:var(--green);font-weight:700;border-top:1px solid var(--line);background:rgba(53,214,111,.04)}
 .grp:first-of-type{border-top:0}
@@ -228,7 +228,7 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 .chk li{padding:3px 0 3px 24px;position:relative}
 .chk li::before{position:absolute;left:0;font-weight:800}
 .chk li.b{color:#FF8A86}.chk li.b::before{content:"✕";color:var(--red)}
-.chk li.w{color:#FFD08A}.chk li.w::before{content:"!";color:var(--amber);left:6px}
+.chk li.w{color:var(--ink)}.chk li.w::before{content:"!";color:var(--amber);left:6px}
 .chk li.o{color:var(--mute)}.chk li.o::before{content:"✓";color:var(--green)}
 .kv{display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr);gap:4px 12px;font-size:15px;margin:6px 0}
 .kv dt{color:var(--mute)}
@@ -284,7 +284,6 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
     <a href="#classements" data-nav="classements">Classements</a>
     <a href="#reglement" data-nav="reglement">Règlement</a>
     <a href="#processus" data-nav="processus">Processus</a>
-    <a href="#participer" data-nav="participer">Participer</a>
     <a href="#compte" data-nav="compte" id="nav-compte">Connexion</a>
     <a href="#admin" data-nav="admin" class="adm" id="nav-admin" hidden>Administration</a>
   </nav>
@@ -307,7 +306,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
       <div class="hero-more">
         <p class="lead">La ligue communautaire et individuelle des joueurs malgaches de Delta Force Mobile. Chaque match validé compte, et chaque contribution peut être reconnue sur la saison.</p>
         <ul class="facts">
-          <li><b>Mer. et sam.</b><span>matchs officiels à 16 h</span></li>
+          <li><b>Mer. et sam.</b><span>matchs de Katana à 16 h</span></li>
           <li><b>14 jours</b><span>entre deux classements provisoires</span></li>
           <li><b>11</b><span>distinctions par saison</span></li>
           <li><b>8</b><span>statistiques suivies par match</span></li>
@@ -321,14 +320,21 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
     </div>
   </div>
 
+  <div class="band" id="home-actus-band" hidden>
+    <div class="wrap">
+      <div class="sec-head"><h2>Actualités</h2><p>Annonces de Katana, réservées aux membres.</p></div>
+      <div id="home-actus"></div>
+    </div>
+  </div>
+
   <div class="band alt">
     <div class="wrap">
       <div class="sec-head"><h2>Comment ça marche</h2><p>La ligue suit vos performances individuelles sur toute la saison, à partir des captures de fin de match.</p></div>
       <div class="steps">
         <div class="step"><span class="n">Étape 1</span><h3>S’inscrire</h3><p>Formulaire d’inscription, puis vérification par l’organisation. Vous recevez un matricule permanent DFMM-n.</p></div>
-        <div class="step"><span class="n">Étape 2</span><h3>Jouer</h3><p>Matchs officiels le mercredi et le samedi à 16 h, ou matchs libres déclarés à l’avance.</p></div>
+        <div class="step"><span class="n">Étape 2</span><h3>Jouer</h3><p>Matchs de Katana, en général le mercredi et le samedi à 16 h, ou matchs libres déclarés au moins 2 h à l’avance (ouverts au lancement).</p></div>
         <div class="step"><span class="n">Étape 3</span><h3>Prouver</h3><p>La capture du résultat de fin de match est contrôlée, puis validée manuellement par l’organisation.</p></div>
-        <div class="step"><span class="n">Étape 4</span><h3>Être classé</h3><p>Classement provisoire un dimanche sur deux, classement final après l’audit de fin de saison.</p></div>
+        <div class="step"><span class="n">Étape 4</span><h3>Être classé</h3><p>Classement provisoire un dimanche sur deux, classement final le dimanche qui suit les 48 h de vérification de fin de saison.</p></div>
       </div>
     </div>
   </div>
@@ -337,8 +343,8 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
     <div class="wrap">
       <div class="sec-head"><h2>Les 11 distinctions</h2><p>Plusieurs façons d’être reconnu : l’assiduité, la qualité et la capacité à rester en vie tout en contribuant.</p></div>
       <div class="dist">
-        <div class="step"><span class="n">5 titres</span><h3>MOST, le total de la saison</h3><p>Récompense l’assiduité et la persévérance : chacun peut gagner en jouant régulièrement.</p><ul><li>MOST Eliminator</li><li>MOST Medic</li><li>MOST Engineer</li><li>MOST Tactician</li><li>MOST Objective</li></ul></div>
-        <div class="step"><span class="n">5 titres</span><h3>BEST, la moyenne par match</h3><p>Récompense la qualité, à condition d’avoir joué au moins le nombre médian de matchs.</p><ul><li>BEST Eliminator</li><li>BEST Medic</li><li>BEST Engineer</li><li>BEST Tactician</li><li>BEST Objective</li></ul></div>
+        <div class="step"><span class="n">5 titres</span><h3>MOST, le total de la saison</h3><p>Récompense l’assiduité et la persévérance : chacun peut gagner en jouant régulièrement.</p><ul><li>MOST Eliminator</li><li>MOST Medic</li><li>MOST Engineer</li><li>MOST Objective</li><li>MOST Tactician</li></ul></div>
+        <div class="step"><span class="n">5 titres</span><h3>BEST, la moyenne par match</h3><p>Récompense la qualité, à condition d’avoir joué au moins le nombre médian de matchs.</p><ul><li>BEST Eliminator</li><li>BEST Medic</li><li>BEST Engineer</li><li>BEST Objective</li><li>BEST Tactician</li></ul></div>
         <div class="step"><span class="n">1 titre</span><h3>BEST Survivor</h3><p>La moyenne de morts par match la plus faible, avec un minimum de matchs et un score moyen au moins égal au premier quartile.</p></div>
       </div>
     </div>
@@ -356,9 +362,9 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <li class="o">Équité : les mêmes règles de calcul pour tous, publiées à l’avance.</li>
           <li class="o">Transparence : classements provisoires réguliers et droit de réclamation sous 48 h.</li>
           <li class="o">Intégrité : un seul matricule par personne, un seul compte actif, des preuves vérifiées.</li>
-          <li class="o">Aucun ex æquo récompensé, aucun tirage au sort, aucune attribution arbitraire.</li>
+          <li class="o">Aucun tirage au sort, aucune attribution arbitraire. En cas d’égalité parfaite : co-lauréats, titre partagé.</li>
         </ul>
-        <p class="mute small">La LEAGUE UV est une compétition communautaire indépendante de DFMM. Elle n’est ni organisée ni certifiée par l’éditeur du jeu.</p>
+        <p class="mute small">La LEAGUE UV est une compétition communautaire organisée par DFMM, indépendante de l’éditeur du jeu : elle n’est ni organisée ni certifiée par lui.</p>
       </div>
     </div>
   </div>
@@ -377,7 +383,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         <button type="button" data-grp="BEST">BEST</button>
       </div>
       <div id="cl-body" class="cl-grid"></div>
-      <p class="mute small" style="margin-top:16px">Seuls les matchs validés par l’organisation sont comptés. Les moyennes sont affichées arrondies, mais le classement compare toujours les valeurs exactes. En cas d’égalité parfaite après les trois critères, la distinction n’est pas attribuée.</p>
+      <p class="mute small" style="margin-top:16px">Seuls les matchs validés par l’organisation sont comptés. Les moyennes sont affichées arrondies, mais le classement compare toujours les valeurs exactes. En cas d’égalité parfaite après les trois critères : co-lauréats, titre partagé, et le lot de la catégorie n’est pas attribué.</p>
     </div>
   </div>
 </section>
@@ -397,14 +403,15 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         <button type="button" data-goto="r-elig">1. Éligibilité et inscription</button>
         <button type="button" data-goto="r-mat">2. Matricule, comptes et pseudo</button>
         <button type="button" data-goto="r-statut">3. Statut de membre</button>
-        <button type="button" data-goto="r-matchs">4. Matchs officiels et libres</button>
+        <button type="button" data-goto="r-matchs">4. Matchs de Katana et matchs libres</button>
         <button type="button" data-goto="r-valid">5. Validité et preuves</button>
-        <button type="button" data-goto="r-stats">6. Statistiques et distinctions</button>
-        <button type="button" data-goto="r-dep">7. Départages et égalités</button>
-        <button type="button" data-goto="r-cal">8. Calendrier et réclamations</button>
-        <button type="button" data-goto="r-lots">9. Récompenses</button>
-        <button type="button" data-goto="r-sanc">10. Intégrité et sanctions</button>
-        <button type="button" data-goto="r-conf">11. Confidentialité</button>
+        <button type="button" data-goto="r-attente">6. Matchs en attente et litiges</button>
+        <button type="button" data-goto="r-stats">7. Statistiques et distinctions</button>
+        <button type="button" data-goto="r-dep">8. Départages et égalités</button>
+        <button type="button" data-goto="r-cal">9. Calendrier et réclamations</button>
+        <button type="button" data-goto="r-lots">10. Récompenses</button>
+        <button type="button" data-goto="r-sanc">11. Intégrité et sanctions</button>
+        <button type="button" data-goto="r-conf">12. Confidentialité</button>
         <button type="button" data-goto="r-chg">Ce qui change</button>
       </nav>
       <div>
@@ -415,7 +422,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Une personne = un matricule = un seul compte actif à la fois.</li>
             <li>8 statistiques suivies, 11 distinctions, 1 lot matériel au maximum par joueur.</li>
             <li>Le <b>lauréat sportif</b> garde le titre de sa catégorie. Le <b>bénéficiaire matériel</b> reçoit éventuellement le lot, selon l’ordre de priorité et la règle d’un seul lot par joueur.</li>
-            <li>Aucun ex æquo récompensé, aucun tirage au sort, aucune attribution arbitraire.</li>
+            <li>Aucun tirage au sort, aucune attribution arbitraire. Égalité parfaite : co-lauréats, titre partagé.</li>
             <li>Initiative indépendante : ce règlement n’est pas celui de l’éditeur du jeu.</li>
           </ul>
         </article>
@@ -450,6 +457,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <ul>
             <li>Format DFMM-1, DFMM-2, DFMM-3… attribué automatiquement à l’approbation.</li>
             <li>Permanent : il suit la personne pendant toutes les saisons. Un numéro n’est jamais réutilisé, même après un retrait ou une exclusion.</li>
+            <li>Membres déjà approuvés (DFMM-1 à DFMM-25) : en se réinscrivant sur le site, ils <b>gardent leur matricule</b> et leur date d’approbation d’origine. Les nouveaux membres commencent à DFMM-26.<span class="chg">Mis à jour</span></li>
           </ul>
           <h3>Comptes de jeu</h3>
           <ul>
@@ -472,7 +480,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <ul>
             <li><b>Actif</b> : membre approuvé, ses matchs comptent.</li>
             <li><b>Suspendu</b> : sanction temporaire, avec une date de fin. Il reste membre, mais ses matchs ne comptent pas pendant la suspension.</li>
-            <li><b>Retiré</b> : départ volontaire, accepté par l’organisation.</li>
+            <li><b>Retiré</b> : départ volontaire, automatique, sauf si un litige, un match en attente ou une sanction est en cours (Katana décide alors).</li>
             <li><b>Exclu</b> : sanction définitive, pour des faits graves ou répétés.</li>
           </ul>
           <p>Un membre ne change jamais lui-même son statut : il adresse une demande à l’organisation, qui l’accepte ou la refuse.</p>
@@ -489,23 +497,25 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-matchs">
-          <h2><span class="cn">4</span>Matchs officiels et matchs libres</h2>
-          <p>Tous les matchs valides ont la même valeur pour les classements. Chaque match garde une étiquette « officiel » ou « libre ».</p>
-          <h3>Matchs officiels</h3>
+          <h2><span class="cn">4</span>Matchs de Katana et matchs libres</h2>
+          <p>Tous les matchs valides ont la même valeur pour les classements. Chaque match garde une étiquette « Katana » ou « libre ».</p>
+          <h3>Matchs de Katana</h3>
           <ul>
-            <li>Organisés par DFMM le mercredi et le samedi à 16 h, un match par session.</li>
+            <li>Matchs programmés par Katana, en général le mercredi et le samedi à 16 h (étiquette « Katana »). Sa seule capture suffit.<span class="chg">Mis à jour</span></li>
             <li>Salon personnalisé du mode Victory Unite, rejoint par code. Chat écrit uniquement, sans micro.</li>
-            <li>Escouades de 4 avec un capitaine, 5 escouades au maximum par faction. Le commandant et les capitaines sont désignés par l’organisation, sans vote. La carte est choisie dans le salon. Aucune condition de grade.</li>
-            <li>Si le salon est complet, les places sont attribuées dans l’ordre d’arrivée.</li>
+            <li>Les consignes de salon (escouades, capitaines…) sont un simple rappel. <b>Aucun nombre maximum de participants.</b> Aucune condition de grade.<span class="chg">Mis à jour</span></li>
           </ul>
           <h3>Matchs libres</h3>
           <ul>
-            <li>Organisés par les joueurs, avec <b>déclaration préalable obligatoire</b> : demande de créneau (date, heure, motif).<span class="chg">Mis à jour</span></li>
-            <li>L’organisation accepte ou refuse, et indique si elle participe comme témoin ou si elle confie le match aux joueurs.</li>
-            <li>Un seul match est comptabilisé par créneau. Seule une capture rattachée à un créneau accepté est prise en compte.</li>
-            <li>Un organisateur et un responsable par faction. Chaque responsable envoie la capture du résultat, l’organisateur peut en envoyer une troisième. Les captures doivent concorder.</li>
-            <li>La capture doit être envoyée au plus <b>30 minutes</b> après la fin du match. L’heure de fin affichée sur la capture fait foi.</li>
+            <li>Organisés par les joueurs, déclarés <b>au moins 2 h avant</b> : date et heure de début, responsables HAAVK et GTI, motif facultatif. Le match est enregistré automatiquement ; Katana est averti et peut l’annuler.<span class="chg">Mis à jour</span></li>
+            <li><b>Fermés jusqu’au lancement</b> de la LEAGUE UV : d’ici là, seuls les matchs de Katana comptent (« saisie de démarrage »).</li>
+            <li>Un seul match est comptabilisé par créneau déclaré.</li>
+            <li>Un organisateur et un responsable par faction. Chaque responsable envoie sa capture par le site ; l’organisateur aussi s’il n’est pas responsable. Les captures doivent concorder, sinon le match est mis en attente.</li>
+            <li>La capture doit être envoyée au plus <b>10 minutes</b> après l’heure de fin affichée, selon l’heure d’envoi enregistrée par le site. L’heure de fin doit tomber entre l’heure annoncée et 1 h après.<span class="chg">Mis à jour</span></li>
+            <li><b>Matricule non autorisé</b> : si un matricule déclaré comme organisateur ou responsable n’est pas autorisé pour la saison, la déclaration est retenue et Katana est averti. Le message affiché reste neutre.<span class="chg">Nouveau</span></li>
           </ul>
+          <h3>Phase de démarrage</h3>
+          <p>Avant le lancement de la LEAGUE UV, seuls les matchs de Katana comptent. Ils sont saisis avec sa seule capture, sans délai de 10 minutes (« saisie de démarrage »). Les autres règles s’appliquent.<span class="chg">Nouveau</span></p>
         </article>
 
         <article class="chap" id="r-valid">
@@ -514,25 +524,43 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <ul>
             <li>Au moins <b>16 participants</b> (8 contre 8).<span class="chg">Mis à jour</span></li>
             <li>Factions HAAVK et GTI équilibrées : même effectif ou un joueur d’écart au maximum, compté sur tous les participants de la capture (inscrits ou non). Au-delà, le match est invalidé automatiquement.</li>
-            <li>Au moins <b>30 % de membres inscrits</b> parmi les participants, arrondi à l’entier supérieur (16 participants : 5 membres au minimum).<span class="chg">Nouveau</span></li>
+            <li>Au moins <b>50 % de membres confirmés</b> parmi les participants, arrondi vers le bas (16 participants : 8 membres au minimum).<span class="chg">Mis à jour</span></li>
             <li>Les joueurs non inscrits ne bloquent pas le match, mais seuls les membres inscrits reçoivent des points.</li>
             <li>Un joueur ne participe qu’une seule fois au même match, y compris avec deux comptes.</li>
-            <li>Le match doit se terminer pendant la saison, avant les 7 derniers jours réservés à l’audit.</li>
+            <li>Le match doit se terminer pendant la saison, au plus tard à sa fin officielle dans le jeu.</li>
           </ul>
           <h3>Preuves et validation</h3>
           <ul>
             <li>La preuve principale est la capture du résultat de fin de match : carte, mode, date et heure de fin, pseudos et 8 statistiques. Au-delà de 8 joueurs par faction, il faut deux captures (haut, puis bas de la liste).</li>
             <li>Contrôles automatiques : valeurs manquantes, négatives ou en double, effectif, équilibre des factions, part de membres inscrits et délai d’envoi.</li>
-            <li>Pseudo ambigu ou incertain : la ligne est marquée « à identifier » et l’organisation choisit le bon compte. Le match ne compte pas tant que ce n’est pas fait.</li>
+            <li>Pseudo ambigu ou incertain : la ligne est marquée « à identifier » et l’organisation choisit le bon compte. Les lignes sûres comptent ; une ligne identifiée après coup ne compte que pour les classements suivants.</li>
             <li>Chaque match est vu et confirmé par l’organisation avant de compter. Une déclaration orale ou une capture isolée et contestée ne suffit pas.</li>
             <li>Une déconnexion ou un abandon n’efface pas automatiquement les statistiques déjà acquises : la validité générale du match est examinée.</li>
             <li>Un match invalidé est retiré pour tous ses participants, sans sanction individuelle automatique.</li>
             <li>La date d’une capture peut être falsifiée : l’organisation peut refuser un match suspect.</li>
+            <li><b>Lisibilité</b> : une capture floue ou partiellement illisible n’est jamais acceptée. Si plusieurs captures sont complètes et lisibles, la plus visible est retenue, sans mélange entre captures.<span class="chg">Nouveau</span></li>
+            <li><b>Aucune capture valable à temps</b> : le match est refusé. Il est gardé avec son motif, mais il ne compte pas.</li>
+            <li><b>Concordance</b> : plusieurs captures doivent montrer les mêmes pseudos, les mêmes statistiques par joueur, la même carte, avec une victoire d’un côté et une défaite de l’autre. Sinon, le match est mis en attente.</li>
+            <li><b>Compte inactif</b> : la ligne ne compte pas, et le joueur reçoit une simple notification.</li>
+            <li><b>Temps de jeu</b> : il n’est pas mesuré ; seul compte le résultat final de la capture.</li>
           </ul>
         </article>
 
+        <article class="chap" id="r-attente">
+          <h2><span class="cn">6</span>Matchs en attente et litiges</h2>
+          <p>Un match qui ne peut pas être validé automatiquement est <b>mis en attente</b>. Katana le tranche dans les <b>48 heures</b> qui suivent la fin du match.<span class="chg">Nouveau</span></p>
+          <ul>
+            <li>Un dossier s’ouvre dans le site, avec une discussion réservée à Katana et aux personnes convoquées. Elle a lieu uniquement dans le site, et les échanges ne sont pas simultanés.</li>
+            <li>Katana convoque les responsables et l’organisateur, et des témoins des deux factions si besoin. Chaque personne convoquée <b>confirme la réception sous 12 heures</b> et reste disponible.</li>
+            <li>Katana décide : vraie capture retenue, match refusé ou match annulé. <b>La discussion est alors fermée.</b></li>
+            <li>Une synthèse du dossier est validée par Katana, puis archivée. Seule la vraie capture est conservée.</li>
+            <li>Un match tranché après la coupure d’un samedi compte pour le classement provisoire suivant.</li>
+          </ul>
+          <p><b>Litige ou non</b> : une capture contradictoire ou falsifiée est un litige. Un écart de pseudo ou un compte inactif n’en est pas un : c’est une simple notification.</p>
+        </article>
+
         <article class="chap" id="r-stats">
-          <h2><span class="cn">6</span>Statistiques et distinctions</h2>
+          <h2><span class="cn">7</span>Statistiques et distinctions</h2>
           <div class="scroll"><table>
             <thead><tr><th>N°</th><th>Statistique</th><th>Utilisation</th></tr></thead>
             <tbody>
@@ -556,7 +584,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-dep">
-          <h2><span class="cn">7</span>Départages et égalités</h2>
+          <h2><span class="cn">8</span>Départages et égalités</h2>
           <div class="scroll"><table>
             <thead><tr><th>Distinction</th><th>Critère principal</th><th>2e critère</th><th>3e critère</th></tr></thead>
             <tbody>
@@ -566,25 +594,24 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             </tbody>
           </table></div>
           <ul>
-            <li>Une seule distinction pour un seul lauréat : ni co-lauréats, ni tirage au sort.</li>
-            <li>Si les trois critères laissent une égalité parfaite, la distinction est <b>non attribuée</b>. Il est interdit de choisir le joueur suivant du classement, ou d’inventer un critère après la clôture.</li>
+            <li>Si les trois critères laissent une égalité parfaite : <b>co-lauréats, titre partagé</b>, et le lot de la catégorie n’est pas attribué. Jamais de tirage au sort ni de critère inventé après la clôture.<span class="chg">Mis à jour</span></li>
             <li>Les valeurs exactes sont comparées. Les arrondis servent seulement à l’affichage.</li>
           </ul>
         </article>
 
         <article class="chap" id="r-cal">
-          <h2><span class="cn">8</span>Calendrier, publication et réclamations</h2>
+          <h2><span class="cn">9</span>Calendrier, publication et réclamations</h2>
           <ul>
             <li>Classement provisoire publié le <b>dimanche, tous les 14 jours</b>.<span class="chg">Confirmé</span></li>
-            <li>Coupure le <b>samedi à 17 h</b> : un match dont la capture indique une heure de fin avant 17 h compte dans le provisoire du lendemain, les autres comptent dans le suivant.</li>
-            <li>Les 7 derniers jours de la saison sont réservés au gel des résultats, à l’audit, aux réclamations et à la validation finale. Le classement final est publié ensuite.</li>
+            <li>Coupure le <b>samedi à 16 h</b>, selon l’<b>heure d’envoi</b> de la capture : envoyée avant 16 h, elle compte pour le provisoire du lendemain, même validée après ; sinon pour le suivant. Seul le match de Katana compte encore à 16 h ou après. Un match en attente tranché ou une ligne identifiée après la coupure compte pour le classement suivant.<span class="chg">Mis à jour</span></li>
+            <li>Les matchs comptent jusqu’à la fin officielle de la saison du jeu, sans gel avant la fin. Puis <b>vérification pendant 48 h</b>, et classement final publié le dimanche qui suit.<span class="chg">Mis à jour</span></li>
             <li>Réclamation en privé dans les <b>48 heures</b> suivant la publication ou la notification, en indiquant le match concerné, le motif et les preuves.</li>
             <li>Les classements provisoires sont toujours distingués des résultats finaux.</li>
           </ul>
         </article>
 
         <article class="chap" id="r-lots">
-          <h2><span class="cn">9</span>Récompenses et redistribution</h2>
+          <h2><span class="cn">10</span>Récompenses et redistribution</h2>
           <ul>
             <li>Un joueur peut remporter plusieurs titres, mais ne reçoit qu’<b>un seul lot matériel</b> sur toute la distribution. Il ne choisit pas la distinction à laquelle son lot est rattaché.</li>
             <li>Les lots dépendent des moyens et des partenaires réellement confirmés. Aucun lot n’est annoncé avant confirmation.</li>
@@ -596,8 +623,8 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
               <tr><td>1</td><td>MOST Eliminator</td><td>7</td><td>BEST Eliminator</td></tr>
               <tr><td>2</td><td>MOST Medic</td><td>8</td><td>BEST Medic</td></tr>
               <tr><td>3</td><td>MOST Engineer</td><td>9</td><td>BEST Engineer</td></tr>
-              <tr><td>4</td><td>MOST Tactician</td><td>10</td><td>BEST Tactician</td></tr>
-              <tr><td>5</td><td>MOST Objective</td><td>11</td><td>BEST Objective</td></tr>
+              <tr><td>4</td><td>MOST Objective</td><td>10</td><td>BEST Objective</td></tr>
+              <tr><td>5</td><td>MOST Tactician</td><td>11</td><td>BEST Tactician</td></tr>
               <tr><td>6</td><td>BEST Survivor</td><td></td><td></td></tr>
             </tbody>
           </table></div>
@@ -610,7 +637,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-sanc">
-          <h2><span class="cn">10</span>Intégrité et sanctions</h2>
+          <h2><span class="cn">11</span>Intégrité et sanctions</h2>
           <h3>Comportements interdits</h3>
           <ul>
             <li>Utiliser plusieurs comptes pour cumuler des statistiques ou occuper plusieurs places dans un match.</li>
@@ -620,17 +647,42 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Fournir une fausse identité, un pseudo ou un UID incorrect, ou contourner une sanction.</li>
             <li>Avoir un comportement toxique envers les autres joueurs.</li>
           </ul>
-          <h3>Mesures possibles</h3>
-          <p>Demande d’explication, avertissement, retrait de statistiques, invalidation d’un résultat, <b>suspension temporaire</b> (date de fin fixée par l’organisation, matchs non comptabilisés pendant la période) ou <b>exclusion définitive</b> (faits graves ou répétés). Pendant une sanction, le matricule est conservé et les comptes de jeu sont inactifs.</p>
-          <p>Une anomalie statistique n’est jamais, à elle seule, une preuve de fraude : elle déclenche une vérification humaine, jamais une sanction automatique. Le joueur est toujours informé du motif, peut présenter sa version des faits et dispose d’un recours sous 48 heures.</p>
+          <h3>Tableau-guide des sanctions</h3>
+          <p>Le tableau est un <b>guide</b> : Katana décide au cas par cas, avec ou sans avertissement préalable.<span class="chg">Nouveau</span></p>
+          <div class="scroll"><table>
+            <thead><tr><th>Situation</th><th>Sanction</th></tr></thead>
+            <tbody>
+              <tr><td>Comportement toxique prouvé, première fois</td><td>Avertissement</td></tr>
+              <tr><td>Comportement toxique répété</td><td>Suspension, 14 jours au plus</td></tr>
+              <tr><td>Capture falsifiée</td><td>Suspension du fraudeur ; il ne peut plus être organisateur ni responsable pendant la saison ; le match compte si le vrai résultat est retrouvé, sinon il est annulé pour tous</td></tr>
+              <tr><td>Deux comptes d’une même personne dans un match, ou compte prêté</td><td>Suspension ; le match reste valide, seules les statistiques de cette personne ne comptent pas</td></tr>
+              <tr><td>Compte d’un ami inscrit comme le sien</td><td>Suspension, compte retiré</td></tr>
+              <tr><td>Fausse identité</td><td>Compte supprimé, accès fermé, données gardées en privé pour enquête</td></tr>
+              <tr><td>Double inscription, ou nouveau matricule pour contourner une sanction</td><td>Les deux comptes supprimés, bannissement</td></tr>
+              <tr><td>Farming ou entente pour manipuler un match</td><td>Exclusion</td></tr>
+              <tr><td>Récidive après une suspension</td><td>Exclusion</td></tr>
+              <tr><td>Divulgation d’un litige : première fois / répétée / nuisant gravement à une personne</td><td>Avertissement / suspension de 14 jours au plus / exclusion</td></tr>
+              <tr><td>Compte inactif utilisé, ou écart de pseudo</td><td>Pas de sanction, simple notification</td></tr>
+            </tbody>
+          </table></div>
+          <ul>
+            <li><b>Suspension</b> : 14 jours au plus, avec une date de fin fixée par Katana. Elle porte sur tout le matricule. Le joueur reste membre, mais ses comptes sont inactifs et ses matchs de la période ne comptent pas.</li>
+            <li><b>Exclusion</b> : définitive. Le matricule est conservé et n’est jamais réutilisé.</li>
+            <li><b>Pendant une sanction</b> : le joueur lit les annonces et peut contester. Il ne fait aucune demande et n’envoie aucune capture.</li>
+            <li><b>Recours</b> : la sanction s’applique dès la décision, et le joueur reçoit le motif. Il peut contester <b>dans les 48 heures</b>, dans « Mon compte ». Passé ce délai, la décision est définitive. Si la contestation aboutit, la sanction est levée et les matchs concernés sont recomptés.</li>
+            <li><b>Captures écartées</b> : supprimées à la fin du délai de recours s’il y a une sanction, tout de suite sinon. Le registre et la synthèse du dossier sont conservés.</li>
+            <li><b>Aucune sanction n’est publiée</b> : ni nom, ni motif, ni catégorie.</li>
+            <li>Une anomalie statistique n’est jamais une preuve à elle seule : elle entraîne une vérification humaine, jamais une sanction automatique.</li>
+          </ul>
         </article>
 
         <article class="chap" id="r-conf">
-          <h2><span class="cn">11</span>Confidentialité</h2>
+          <h2><span class="cn">12</span>Confidentialité</h2>
           <ul>
             <li>Publics : nom de gamer, pseudos, matricule et statistiques des classements.</li>
             <li>Privés : identité, e-mail, date de naissance, UID (visible uniquement par l’organisation et le joueur concerné) et historique des comptes.</li>
             <li>Ne publiez jamais les informations personnelles ou l’UID d’un autre joueur. Pour toute question ou contestation, utilisez le canal privé indiqué par l’organisation.</li>
+            <li><b>Litiges</b> : les discussions, témoignages, captures et échanges avec Katana sont confidentiels. Seuls Katana et les personnes convoquées y ont accès. Il est interdit de les divulguer, de les copier ou de les publier, sur quelque support que ce soit. Une personne convoquée peut dire qu’elle a été convoquée et parler de ce qui la concerne directement, sans reprendre les témoignages ni les captures des autres. Les décisions publiées ne sont pas concernées.<span class="chg">Nouveau</span></li>
           </ul>
         </article>
 
@@ -638,12 +690,17 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <h2>Ce qui change par rapport au guide PDF</h2>
           <ul>
             <li>Taille minimale d’un match : 16 participants (la mention « 20 participants maximum » était une erreur).</li>
-            <li>Au moins 30 % de membres inscrits par match.</li>
-            <li>Matchs libres : déclaration préalable obligatoire, un match par créneau, capture sous 30 minutes.</li>
+            <li>Au moins 50 % de membres confirmés par match, arrondi vers le bas.</li>
+            <li>Matchs libres : déclaration au moins 2 h avant, un match par créneau, capture sous 10 minutes (heure d’envoi) ; fermés jusqu’au lancement.</li>
+            <li>Égalité parfaite : co-lauréats, titre partagé, lot non attribué.</li>
+            <li>Fin de saison : pas de gel ; 48 h de vérification, puis classement final le dimanche qui suit.</li>
             <li>Comptes : 2 comptes enregistrés au maximum, un seul actif, 7 jours entre deux changements. Changement de pseudo par simple déclaration.</li>
             <li>Langue : comprendre le malgache est essentiel ; le parler est une information non bloquante.</li>
             <li>Statuts : suspension, retrait, réintégration et périodes de comptabilisation.</li>
-            <li>Classement provisoire tous les 14 jours, le dimanche, avec coupure le samedi à 17 h.</li>
+            <li>Classement provisoire tous les 14 jours, le dimanche, avec coupure le samedi à 16 h selon l’heure d’envoi de la capture.</li>
+            <li>Matchs en attente et litiges : dossier dans le site, convocations, décision sous 48 h, confidentialité.</li>
+            <li>Sanctions : tableau-guide, recours de 48 h, aucune sanction publiée.</li>
+            <li>Phase de démarrage : seuls les matchs de Katana comptent avant le lancement.</li>
           </ul>
         </article>
       </div>
@@ -660,30 +717,29 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         <div class="flow">
           <h3>Inscription</h3><p>De la demande au matricule.</p>
           <ol class="rail">
-            <li><b>Formulaire</b><span>Page Participer : le site prépare votre message.</span></li>
-            <li><b>Envoi en privé</b><span>Message et capture du profil (pseudo et UID visibles) à l’organisation.</span></li>
+            <li><b>Formulaire</b><span>Page Inscription du site, avec la capture du profil (pseudo et UID visibles).</span></li>
             <li><b>Contrôles</b><span>Dossier complet, UID unique, pseudo vérifié sur la capture, critères d’éligibilité.</span></li>
             <li><b>Décision</b><span>Approbation, demande de précisions ou refus motivé.</span></li>
             <li><b>Matricule DFMM-n</b><span>Compte enregistré, période active ouverte, message de confirmation.</span></li>
           </ol>
         </div>
         <div class="flow">
-          <h3>Match officiel</h3><p>Mercredi et samedi à 16 h.</p>
+          <h3>Match de Katana</h3><p>En général le mercredi et le samedi à 16 h.</p>
           <ol class="rail">
-            <li><b>Salon personnalisé</b><span>Code communiqué, escouades de 4 avec capitaine, commandant désigné.</span></li>
+            <li><b>Salon personnalisé</b><span>Code communiqué, consignes de salon rappelées, sans nombre maximum.</span></li>
             <li><b>Match</b><span>Victory Unite, chat écrit uniquement.</span></li>
             <li><b>Capture du résultat</b><span>Prise par l’organisation, deux captures au-delà de 8 joueurs par faction.</span></li>
             <li><b>Saisie et contrôles</b><span>Lecture de la capture, rattachement des pseudos, contrôles automatiques.</span></li>
-            <li><b>Validation</b><span>Le match compte dans le prochain classement selon la coupure du samedi 17 h.</span></li>
+            <li><b>Validation</b><span>Validé avant la publication, il compte dans le classement du dimanche.</span></li>
           </ol>
         </div>
         <div class="flow">
-          <h3>Match libre</h3><p>Organisé par les joueurs, toujours déclaré à l’avance.</p>
+          <h3>Match libre</h3><p>Organisé par les joueurs, déclaré au moins 2 h avant (ouvert au lancement).</p>
           <ol class="rail">
-            <li><b>Demande de créneau</b><span>Date, heure, motif, responsables HAAVK et GTI.</span></li>
-            <li><b>Décision</b><span>Créneau accepté ou refusé. L’organisation témoigne ou confie le match aux joueurs.</span></li>
+            <li><b>Déclaration</b><span>Date et heure de début, responsables HAAVK et GTI, motif facultatif.</span></li>
+            <li><b>Enregistrement</b><span>Automatique ; Katana est averti et peut annuler.</span></li>
             <li><b>Match dans le créneau</b><span>Au moins 16 joueurs, factions équilibrées à un joueur près.</span></li>
-            <li><b>Captures sous 30 minutes</b><span>Une par responsable de faction, une troisième possible par l’organisateur.</span></li>
+            <li><b>Captures sous 10 minutes</b><span>Envoyées par le site : une par responsable, une par l’organisateur s’il n’est pas responsable.</span></li>
             <li><b>Contrôles et validation</b><span>Un seul match comptabilisé par créneau.</span></li>
           </ol>
         </div>
@@ -692,7 +748,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <ol class="rail">
             <li><b>Lecture</b><span>Carte, heure de fin, pseudos et 8 statistiques par joueur.</span></li>
             <li><b>Rattachement</b><span>Pseudo reconnu, à identifier, ou joueur non inscrit.</span></li>
-            <li><b>Contrôles automatiques</b><span>16 participants, écart d’un joueur, 30 % de membres, valeurs manquantes, négatives ou en double.</span></li>
+            <li><b>Contrôles automatiques</b><span>16 participants, écart d’un joueur, 50 % de membres confirmés, valeurs manquantes, négatives ou en double.</span></li>
             <li><b>Décision</b><span>Validé : il compte. Invalidé : il est retiré pour tous.</span></li>
             <li class="stop"><b>Alerte de performance</b><span>Vérification humaine, jamais de sanction automatique.</span></li>
           </ol>
@@ -700,11 +756,11 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         <div class="flow">
           <h3>Classements</h3><p>Tous les 14 jours, puis en fin de saison.</p>
           <ol class="rail">
-            <li><b>Coupure</b><span>Samedi 17 h, selon l’heure de fin lue sur la capture.</span></li>
+            <li><b>Coupure</b><span>Samedi 16 h, selon l’heure d’envoi de la capture.</span></li>
             <li><b>Calcul</b><span>Totaux, moyennes, seuil médian, premier quartile et départages.</span></li>
             <li><b>Publication</b><span>Dimanche, classement provisoire numéroté.</span></li>
             <li><b>Réclamations</b><span>En privé, dans les 48 heures.</span></li>
-            <li><b>Fin de saison</b><span>7 derniers jours d’audit, puis classement final, titres et lots confirmés.</span></li>
+            <li><b>Fin de saison</b><span>48 h de vérification, puis classement final le dimanche qui suit, titres et lots.</span></li>
           </ol>
         </div>
         <div class="flow">
@@ -720,18 +776,30 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <h3>Retrait et réintégration</h3><p>Le matricule n’est jamais perdu.</p>
           <ol class="rail">
             <li><b>Demande de retrait</b><span>Motif facultatif, rappel des conséquences avant l’envoi.</span></li>
-            <li><b>Décision</b><span>Si accepté : période fermée, comptes inactifs, demandes en cours annulées.</span></li>
+            <li><b>Retrait</b><span>Automatique (sauf litige, match en attente ou sanction) : période fermée, comptes inactifs, demandes en cours annulées.</span></li>
             <li><b>Pendant le retrait</b><span>Absent des classements et des lots, historique conservé.</span></li>
             <li><b>Réintégration</b><span>Même matricule, nouvelle période à la date d’accord.</span></li>
+          </ol>
+        </div>
+        <div class="flow">
+          <h3>Match en attente et litige</h3><p>Tranché par Katana sous 48 h, dans le site.</p>
+          <ol class="rail">
+            <li><b>Mise en attente</b><span>Captures différentes, heure hors de la plage, ou décision de Katana.</span></li>
+            <li><b>Dossier ouvert</b><span>Automatiquement, dans le site, à trancher sous 48 h.</span></li>
+            <li><b>Convocations</b><span>Responsables, organisateur, témoins ; confirmation de réception sous 12 h.</span></li>
+            <li><b>Discussion</b><span>Dans le site seulement, confidentielle.</span></li>
+            <li><b>Décision</b><span>Vraie capture retenue, match refusé ou annulé ; la discussion se ferme.</span></li>
+            <li><b>Synthèse</b><span>Validée par Katana, puis archivée ; les captures écartées sont supprimées.</span></li>
           </ol>
         </div>
         <div class="flow">
           <h3>Sanction et recours</h3><p>Proportionnée, motivée, contestable.</p>
           <ol class="rail">
             <li><b>Signalement ou alerte</b><span>Examen des éléments disponibles.</span></li>
-            <li><b>Demande d’explication</b><span>Le joueur présente sa version des faits.</span></li>
-            <li><b>Décision motivée</b><span>Avertissement, retrait de statistiques, invalidation, suspension ou exclusion.</span></li>
-            <li><b>Recours sous 48 h</b><span>En privé, avec le motif et les preuves.</span></li>
+            <li><b>Explication</b><span>Le joueur présente sa version des faits.</span></li>
+            <li><b>Décision motivée</b><span>Avertissement, retrait de statistiques, suspension (14 jours au plus) ou exclusion, appliquée tout de suite ; jamais publiée.</span></li>
+            <li><b>Recours sous 48 h</b><span>Bouton « Contester » dans Mon compte.</span></li>
+            <li><b>Réponse de Katana</b><span>Décision maintenue, ou levée avec les matchs recomptés.</span></li>
           </ol>
         </div>
       </div>
@@ -1045,6 +1113,7 @@ function rendreAccueil() {
   h += '<div class="board-f">' + (p ? 'Matchs terminés avant le ' + fDT(p.coupure) + '. <a href="#classements">Voir les classements complets</a>' : 'Le premier classement provisoire sera publié un dimanche, après les premiers matchs validés.') + '</div>';
   $('#home-board').innerHTML = h;
   $('#home-cal').innerHTML = calHtml();
+  afficherActualites();
 }
 function reglesSite() { try { return L.regles(PARAM); } catch (e) { return null; } }
 function heureTxt(h) { return String(h).replace(':', ' h ').replace(/ h 00$/, ' h'); }
@@ -1221,8 +1290,8 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
-const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
@@ -1233,6 +1302,7 @@ function compteurTab(k) {
   if (k === 'matchs') return ADM.nbMatchs || 0;
   if (k === 'sanctions') return ADM.nbContest || 0;
   if (k === 'litiges') return ADM.nbDossiers || 0;
+  if (k === 'messages') return ADM.nbMessages || 0;
   return 0;
 }
 function rendreAdmin() {
@@ -1748,25 +1818,6 @@ function reduireImage(file, max, q) {
 function extraireJSON(t) { const a = String(t).indexOf('{'), b = String(t).lastIndexOf('}'); return a >= 0 && b > a ? String(t).slice(a, b + 1) : t; }
 
 /* ----- Titres et lots ----- */
-TAB.lots = {
-  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="lo-s">Saison</label><select id="lo-s">' + optSaisons(UI.lotSaison || (saisonActive() || {}).id) + '</select></div></div>' + note('Calcul sur tous les matchs validés de la saison (avant la date limite des matchs). À confirmer sur le classement final publié. Les lots ne sont jamais publiés : cochez seulement les catégories dont le lot est confirmé.', 'a'),
-  apres: () => { UI.lotSaison = $('#lo-s').value; },
-  body: () => {
-    const s = saisonPar(UI.lotSaison) || saisonActive();
-    if (!s) return note('Créez d’abord une saison.', 'a');
-    const cx = ctx(), lim = L.finCompetition(s), cl = L.classer(L.agreger(cx, s, lim ? L.addDays(lim, 1) + 'T00:00' : null), cx.membres);
-    const r = L.attribuerLots(cl, s.lots || {});
-    const lotis = r.filter(x => x.beneficiaire).map(x => x.beneficiaire);
-    const unique = lotis.length === new Set(lotis).size;
-    let h = '<div class="scroll"><table><thead><tr><th>Ordre</th><th>Distinction</th><th>Lot confirmé</th><th>Lauréat sportif</th><th>Déjà loti ?</th><th>Bénéficiaire matériel</th><th>Statut</th></tr></thead><tbody>';
-    r.forEach(x => {
-      h += '<tr><td>' + x.prio + '</td><td><b>' + esc(x.label) + '</b></td><td><label class="coche" style="margin:0"><input type="checkbox" data-act="lot-toggle" data-k="' + x.key + '"' + (x.lot ? ' checked' : '') + ' aria-label="Lot confirmé pour ' + esc(x.label) + '"></label></td><td>' + (x.laureat ? esc(nomJoueur(x.laureat)) + '<div class="dim small">' + esc(x.laureat) + '</div>' : '<span class="dim">' + esc(x.statutTitre) + '</span>') + '</td><td>' + (x.dejaLoti === null ? '—' : x.dejaLoti ? 'Oui' : 'Non') + '</td><td>' + (x.beneficiaire ? esc(nomJoueur(x.beneficiaire)) + '<div class="dim small">' + esc(x.beneficiaire) + '</div>' : '—') + '</td><td>' + badge(x.statut, x.statut.indexOf('Attribué') === 0 ? 'g' : x.statut === 'Non attribué' ? 'r' : 'o') + (x.explication ? '<div class="dim small">' + esc(x.explication) + '</div>' : '') + '</td></tr>';
-    });
-    h += '</tbody></table></div><ul class="chk"><li class="' + (unique ? 'o' : 'b') + '">' + (unique ? 'Chaque joueur reçoit au maximum un lot (' + lotis.length + ' lot(s) attribué(s)).' : 'Un joueur reçoit plusieurs lots : anomalie.') + '</li><li class="o">Priorité des 11 catégories et redistribution appliquées dans l’ordre du règlement.</li><li class="o">Le bénéficiaire matériel ne remplace jamais le lauréat sportif dans le tableau des titres.</li></ul>';
-    return h;
-  }
-};
-
 /* ----- Journal ----- */
 TAB.journal = {
   shell: () => '<label class="lab" for="j-rech">Rechercher dans le journal</label><input type="search" id="j-rech" placeholder="Matricule, match, type, mot du motif…" style="margin-bottom:12px">',
@@ -1840,6 +1891,7 @@ function router() {
   const h = (location.hash || '').slice(1);
   let vue = h, t = '';
   if (h.indexOf('admin-') === 0) { vue = 'admin'; t = h.slice(6); }
+  if (vue === 'participer') vue = 'inscription';   // ancienne page retirée : tout se fait dans le site
   if (VUES.indexOf(vue) < 0) vue = 'accueil';
   const chg = UI.vue !== vue;
   UI.vue = vue;
@@ -1855,7 +1907,7 @@ function lierEvenements() {
   window.addEventListener('hashchange', router);
   document.addEventListener('click', e => {
     const a = e.target.closest('[data-act]');
-    if (a && a.dataset.act !== 'lot-toggle') { const H = ACTIONS[a.dataset.act]; if (H) { e.preventDefault(); H(a, e); } return; }
+    if (a) { const H = ACTIONS[a.dataset.act]; if (H) { e.preventDefault(); H(a, e); } return; }
     const g = e.target.closest('[data-goto]');
     if (g) { const el = document.getElementById(g.dataset.goto); if (el) el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); return; }
     const sg = e.target.closest('#cl-seg button');
@@ -1875,12 +1927,6 @@ function lierEvenements() {
     if (t.id === 'j-rech') { UI.jRech = t.value; UI.jMax = 100; $('#adm-body').innerHTML = TAB.journal.body(); return; }
     if (e.type !== 'change') return;
     if (t.id === 'ma-s') { UI.matchSaison = t.value; rendreAdmin(); }
-    else if (t.id === 'lo-s') { UI.lotSaison = t.value; rendreAdmin(); }
-    else if (t.dataset.act === 'lot-toggle') {
-      const s = saisonPar(UI.lotSaison) || saisonActive(); if (!s) return;
-      const lots = Object.assign({}, s.lots || {}); lots[t.dataset.k] = t.checked;
-      agir(async () => { await ecrire('saisons', s.id, Object.assign({}, s, { lots })); await noter('Lots', s.id, (t.checked ? 'Lot confirmé : ' : 'Lot retiré : ') + t.dataset.k, ''); });
-    }
   };
   document.addEventListener('input', saisie);
   document.addEventListener('change', saisie);
@@ -1940,7 +1986,7 @@ function rendreCompte() {
     if (!ADMIN) chargerMonDossier();
     return;
   }
-  z.innerHTML = (lienPerime ? note('Ce lien n’est plus valable : il a expiré ou a déjà servi. Demandez un nouveau lien à Katana sur Messenger.', 'r') : '') + '<form id="f-connexion" class="panel" novalidate><h3>Se connecter</h3><label class="lab" for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email"><label class="lab" for="c-mdp">Mot de passe</label><input type="password" id="c-mdp" autocomplete="current-password"><div id="c-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Se connecter</button></div><p class="mute small">Mot de passe oublié ? Écrivez à Katana sur Messenger : il vous enverra un lien pour en choisir un nouveau.</p></form>' + (PARAM.inscriptions_ouvertes === true ? '' : note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV.'));
+  z.innerHTML = (lienPerime ? note('Ce lien n’est plus valable : il a déjà servi, ou un lien plus récent l’a remplacé. Ouvrez seulement le lien le plus récent, une seule fois. Si cela ne marche pas, demandez un nouveau lien à Katana sur Messenger.', 'r') : '') + '<form id="f-connexion" class="panel" novalidate><h3>Se connecter</h3><label class="lab" for="c-email">E-mail</label><input type="email" id="c-email" autocomplete="email"><label class="lab" for="c-mdp">Mot de passe</label><input type="password" id="c-mdp" autocomplete="current-password"><div id="c-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Se connecter</button></div><p class="mute small">Mot de passe oublié ? Écrivez à Katana sur Messenger : il vous enverra un lien pour en choisir un nouveau.</p></form>' + (PARAM.inscriptions_ouvertes === true ? '' : note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV.'));
 }
 async function seConnecter(e) {
   e.preventDefault();
@@ -2035,15 +2081,17 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c, vs, mt, ct, li] = await Promise.all([
+  const [a, b, c, vs, mt, ct, li, ms] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
     SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
     SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString()),
     SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente']),
     SB.from('sanctions').select('id', { count: 'exact', head: true }).not('conteste_le', 'is', null).is('decision_recours', null).eq('statut', 'active'),
-    SB.from('dossiers').select('id', { count: 'exact', head: true }).eq('statut', 'ouvert')
+    SB.from('dossiers').select('id', { count: 'exact', head: true }).eq('statut', 'ouvert'),
+    SB.from('messages').select('id', { count: 'exact', head: true }).eq('de_katana', false).is('lu_le', null)
   ]);
+  ADM.nbMessages = (ms && ms.count) || 0;
   ADM.nbDossiers = (li && li.count) || 0;
   ADM.nbMatchs = mt.count || 0;
   ADM.nbContest = (ct && ct.count) || 0;
@@ -2054,6 +2102,11 @@ async function chargerCompteursAdmin() {
   ADM.vsAlerte = limJ > 0 && pctA > 0 && ADM.vsJour >= limJ * pctA / 100;
   ADM.derniereSauvegarde = b.data && b.data[0] ? b.data[0].date : null;
   ADM.sauvegardeEnRetard = !ADM.derniereSauvegarde || Date.now() - new Date(ADM.derniereSauvegarde).getTime() > 7 * 86400000;
+}
+
+function redessinerOnglets() {
+  const z = $('#adm-tabs'); if (!z) return;
+  z.innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, lb]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(lb) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
 }
 
 /* ----- Formulaire public d'inscription ----- */
@@ -2109,9 +2162,13 @@ const STATUTS_CPT = { actif: 'actif', en_pause: 'en pause', remplace: 'remplacé
 const dateLoc = iso => iso ? fDT(L.versLocal(iso)) : '—';
 async function majPastilleCompte() {
   const lien = $('#nav-compte');
+  if (UI.vue !== 'accueil') chargerActualites().then(majPastilleActus);
   if (!SESSION) { lien.textContent = 'Connexion'; return; }
   let n = 0;
-  if (SB && !ADMIN) { const r = await SB.from('notifications').select('id', { count: 'exact', head: true }).eq('lu', false); n = r.count || 0; }
+  if (SB && !ADMIN) {
+    const [r, mg] = await Promise.all([SB.from('notifications').select('id', { count: 'exact', head: true }).eq('lu', false), SB.from('messages').select('id', { count: 'exact', head: true }).eq('de_katana', true).is('lu_le', null)]);
+    n = (r.count || 0) + ((mg && mg.count) || 0);
+  }
   lien.innerHTML = 'Mon compte' + (n ? '<span class="cpt" aria-label="' + n + ' notification(s) non lue(s)">' + n + '</span>' : '');
 }
 function historiquePseudos(c) {
@@ -2151,10 +2208,10 @@ async function chargerMonDossier() {
   if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
   h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
-  h += '<div id="mes-sanctions"></div><div id="mes-convocations"></div>';
+  h += '<div id="mes-messages"></div><div id="mes-sanctions"></div><div id="mes-convocations"></div>';
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
   z.innerHTML = h;
-  afficherMesSanctions(); afficherMesConvocations();
+  afficherMesSanctions(); afficherMesConvocations(); afficherMesMessages();
 }
 function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
 function moiCompte2() {
@@ -2431,7 +2488,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -2461,7 +2518,7 @@ async function telechargerSauvegarde(b) {
     const { error } = await SB.from('journal').insert({ type: 'Sauvegarde', decision: 'Sauvegarde complète téléchargée' });
     etat.textContent = error ? 'Fichier téléchargé, mais la date n’a pas pu être notée : ' + error.message : 'Sauvegarde téléchargée.';
     await chargerCompteursAdmin(); TAB.sauvegarde.charger();
-    $('#adm-tabs').innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, lb]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(lb) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
+    redessinerOnglets();
   } catch (x) { etat.textContent = 'Échec : ' + x.message; }
   finally { b.disabled = false; }
 }
@@ -2849,7 +2906,7 @@ document.addEventListener('change', e => { if (e.target && e.target.id === 'ma-s
 let PUBS = [], CLC = null;
 function pubDepuisLigne(r) {
   const c = r.contenu || {};
-  return Object.assign({}, c, { id: r.id, saison_id: r.saison_id, type: r.type === 'final' ? 'Final' : 'Provisoire', numero: r.numero, publie_le: isoLoc(r.publie_le), coupure: isoLoc(r.coupure) });
+  return Object.assign({}, c, { id: r.id, saison_id: r.saison_id, type: r.type === 'final' ? 'Final' : 'Provisoire', numero: r.numero, publie_le: isoLoc(r.publie_le), publie_le_iso: r.publie_le, coupure: isoLoc(r.coupure) });
 }
 async function chargerPublic() {
   if (!SB) return;
@@ -3281,6 +3338,204 @@ async function afficherMesConvocations() {
 }
 ACTIONS['moi-confirmer'] = async b => { const { error } = await SB.rpc('confirmer_convocation', { p_dossier: Number(b.dataset.id) }); if (error) { toast(erreurRpc(error), true); return; } toast('Réception confirmée.'); afficherMesConvocations(); };
 ACTIONS['moi-ecrire-lit'] = async b => { const t = v('mc-' + b.dataset.id); if (!t) return; const { error } = await SB.rpc('ecrire_litige', { p_dossier: Number(b.dataset.id), p_texte: t }); if (error) { toast(erreurRpc(error), true); return; } toast('Message envoyé.'); afficherMesConvocations(); };
+
+/* ----- Titres et lots (jamais publiés tant que sponsors et moyens ne sont pas confirmés) ----- */
+let LOTS = [], LOTA = null;
+TAB.lots = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:220px"><label class="lab" for="lo2-s">Saison</label><select id="lo2-s"></select></div></div>'
+    + note('Les lots ne sont jamais publiés : cette page est réservée à l’administration. Un joueur reçoit au plus un lot, dans l’ordre de priorité du cahier ; des co-lauréats gardent le titre sans lot.', 'a')
+    + '<div id="lo-liste"><p class="mute">Chargement…</p></div><div id="lo-attr"></div>',
+  body: () => '',
+  charger: afficherLots
+};
+async function afficherLots() {
+  const z = $('#lo-liste'), za = $('#lo-attr'); if (!z) return;
+  try { await chargerSaisons(); } catch (e) { z.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+  if (!SA.length) { z.innerHTML = note('Créez d’abord la saison (onglet « Saison »).', 'a'); return; }
+  if (!UI.lotSaison || !saisonSB(UI.lotSaison)) UI.lotSaison = (saisonActiveSB() || SA[0]).id;
+  $('#lo2-s').innerHTML = optSaisonsSB(UI.lotSaison);
+  const [a, b] = await Promise.all([
+    SB.from('lots').select('*, membres(matricule, nom_gamer)').eq('saison_id', UI.lotSaison),
+    SB.from('publications').select('*').eq('saison_id', UI.lotSaison).eq('type', 'final')
+  ]);
+  if (a.error) { z.innerHTML = note('Lecture impossible : ' + esc(a.error.message), 'r'); return; }
+  LOTS = a.data || [];
+  const lot = k => LOTS.find(x => x.categorie === k) || {};
+  z.innerHTML = '<div class="panel"><h3>Lots de la saison</h3><p class="mute small">Décrivez chaque lot et cochez « confirmé » quand le sponsor ou les moyens sont sûrs. Seuls les lots confirmés sont attribués.</p><div class="scroll"><table><thead><tr><th>Ordre</th><th>Distinction</th><th>Lot</th><th>Confirmé</th></tr></thead><tbody>'
+    + L.CATS.map(c => '<tr><td>' + c.prio + '</td><td><b>' + esc(c.label) + '</b></td><td><input type="text" id="lo-d-' + c.key + '" value="' + esc(lot(c.key).description || '') + '" aria-label="Lot ' + esc(c.label) + '"></td><td><input type="checkbox" id="lo-c-' + c.key + '"' + (lot(c.key).confirme ? ' checked' : '') + ' aria-label="Lot confirmé ' + esc(c.label) + '"></td></tr>').join('')
+    + '</tbody></table></div><div class="row-btns"><button class="btn sm" type="button" data-act="lo-enregistrer">Enregistrer les lots</button></div></div>';
+  // Attribution : sur le classement final publié (figé), sinon prévision sur les matchs validés.
+  const pub = (b.data || [])[0] || null, sj = saisonJS(saisonSB(UI.lotSaison)), R = reglesSite();
+  let cl, noms = {}, source;
+  if (pub) {
+    cl = L.classementDepuisPublication(pub.contenu);
+    (pub.contenu.categories || []).forEach(c => (c.lignes || []).forEach(l => { noms[l.mat] = l.nom; }));
+    source = 'Classement final publié le ' + dateLoc(pub.publie_le) + '.';
+  } else {
+    try { await chargerContexte(UI.lotSaison); } catch (e) { za.innerHTML = note('Lecture impossible : ' + esc(e.message), 'r'); return; }
+    const coupure = L.coupureFinale(sj);
+    cl = L.classer(L.agreger(CX, sj, { coupure, limiteDecisions: now() }), CX.membres, coupure);
+    source = 'Prévision : le classement final n’est pas encore publié (prévu le ' + (R ? fD(L.publicationFinale(sj, R)) : '—') + '). L’attribution s’enregistrera après sa publication.';
+  }
+  const nom = mat => noms[mat] || nomMat(mat);
+  const dispo = {}; LOTS.filter(x => x.confirme).forEach(x => { dispo[x.categorie] = true; });
+  const r = L.attribuerLots(cl, dispo);
+  LOTA = { pub, r };
+  const lotis = r.filter(x => x.beneficiaire).map(x => x.beneficiaire), unique = lotis.length === new Set(lotis).size;
+  za.innerHTML = '<div class="panel"><h3>Attribution</h3><p class="mute small">' + esc(source) + '</p><div class="scroll"><table><thead><tr><th>Ordre</th><th>Distinction</th><th>Lot</th><th>Titre</th><th>Bénéficiaire du lot</th><th>Statut</th>' + (pub ? '<th>Remise</th>' : '') + '</tr></thead><tbody>'
+    + r.map(x => { const l = lot(x.key);
+      return '<tr><td>' + x.prio + '</td><td><b>' + esc(x.label) + '</b></td><td class="small">' + (x.lot ? esc(l.description || 'confirmé') : '<span class="dim">pas de lot confirmé</span>') + '</td>'
+        + '<td class="small">' + (x.laureats.length ? x.laureats.map(m => esc(nom(m)) + ' <span class="dim">' + esc(m) + '</span>').join('<br>') : '<span class="dim">' + esc(x.statutTitre) + '</span>') + '</td>'
+        + '<td class="small">' + (x.beneficiaire ? esc(nom(x.beneficiaire)) + ' <span class="dim">' + esc(x.beneficiaire) + '</span>' : '—') + '</td>'
+        + '<td>' + badge(x.statut, x.statut.indexOf('Attribué') === 0 ? 'g' : x.statut === 'Non attribué' ? 'r' : 'o') + (x.explication ? '<div class="dim small">' + esc(x.explication) + '</div>' : '') + '</td>'
+        + (pub ? '<td class="small">' + (l.remis_le ? 'remis le ' + dateLoc(l.remis_le) : l.beneficiaire_id ? '<button class="btn sm ghost" type="button" data-act="lo-remis" data-id="' + l.id + '">Marquer comme remis</button>' : '—') + '</td>' : '') + '</tr>';
+    }).join('') + '</tbody></table></div>'
+    + '<ul class="chk"><li class="' + (unique ? 'o' : 'b') + '">' + (unique ? 'Chaque joueur reçoit au plus un lot (' + lotis.length + ' lot(s) attribué(s)).' : 'Un joueur reçoit plusieurs lots : anomalie.') + '</li><li class="o">Ordre de priorité des 11 catégories et redistribution appliqués ; co-lauréats sans lot ; égalité entre bénéficiaires d’une redistribution : lot non attribué.</li></ul>'
+    + (pub ? '<div class="row-btns"><button class="btn" type="button" data-act="lo-attribuer">Enregistrer l’attribution</button></div>' + (LOTS.some(x => x.attribue_le) ? '<p class="dim small">Dernière attribution enregistrée le ' + dateLoc(LOTS.filter(x => x.attribue_le).map(x => x.attribue_le).sort().pop()) + '.</p>' : '') : '') + '</div>';
+}
+ACTIONS['lo-enregistrer'] = async () => {
+  const lignes = L.CATS.map(c => ({ saison_id: Number(UI.lotSaison), categorie: c.key, description: v('lo-d-' + c.key) || null, confirme: coche('lo-c-' + c.key) }))
+    .filter(x => x.description || x.confirme || LOTS.some(l => l.categorie === x.categorie));
+  const { error } = await SB.from('lots').upsert(lignes, { onConflict: 'saison_id,categorie' });
+  if (error) { toast('Enregistrement impossible : ' + error.message, true); return; }
+  await SB.from('journal').insert({ type: 'Lots', objet: (saisonSB(UI.lotSaison) || {}).nom, decision: 'Lots de la saison mis à jour : ' + lignes.filter(x => x.confirme).length + ' confirmé(s)' });
+  toast('Lots enregistrés.'); afficherLots();
+};
+ACTIONS['lo-attribuer'] = async () => {
+  if (!LOTA || !LOTA.pub) return;
+  const res = LOTA.r.filter(x => x.lot).map(x => ({ categorie: x.key, beneficiaire_matricule: x.beneficiaire ? Number(String(x.beneficiaire).replace(/\D/g, '')) : null, statut: x.statut, explication: x.explication }));
+  if (!confirm('Enregistrer l’attribution des ' + res.length + ' lot(s) confirmé(s) ?')) return;
+  const { data, error } = await SB.rpc('enregistrer_attribution', { p_publication: LOTA.pub.id, p_resultats: res });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Attribution enregistrée : ' + data + ' lot(s).'); afficherLots();
+};
+ACTIONS['lo-remis'] = async b => {
+  if (!confirm('Marquer ce lot comme remis au bénéficiaire ?')) return;
+  const { error } = await SB.rpc('marquer_lot_remis', { p_lot: Number(b.dataset.id) });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Lot marqué comme remis.'); afficherLots();
+};
+document.addEventListener('change', e => { if (e.target && e.target.id === 'lo2-s') { UI.lotSaison = e.target.value; afficherLots(); } });
+
+/* ----- Lot 5 : actualités (membres connectés) et messagerie avec Katana ----- */
+let ACTUS = [], CONV = [];
+const VU_ACTUS = 'dfmm_actus_vues';
+function lireVu() { try { return localStorage.getItem(VU_ACTUS) || ''; } catch (e) { return ''; } }
+function noterVu(d) { try { localStorage.setItem(VU_ACTUS, d); } catch (e) { /* stockage indisponible : sans conséquence */ } }
+async function chargerActualites() {
+  if (!SB || !SESSION) { ACTUS = []; return; }
+  const { data, error } = await SB.from('actualites').select('*').is('retire_le', null).order('publie_le', { ascending: false }).limit(20);
+  ACTUS = error ? [] : (data || []);
+}
+async function afficherActualites() {
+  const band = $('#home-actus-band'), z = $('#home-actus'); if (!band || !z) return;
+  await chargerActualites();
+  if (!SESSION || !ACTUS.length) { band.hidden = true; majPastilleActus(); return; }
+  const vu = lireVu();
+  band.hidden = false;
+  z.innerHTML = ACTUS.map(a => '<div class="card-l"><div class="t"><div><b>' + esc(a.titre) + '</b><div class="small dim">' + dateLoc(a.publie_le) + '</div></div>' + (a.publie_le > vu ? badge('Nouveau', 'g') : '') + '</div><p style="white-space:pre-line">' + esc(a.texte) + '</p></div>').join('');
+  if (UI.vue === 'accueil') noterVu(ACTUS[0].publie_le);
+  majPastilleActus();
+}
+function majPastilleActus() {
+  const l = document.querySelector('[data-nav="accueil"]'); if (!l) return;
+  const n = UI.vue === 'accueil' ? 0 : ACTUS.filter(a => a.publie_le > lireVu()).length;
+  l.innerHTML = 'Accueil' + (n ? '<span class="cpt" aria-label="' + n + ' actualité(s) nouvelle(s)">' + n + '</span>' : '');
+}
+
+/* Administration : actualités */
+TAB.actualites = {
+  shell: () => '<div class="panel"><h3>Nouvelle actualité</h3><p class="mute small">Visible seulement par les membres connectés (pas par le public). Les membres lisent, sans pouvoir répondre ici.</p>'
+    + '<label class="lab" for="ac-titre">Titre</label><input type="text" id="ac-titre"><label class="lab" for="ac-texte">Texte</label><textarea id="ac-texte" rows="5"></textarea>'
+    + '<div class="row-btns"><button class="btn" type="button" data-act="ac-publier">Publier</button></div></div><div id="ac-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherActualitesAdmin
+};
+async function afficherActualitesAdmin() {
+  const z = $('#ac-liste'); if (!z) return;
+  const { data, error } = await SB.from('actualites').select('*').order('publie_le', { ascending: false });
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  z.innerHTML = (data || []).length ? data.map(a => '<div class="card-l"><div class="t"><div><b>' + esc(a.titre) + '</b><div class="small dim">publiée le ' + dateLoc(a.publie_le) + (a.retire_le ? ' · retirée le ' + dateLoc(a.retire_le) : '') + '</div></div>' + (a.retire_le ? badge('Retirée', 'o') : badge('En ligne', 'g')) + '</div><p style="white-space:pre-line">' + esc(a.texte) + '</p>'
+    + (a.retire_le ? '' : '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ac-retirer" data-id="' + a.id + '">Retirer</button></div>') + '</div>').join('') : note('Aucune actualité pour l’instant.');
+}
+ACTIONS['ac-publier'] = async () => {
+  const titre = v('ac-titre'), texte = v('ac-texte');
+  if (!titre || !texte) { toast('Le titre et le texte sont obligatoires.', true); return; }
+  const { error } = await SB.from('actualites').insert({ titre, texte });
+  if (error) { toast('Publication impossible : ' + error.message, true); return; }
+  await SB.from('journal').insert({ type: 'Actualité', objet: titre, decision: 'Actualité publiée' });
+  $('#ac-titre').value = ''; $('#ac-texte').value = ''; toast('Actualité publiée : les membres la voient sur l’accueil.'); afficherActualitesAdmin();
+};
+ACTIONS['ac-retirer'] = async b => {
+  if (!confirm('Retirer cette actualité ? Les membres ne la verront plus.')) return;
+  const { error } = await SB.from('actualites').update({ retire_le: new Date().toISOString() }).eq('id', Number(b.dataset.id));
+  if (error) { toast('Impossible : ' + error.message, true); return; }
+  toast('Actualité retirée.'); afficherActualitesAdmin();
+};
+
+/* Administration : messages */
+TAB.messages = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:240px"><label class="lab" for="ms-mb">Écrire à un membre</label><select id="ms-mb"><option value="">Choisir…</option></select></div><button class="btn sm ghost" type="button" data-act="ms-nouveau">Ouvrir la conversation</button></div>'
+    + note('Messagerie privée entre vous et chaque membre. Pas de messagerie entre joueurs. Les réclamations sur un classement arrivent ici (48 h après sa publication).') + '<div id="ms-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherConversations
+};
+async function afficherConversations() {
+  const z = $('#ms-liste'); if (!z) return;
+  const [a, b] = await Promise.all([
+    SB.from('messages').select('*, membres(matricule, nom_gamer)').order('cree_le', { ascending: false }),
+    SB.from('membres').select('id, matricule, nom_gamer').not('matricule', 'is', null).order('matricule')
+  ]);
+  if (a.error) { z.innerHTML = note('Lecture impossible : ' + esc(a.error.message), 'r'); return; }
+  const sel = $('#ms-mb'); if (sel) sel.innerHTML = '<option value="">Choisir…</option>' + (b.data || []).map(m => '<option value="' + m.id + '">' + esc(matTxt(m.matricule) + ' · ' + m.nom_gamer) + '</option>').join('');
+  const parMb = {};
+  (a.data || []).forEach(x => { const c = parMb[x.membre_id] = parMb[x.membre_id] || { membre_id: x.membre_id, m: x.membres, dernier: x, nonLus: 0, recl: 0 }; if (!x.de_katana && !x.lu_le) c.nonLus++; if (x.publication_id && !x.de_katana && !x.lu_le) c.recl++; });
+  CONV = Object.values(parMb);
+  if (!CONV.length) { z.innerHTML = note('Aucun message pour l’instant.'); return; }
+  z.innerHTML = '<ul class="taches">' + CONV.map(c => '<li><span><b>' + esc(matTxt(c.m && c.m.matricule) + ' ' + ((c.m && c.m.nom_gamer) || '')) + '</b>' + (c.nonLus ? ' <span class="cpt">' + c.nonLus + '</span>' : '') + (c.recl ? ' ' + badge('Réclamation', 'a') : '') + '<div class="small dim">' + esc((c.dernier.de_katana ? 'Vous : ' : '') + String(c.dernier.texte).slice(0, 80)) + ' · ' + dateLoc(c.dernier.cree_le) + '</div></span>'
+    + '<button class="btn sm ghost" type="button" data-act="ms-ouvrir" data-id="' + c.membre_id + '">Ouvrir</button></li>').join('') + '</ul>';
+}
+async function ouvrirConversation(membreId) {
+  const [a, b] = await Promise.all([
+    SB.from('messages').select('*').eq('membre_id', membreId).order('cree_le'),
+    SB.from('membres').select('matricule, nom_gamer').eq('id', membreId).single()
+  ]);
+  if (a.error || b.error) { toast('Lecture impossible.', true); return; }
+  await SB.rpc('marquer_messages_lus', { p_membre: membreId });
+  const pubs = {}; PUBS.forEach(p => { pubs[p.id] = p; });
+  const h = (a.data || []).length ? '<ul class="taches">' + a.data.map(x => '<li><span><b>' + (x.de_katana ? 'Vous' : esc(b.data.nom_gamer)) + '</b>' + (x.publication_id ? ' ' + badge('Réclamation · ' + (pubs[x.publication_id] ? libPub(pubs[x.publication_id]) : 'classement'), 'a') : '') + ' : <span style="white-space:pre-line">' + esc(x.texte) + '</span></span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message.</p>';
+  modal('Messages · ' + matTxt(b.data.matricule) + ' ' + b.data.nom_gamer, h + '<label class="lab" for="ms-rep">Votre réponse</label><textarea id="ms-rep" rows="3"></textarea><div id="ms-err" class="err" role="alert"></div>',
+    [{ label: 'Fermer', cls: 'ghost', onClick: async () => { await afficherConversations(); await chargerCompteursAdmin(); redessinerOnglets(); return true; } },
+     { label: 'Envoyer', onClick: async () => {
+       if (!v('ms-rep')) { $('#ms-err').textContent = 'Écrivez votre réponse.'; return false; }
+       const { error } = await SB.rpc('repondre_membre', { p_membre: membreId, p_texte: v('ms-rep') });
+       if (error) { $('#ms-err').textContent = erreurRpc(error); return false; }
+       toast('Message envoyé. Le membre est averti.'); ouvrirConversation(membreId); return false;
+     } }]);
+}
+ACTIONS['ms-ouvrir'] = b => ouvrirConversation(Number(b.dataset.id));
+ACTIONS['ms-nouveau'] = () => { const id = Number(v('ms-mb')); if (!id) { toast('Choisissez le membre.', true); return; } ouvrirConversation(id); };
+
+/* Mon compte : messages avec Katana */
+async function afficherMesMessages() {
+  const z = $('#mes-messages'); if (!z || !SB || !DOS || !DOS.m) return;
+  const { data, error } = await SB.from('messages').select('*').order('cree_le');
+  if (error) { z.innerHTML = ''; return; }
+  const R = reglesSite(), lim = R ? R.reclamation_h * 3600000 : 0;
+  const recl = PUBS.filter(p => Date.now() - new Date(p.publie_le_iso || 0).getTime() < lim);
+  const pubs = {}; PUBS.forEach(p => { pubs[p.id] = p; });
+  z.innerHTML = '<h3 style="margin-top:12px">Messages avec Katana</h3>' + ((data || []).length ? '<ul class="taches">' + data.map(x => '<li><span><b>' + (x.de_katana ? 'Katana' : 'Vous') + '</b>' + (x.publication_id ? ' ' + badge('Réclamation · ' + (pubs[x.publication_id] ? libPub(pubs[x.publication_id]) : 'classement'), 'a') : '') + ' : <span style="white-space:pre-line">' + esc(x.texte) + '</span></span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message. Écrivez à Katana pour toute question, précision ou contestation.</p>')
+    + (recl.length ? '<label class="lab" for="mm-pub">Concerne</label><select id="mm-pub"><option value="">Message simple</option>' + recl.map(p => '<option value="' + p.id + '">Réclamation : ' + esc(libPub(p)) + '</option>').join('') + '</select>' : '')
+    + '<label class="lab" for="mm-txt">Votre message à Katana</label><textarea id="mm-txt" rows="3"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="mm-envoyer">Envoyer</button></div>';
+  if ((data || []).some(x => x.de_katana && !x.lu_le)) { await SB.rpc('marquer_messages_lus', {}); majPastilleCompte(); }
+}
+ACTIONS['mm-envoyer'] = async () => {
+  const t = v('mm-txt'); if (!t) { toast('Écrivez votre message.', true); return; }
+  const pub = v('mm-pub');
+  const { error } = await SB.rpc('ecrire_a_katana', { p_texte: t, p_publication: pub ? Number(pub) : null });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast(pub ? 'Réclamation envoyée à Katana.' : 'Message envoyé à Katana.'); afficherMesMessages();
+};
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));

@@ -32,6 +32,7 @@
   Q.prototype.maybeSingle = function () { this.one = true; this.maybe = true; return this; };
   Q.prototype.insert = function (o) { this.op = 'insert'; this.val = Array.isArray(o) ? o : [o]; return this; };
   Q.prototype.update = function (o) { this.op = 'update'; this.val = o; return this; };
+  Q.prototype.upsert = function (o, opt) { this.op = 'upsert'; this.val = Array.isArray(o) ? o : [o]; this.cles = ((opt && opt.onConflict) || 'id').split(','); return this; };
   Q.prototype.then = function (res, rej) { return Promise.resolve(this.exec()).then(res, rej); };
   Q.prototype.exec = function () {
     const T = DB[this.t] = DB[this.t] || [];
@@ -44,6 +45,10 @@
         T.push(r); return r;
       });
       return { data: this.one ? rows[0] : rows, error: null };
+    }
+    if (this.op === 'upsert') {
+      const rows = this.val.map(o => { const x = T.find(r => this.cles.every(k => String(r[k]) === String(o[k]))); if (x) return Object.assign(x, o); const r = Object.assign({ id: ++seq }, o); T.push(r); return r; });
+      return { data: rows, error: null };
     }
     let rows = T.filter(r => this.f.every(f => f(r)));
     if (this.op === 'update') { rows.forEach(r => Object.assign(r, this.val)); return { data: rows, error: null }; }
@@ -94,6 +99,8 @@
     captures_a_supprimer: p => { const d = DB.dossiers.find(x => x.id === p.p_dossier); return DB.captures.filter(c => c.match_id === d.match_id && c.statut === 'ecartee').map(c => c.chemin); },
     noter_captures_supprimees: p => { DB.dossiers.find(x => x.id === p.p_dossier).captures_supprimees_le = iso(); return null; },
     sanctionner_dossier: p => { DB.sanctions.find(x => x.id === p.p_sanction).dossier_id = p.p_dossier; return null; },
+    repondre_membre: p => { (DB.messages = DB.messages || []).push({ id: ++seq, membre_id: p.p_membre, de_katana: true, texte: p.p_texte, publication_id: null, cree_le: iso(), lu_le: null }); DB.notifications.push({ id: ++seq, membre_id: p.p_membre, texte: 'Nouveau message de Katana', lu: false }); return null; },
+    marquer_messages_lus: p => { (DB.messages || []).filter(m => m.membre_id === p.p_membre && !m.de_katana && !m.lu_le).forEach(m => { m.lu_le = iso(); }); return null; },
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {

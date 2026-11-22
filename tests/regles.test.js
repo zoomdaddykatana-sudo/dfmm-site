@@ -196,6 +196,18 @@ test('redistribution : le lauréat déjà loti garde le titre, le lot passe au s
   assert.deepEqual(med.laureats, ['A']); assert.equal(med.beneficiaire, 'B'); assert.equal(med.statut, 'Attribué (redistribution)');
 });
 
+test('lots depuis un classement publié : même attribution que depuis le calcul en direct', () => {
+  const cl = L.classer(agg([{ mat: 'A', n: 4, elim: 30, med: 9, score: 900 }, { mat: 'B', n: 4, elim: 10, med: 5, score: 900 }, { mat: 'C', n: 4, elim: 10, med: 5, score: 900 }]), MEMBRES);
+  // Contenu tel que le site le publie (noms et valeurs en plus, objets joueurs en moins).
+  const contenu = { seuil: cl.seuil, q1: cl.q1, categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut,
+    laureats: c.laureats.map(j => ({ mat: j.mat, nom: 'Nom ' + j.mat })), lignes: c.lignes.map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: 'Nom ' + l.j.mat, n: l.j.n, val: l.val })) })) };
+  const dispo = { most_elim: true, most_med: true, best_surv: true };
+  const direct = L.attribuerLots(cl, dispo), publie = L.attribuerLots(L.classementDepuisPublication(contenu), dispo);
+  assert.deepEqual(publie.map(r => [r.key, r.beneficiaire, r.statut]), direct.map(r => [r.key, r.beneficiaire, r.statut]));
+  // B et C à égalité parfaite pour la redistribution du lot MOST Medic : lot non attribué (décision du 21/11/2026).
+  assert.equal(publie.find(r => r.key === 'most_med').statut, 'Non attribué');
+});
+
 // ---------- Alertes ----------
 test('alertes de performance : seuils réglables, jamais bloquantes', () => {
   const ctx = ctxAvec(16);
