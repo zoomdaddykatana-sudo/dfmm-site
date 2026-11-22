@@ -118,7 +118,7 @@
     from: t => new Q(t),
     rpc: async (n, p) => { window.APPELS = (window.APPELS || []).concat([[n, p]]); try { return { data: RPC[n] ? RPC[n](p || {}) : null, error: null }; } catch (e) { return { data: null, error: { message: e.message } }; } },
     storage: { from: () => ({ remove: async () => ({ data: [], error: null }), upload: async () => ({ data: {}, error: null }), createSignedUrl: async () => ({ data: { signedUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACw=' } }) }) },
-    functions: { invoke: async () => ({ data: null, error: null }) }
+    functions: { invoke: async (n, o) => { window.APPELS = (window.APPELS || []).concat([['fonction:' + n, o && o.body]]); return window.FAUX_INVOKE ? window.FAUX_INVOKE(n, o) : { data: null, error: null }; } }
   };
   window.supabase = { createClient: () => client };
 })();
