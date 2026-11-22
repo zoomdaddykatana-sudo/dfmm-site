@@ -445,7 +445,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <h3>Informations demandées</h3>
           <p>Nom et prénom réels, nom de gamer dans la communauté, e-mail (obligatoire), date de naissance, genre (homme, femme ou préfère ne pas le dire), lien Facebook, clan (facultatif), pseudo exact en jeu, UID Delta Force, capture du profil de jeu montrant le pseudo et l’UID, lieu de résidence (à Madagascar : province puis ville principale ou périphérie ; à l’étranger : pays), compréhension et pratique du malgache, déclaration de nationalité ou d’origine malgache, acceptation des règlements DFMM et LEAGUE UV, du traitement des données et de l’approbation de l’inscription.</p>
           <h3>Parcours</h3>
-          <p>Envoi des informations, vérification automatique à l’envoi (UID existant dans Delta Force, pseudo lu sur le profil officiel, adresse e-mail réelle : les adresses temporaires sont refusées), envoi d’un code personnel à la page DFMM sur Messenger, depuis le compte Facebook indiqué, vérification par l’organisation (dossier complet, UID unique, pseudo et UID contrôlés sur la capture du profil, code Messenger reçu, critères d’éligibilité), décision de l’organisation, attribution du matricule et enregistrement du compte, puis message de confirmation. Si le pseudo lu sur le profil diffère du pseudo déclaré, c’est le pseudo du profil qui est enregistré.<span class="chg">Mis à jour</span> Chaque inscription est validée manuellement. L’inscription donne accès aux activités réservées aux membres ; certaines activités restent publiques.</p>
+          <p>Envoi des informations, vérification automatique à l’envoi (UID existant dans Delta Force, pseudo lu sur le profil officiel, adresse e-mail réelle : les adresses temporaires sont refusées), envoi d’un code personnel à la <a href="https://www.facebook.com/profile.php?id=61596920126729" target="_blank" rel="noopener">page DFMM</a> sur Messenger, depuis le compte Facebook indiqué, vérification par l’organisation (dossier complet, UID unique, pseudo et UID contrôlés sur la capture du profil, code Messenger reçu, critères d’éligibilité), décision de l’organisation, attribution du matricule et enregistrement du compte, puis message de confirmation. Si le pseudo lu sur le profil diffère du pseudo déclaré, c’est le pseudo du profil qui est enregistré.<span class="chg">Mis à jour</span> Chaque inscription est validée manuellement. L’inscription donne accès aux activités réservées aux membres ; certaines activités restent publiques.</p>
         </article>
 
         <article class="chap" id="r-mat">
@@ -733,7 +733,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <h3>Inscription</h3><p>De la demande au matricule.</p>
           <ol class="rail">
             <li><b>Formulaire</b><span>Page Inscription du site, avec la capture du profil (pseudo et UID visibles).</span></li>
-            <li><b>Contrôles</b><span>UID et e-mail vérifiés automatiquement à l’envoi, puis par l’organisation : dossier complet, UID unique, pseudo vérifié sur la capture, code Messenger reçu depuis le compte Facebook indiqué, critères d’éligibilité.</span></li>
+            <li><b>Contrôles</b><span>UID et e-mail vérifiés automatiquement à l’envoi, puis par l’organisation : dossier complet, UID unique, pseudo vérifié sur la capture, code Messenger reçu par la <a href="https://www.facebook.com/profile.php?id=61596920126729" target="_blank" rel="noopener">page DFMM</a> depuis le compte Facebook indiqué, critères d’éligibilité.</span></li>
             <li><b>Décision</b><span>Approbation, demande de précisions ou refus motivé.</span></li>
             <li><b>Matricule DFMM-n</b><span>Compte enregistré, période active ouverte, message de confirmation.</span></li>
           </ol>
@@ -906,6 +906,9 @@ function fV(kind, v) { return kind === 'MOST' ? fN(v) : fN(v, 2); }
 const now = () => L.nowStr();
 const nid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 const note = (t, c) => '<div class="note' + (c ? ' ' + c : '') + '">' + t + '</div>';
+// Page Facebook DFMM : c'est elle qui reçoit le code Messenger de l'inscription.
+const PAGE_DFMM = 'https://www.facebook.com/profile.php?id=61596920126729';
+const lienPageDfmm = (txt, cls) => '<a href="' + PAGE_DFMM + '" target="_blank" rel="noopener"' + (cls ? ' class="' + cls + '"' : '') + '>' + (txt || 'page Facebook DFMM') + '</a>';
 
 /* ---------------- Données ---------------- */
 const COLS = ['saisons', 'membres', 'comptes', 'inscriptions', 'demandes', 'matchs', 'publications', 'journal', 'parametres'];
@@ -1157,6 +1160,89 @@ function majVisibilite(champs, px, conteneur) {
 function verifierChamps(champs, o) {
   const manq = champs.filter(f => f.req && !(f.si && !f.si(o)) && (f.t === 'check' ? !o[f.k] : !String(o[f.k] || '').trim())).map(f => f.court || f.lab);
   return manq.length ? 'À compléter : ' + manq.join(', ') + '.' : '';
+}
+
+/* ---------------- Brouillons des formulaires ----------------
+   Une zone marquée data-brouillon="nom" garde ce qui y est tapé sur cet appareil (localStorage),
+   pour ne pas tout ressaisir après avoir quitté la page. Jamais les mots de passe ni les fichiers.
+   Effacé à l'envoi réussi, à la déconnexion, par le bouton « Effacer mes réponses », ou après BROUILLON_JOURS jours. */
+const BROUILLON_JOURS = 7, BR_PREFIXE = 'dfmm-brouillon|';
+const brQui = () => (SESSION && SESSION.user && SESSION.user.id) || 'visiteur';
+const brCle = nom => BR_PREFIXE + brQui() + '|' + nom;
+function brChamps(zone) {
+  return Array.from(zone.querySelectorAll('input, select, textarea')).filter(el => (el.id || el.name) && ['password', 'file', 'hidden', 'button', 'submit'].indexOf(el.type) < 0);
+}
+function garderBrouillon(zone) {
+  const val = {};
+  brChamps(zone).forEach(el => {
+    if (el.type === 'radio') { if (el.checked) val['r:' + el.name] = el.value; }
+    else if (el.type === 'checkbox') val[el.id] = el.checked;
+    else if (el.id) val[el.id] = el.value;
+  });
+  try { localStorage.setItem(brCle(zone.dataset.brouillon), JSON.stringify({ t: Date.now(), v: val })); } catch (e) { /* stockage indisponible : sans conséquence */ }
+}
+function lireBrouillon(nom) {
+  try {
+    const o = JSON.parse(localStorage.getItem(brCle(nom)) || 'null');
+    if (!o || !o.v) return null;
+    if (Date.now() - o.t > BROUILLON_JOURS * 86400000) { localStorage.removeItem(brCle(nom)); return null; }
+    return o.v;
+  } catch (e) { return null; }
+}
+function oublierBrouillon(nom) { try { localStorage.removeItem(brCle(nom)); } catch (e) { /* rien */ } }
+function oublierBrouillonsDe(qui) {
+  try { Object.keys(localStorage).filter(k => k.indexOf(BR_PREFIXE + qui + '|') === 0).forEach(k => localStorage.removeItem(k)); } catch (e) { /* rien */ }
+}
+function nettoyerBrouillons() {
+  try {
+    Object.keys(localStorage).filter(k => k.indexOf(BR_PREFIXE) === 0).forEach(k => {
+      let o = null; try { o = JSON.parse(localStorage.getItem(k)); } catch (e) { o = null; }
+      if (!o || Date.now() - o.t > BROUILLON_JOURS * 86400000) localStorage.removeItem(k);
+    });
+  } catch (e) { /* rien */ }
+}
+// Remet les réponses gardées dans une zone qui vient d'apparaître ; signale si quelque chose a été remis.
+function remettreBrouillon(zone) {
+  if (zone.dataset.brRemis) return;
+  zone.dataset.brRemis = '1';
+  const val = lireBrouillon(zone.dataset.brouillon); if (!val) return;
+  let remis = 0, dernier = null;
+  brChamps(zone).forEach(el => {
+    if (el.type === 'radio') { const r = val['r:' + el.name]; if (r !== undefined && (el.value === r) !== el.checked) { el.checked = el.value === r; remis++; dernier = el; } }
+    else if (el.type === 'checkbox') { if (el.id in val && el.checked !== !!val[el.id]) { el.checked = !!val[el.id]; remis++; dernier = el; } }
+    else if (el.id in val && el.value !== val[el.id]) { el.value = val[el.id]; remis++; dernier = el; }
+  });
+  if (!remis) return;
+  const det = zone.closest('details') || zone.querySelector('details'); if (det) det.open = true;
+  const n = document.createElement('div'); n.className = 'br-note';
+  n.innerHTML = note('Vos réponses précédentes ont été remises (gardées sur cet appareil seulement). Le mot de passe et les captures ne sont jamais gardés : ajoutez-les à nouveau. <button class="btn sm ghost" type="button" data-act="br-effacer">Effacer mes réponses</button>');
+  zone.insertBefore(n, zone.firstChild);
+  if (dernier) dernier.dispatchEvent(new Event('change', { bubbles: true }));
+}
+function brZones(racine) {
+  if (!racine || racine.nodeType !== 1) return [];
+  const l = Array.from(racine.querySelectorAll('[data-brouillon]'));
+  if (racine.matches('[data-brouillon]')) l.unshift(racine);
+  return l;
+}
+['input', 'change'].forEach(t => document.addEventListener(t, e => {
+  const z = e.target.closest && e.target.closest('[data-brouillon]');
+  if (z && z.dataset.brRemis) garderBrouillon(z);
+}));
+new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => brZones(n).forEach(remettreBrouillon)))).observe(document.documentElement, { childList: true, subtree: true });
+nettoyerBrouillons();
+function effacerBrouillonUI(b) {
+  const z = b.closest('[data-brouillon]'); if (!z) return;
+  if (!confirm('Effacer toutes les réponses de ce formulaire ?')) return;
+  oublierBrouillon(z.dataset.brouillon);
+  brChamps(z).forEach(el => {
+    if (el.type === 'radio' || el.type === 'checkbox') el.checked = el.defaultChecked;
+    else if (el.tagName === 'SELECT') { const i = Array.from(el.options).findIndex(o => o.defaultSelected); el.selectedIndex = i < 0 ? 0 : i; }
+    else el.value = el.defaultValue;
+  });
+  const nt = z.querySelector('.br-note'); if (nt) nt.remove();
+  const p = brChamps(z)[0]; if (p) p.dispatchEvent(new Event('change', { bubbles: true }));
+  oublierBrouillon(z.dataset.brouillon);   // l'événement ci-dessus a regardé le formulaire vide : rien à garder
 }
 
 /* ---------------- Administration ---------------- */
@@ -1632,6 +1718,7 @@ const ACTIONS = {
   'mb-retour': () => { UI.membre = ''; rendreAdmin(); },
   'j-plus': () => { UI.jMax += 100; rendreAdmin(); },
   'deconnexion': () => seDeconnecter(),
+  'br-effacer': b => effacerBrouillonUI(b),
   'param-enregistrer': b => enregistrerParam(b.dataset.k),
   'lien-creer': b => creerLien(b),
   'lien-copier': () => copier($('#l-lien')),
@@ -1762,7 +1849,7 @@ async function changerMdp(e) {
   if (error) { err.textContent = 'Enregistrement impossible : ' + error.message; return; }
   RECUP = false; toast('Nouveau mot de passe enregistré.'); rendreCompte();
 }
-async function seDeconnecter() { await SB.auth.signOut(); RECUP = false; toast('Vous êtes déconnecté.'); location.hash = '#accueil'; }
+async function seDeconnecter() { oublierBrouillonsDe(brQui()); await SB.auth.signOut(); RECUP = false; toast('Vous êtes déconnecté.'); location.hash = '#accueil'; }
 
 /* ----- Administration : paramètres ----- */
 function champParam(p) {
@@ -1874,7 +1961,7 @@ function rendreInscription() {
   if (SESSION) { z.innerHTML = note('Vous êtes connecté : votre inscription est déjà enregistrée. Suivez-la dans « Mon compte ».') + '<a class="btn" href="#compte">Mon compte</a>'; return; }
   if ($('#f-inscription')) return;
   const D = DEM.inscription;
-  z.innerHTML = '<form id="f-inscription" class="panel" novalidate><p class="mute">' + esc(D.intro) + '</p><div class="grid-f" id="ins-champs">' + D.champs.map(f => champHtml(f, {}, 'i-')).join('') + '</div><div class="grid-f"><div><label class="lab" for="i-mdp">Mot de passe (8 caractères au moins) <span class="dim">*</span></label><input type="password" id="i-mdp" autocomplete="new-password"></div><div><label class="lab" for="i-mdp2">Le même, une seconde fois <span class="dim">*</span></label><input type="password" id="i-mdp2" autocomplete="new-password"></div></div><label class="lab" for="i-capture">Capture de votre profil de jeu, avec le pseudo et l’UID bien visibles <span class="dim">*</span></label><input type="file" id="i-capture" accept="image/*"><div id="i-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Envoyer mon inscription</button></div></form>';
+  z.innerHTML = '<form id="f-inscription" class="panel" novalidate data-brouillon="inscription"><p class="mute">' + esc(D.intro) + '</p><p class="small">Page DFMM à qui envoyer le code : ' + lienPageDfmm('ouvrir la page Facebook DFMM') + '. Vos réponses sont gardées sur cet appareil jusqu’à l’envoi (' + BROUILLON_JOURS + ' jours au plus), sauf le mot de passe et la capture : vous pouvez quitter la page pour chercher une information.</p><div class="grid-f" id="ins-champs">' + D.champs.map(f => champHtml(f, {}, 'i-')).join('') + '</div><div class="grid-f"><div><label class="lab" for="i-mdp">Mot de passe (8 caractères au moins) <span class="dim">*</span></label><input type="password" id="i-mdp" autocomplete="new-password"></div><div><label class="lab" for="i-mdp2">Le même, une seconde fois <span class="dim">*</span></label><input type="password" id="i-mdp2" autocomplete="new-password"></div></div><label class="lab" for="i-capture">Capture de votre profil de jeu, avec le pseudo et l’UID bien visibles <span class="dim">*</span></label><input type="file" id="i-capture" accept="image/*"><div id="i-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Envoyer mon inscription</button></div></form>';
   majVisibilite(D.champs, 'i-', $('#ins-champs'));
 }
 document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#ins-champs')) majVisibilite(DEM.inscription.champs, 'i-', $('#ins-champs')); if (e.target.id === 'mb2-rech') afficherMembres(); });
@@ -1886,7 +1973,7 @@ async function erreurFonction(data, error, defaut) {
 }
 // Code que le joueur envoie à la page DFMM sur Messenger, depuis le compte Facebook indiqué (preuve que le profil est le sien).
 function blocCodeMessenger(code) {
-  return '<div class="panel" style="margin:12px 0"><h3>Dernière étape : votre code Messenger</h3><p>Envoyez ce code en message privé à la page Facebook DFMM, <b>depuis le compte Facebook que vous avez indiqué</b> :</p><p style="font-size:1.6em;letter-spacing:.12em"><b>' + esc(code) + '</b></p><p class="mute small">Katana vérifie que le code vient bien de ce compte avant d’approuver votre inscription. Vous retrouverez ce code dans « Mon compte ».</p></div>';
+  return '<div class="panel" style="margin:12px 0"><h3>Dernière étape : votre code Messenger</h3><p>Envoyez ce code en message privé à la ' + lienPageDfmm() + ', <b>depuis le compte Facebook que vous avez indiqué</b> :</p><p style="font-size:1.6em;letter-spacing:.12em"><b>' + esc(code) + '</b></p><p class="small">1. Touchez le bouton ci-dessous : la page DFMM s’ouvre (dans l’application Facebook si elle est installée).<br>2. Touchez « Message » (ou « Envoyer un message »).<br>3. Collez ou tapez le code, puis envoyez.</p><div class="row-btns">' + lienPageDfmm('Ouvrir la page DFMM', 'btn') + '</div><p class="mute small">Katana vérifie que le code vient bien de ce compte avant d’approuver votre inscription. Vous retrouverez ce code dans « Mon compte ».</p></div>';
 }
 async function soumettreInscription(e) {
   e.preventDefault();
@@ -1907,6 +1994,7 @@ async function soumettreInscription(e) {
     fd.append('capture', new File([img], 'profil.jpg', { type: 'image/jpeg' }));
     const { data, error } = await SB.functions.invoke('inscription', { body: fd });
     if (error || !data || !data.ok) throw new Error(await erreurFonction(data, error, 'Inscription impossible pour le moment. Réessayez plus tard.'));
+    oublierBrouillon('inscription');
     $('#ins-zone').innerHTML = note('Inscription envoyée. Katana va la vérifier. Vous pouvez déjà vous connecter avec votre e-mail et votre mot de passe pour suivre son état.')
       + (data.code_messenger ? blocCodeMessenger(data.code_messenger) : '')
       + (data.ecart_pseudo ? note('Le pseudo lu sur votre profil de jeu est « ' + esc(data.pseudo_retenu) + ' » : c’est celui-ci qui est enregistré. Katana va vérifier.', 'a') : '')
@@ -1981,7 +2069,7 @@ async function chargerMonDossier() {
 function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
 function moiCompte2() {
   const R = reglesSite();
-  modal('Ajouter un 2e compte', '<p class="mute small">' + (R ? R.comptes_max : 2) + ' comptes au maximum par matricule, un seul actif à la fois. Katana examine la demande.</p><label class="lab" for="d-pseudo">Pseudo exact du nouveau compte</label><input id="d-pseudo" type="text"><label class="lab" for="d-uid">UID du nouveau compte</label><input id="d-uid" type="text" inputmode="numeric"><label class="lab" for="d-capture">Capture du profil du nouveau compte (pseudo et UID visibles)</label><input id="d-capture" type="file" accept="image/*"><label class="lab" for="d-motif">Motif</label><textarea id="d-motif" rows="2"></textarea><label class="coche"><input type="checkbox" id="d-activer"><span>Je veux jouer avec ce compte dès son approbation. Le délai de ' + (R ? R.delai_changement_compte_jours : 7) + ' jours avant le changement suivant commence alors.</span></label><div id="d-err" class="err" role="alert"></div>',
+  modal('Ajouter un 2e compte', '<div data-brouillon="compte2"><p class="mute small">' + (R ? R.comptes_max : 2) + ' comptes au maximum par matricule, un seul actif à la fois. Katana examine la demande.</p><label class="lab" for="d-pseudo">Pseudo exact du nouveau compte</label><input id="d-pseudo" type="text"><label class="lab" for="d-uid">UID du nouveau compte</label><input id="d-uid" type="text" inputmode="numeric"><label class="lab" for="d-capture">Capture du profil du nouveau compte (pseudo et UID visibles)</label><input id="d-capture" type="file" accept="image/*"><label class="lab" for="d-motif">Motif</label><textarea id="d-motif" rows="2"></textarea><label class="coche"><input type="checkbox" id="d-activer"><span>Je veux jouer avec ce compte dès son approbation. Le délai de ' + (R ? R.delai_changement_compte_jours : 7) + ' jours avant le changement suivant commence alors.</span></label><div id="d-err" class="err" role="alert"></div></div>',
     [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer la demande', onClick: async () => {
       const err = $('#d-err'), f = $('#d-capture').files[0], pseudo = $('#d-pseudo').value.trim(), uid = v('d-uid'), motif = v('d-motif');
       err.textContent = '';
@@ -1992,18 +2080,18 @@ function moiCompte2() {
       if (up.error) { err.textContent = 'Envoi de la capture impossible : ' + up.error.message; return false; }
       const { error } = await SB.rpc('demander_compte2', { p_pseudo: pseudo, p_uid: uid, p_motif: motif, p_capture: chemin, p_activer: coche('d-activer') });
       if (error) { err.textContent = erreurRpc(error); return false; }
-      toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
+      oublierBrouillon('compte2'); toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
     } }]);
 }
 function moiActif() {
   const pause = ((DOS && DOS.m.comptes_jeu) || []).filter(x => x.statut === 'en_pause');
-  modal('Changer de compte actif', '<p class="mute small">Seul le compte actif est comptabilisé. Katana approuve le changement.</p><label class="lab" for="d-cpt">Compte à activer</label><select id="d-cpt">' + pause.map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="d-motif">Motif court</label><input id="d-motif" type="text"><div id="d-err" class="err" role="alert"></div>',
+  modal('Changer de compte actif', '<div data-brouillon="compte-actif"><p class="mute small">Seul le compte actif est comptabilisé. Katana approuve le changement.</p><label class="lab" for="d-cpt">Compte à activer</label><select id="d-cpt">' + pause.map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="d-motif">Motif court</label><input id="d-motif" type="text"><div id="d-err" class="err" role="alert"></div></div>',
     [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer la demande', onClick: async () => {
       const err = $('#d-err'), motif = v('d-motif'); err.textContent = '';
       if (!motif) { err.textContent = 'Le motif est obligatoire.'; return false; }
       const { error } = await SB.rpc('demander_compte_actif', { p_compte: Number(v('d-cpt')), p_motif: motif });
       if (error) { err.textContent = erreurRpc(error); return false; }
-      toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
+      oublierBrouillon('compte-actif'); toast('Demande envoyée à Katana.'); chargerMonDossier(); return true;
     } }]);
 }
 function moiRetrait() {
@@ -2105,7 +2193,7 @@ ACTIONS['fiche-ouvrir'] = b => ouvrirFiche(Number(b.dataset.id));
 /* ----- Lot 2C : pseudo avec volsever, effacement des données ----- */
 function moiPseudo() {
   const cpts = ((DOS && DOS.m.comptes_jeu) || []).filter(x => x.statut !== 'remplace');
-  modal('Déclarer un nouveau pseudo', '<p class="mute small">Le site lit votre pseudo officiel à partir de votre UID. Le pseudo trouvé sur votre profil remplace l’actuel ; s’il diffère de celui que vous tapez, Katana vérifie.</p><label class="lab" for="d-cpt">Compte</label><select id="d-cpt">' + cpts.map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="d-pseudo">Nouveau pseudo exact (avec le tag de clan)</label><input id="d-pseudo" type="text"><div id="d-err" class="err" role="alert"></div><div id="d-ok"></div>',
+  modal('Déclarer un nouveau pseudo', '<div data-brouillon="pseudo"><p class="mute small">Le site lit votre pseudo officiel à partir de votre UID. Le pseudo trouvé sur votre profil remplace l’actuel ; s’il diffère de celui que vous tapez, Katana vérifie.</p><label class="lab" for="d-cpt">Compte</label><select id="d-cpt">' + cpts.map(x => '<option value="' + x.id + '">' + esc(x.pseudo) + ' · UID ' + esc(x.uid) + '</option>').join('') + '</select><label class="lab" for="d-pseudo">Nouveau pseudo exact (avec le tag de clan)</label><input id="d-pseudo" type="text"><div id="d-err" class="err" role="alert"></div><div id="d-ok"></div></div>',
     [{ label: 'Fermer', cls: 'ghost' }, { label: 'Déclarer', onClick: async b => {
       const err = $('#d-err'), ok = $('#d-ok'), pseudo = $('#d-pseudo').value.trim();
       err.textContent = ''; ok.innerHTML = '';
@@ -2113,6 +2201,7 @@ function moiPseudo() {
       ok.innerHTML = '<p class="mute small">Vérification auprès de volsever… (quelques secondes)</p>';
       const { data, error } = await SB.functions.invoke('pseudo-volsever', { body: { compte_id: Number(v('d-cpt')), pseudo } });
       if (error || !data || !data.issue) { ok.innerHTML = ''; err.textContent = await erreurFonction(data, error, 'Déclaration impossible pour le moment. Réessayez plus tard.'); return false; }
+      oublierBrouillon('pseudo');
       ok.innerHTML = note(esc(data.message) + (data.pseudo_retenu ? ' Pseudo retenu : <b>' + esc(data.pseudo_retenu) + '</b>.' : ''), data.issue === 'conforme' || data.issue === 'modifie' ? '' : 'a');
       b.hidden = true; chargerMonDossier(); majPastilleCompte();
       return false;
@@ -3005,13 +3094,13 @@ async function afficherMesSanctions() {
     + (s.statut === 'active' && !s.conteste_le && new Date(s.recours_jusqu) > new Date() ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-contester" data-id="' + s.id + '">Contester (jusqu’au ' + dateLoc(s.recours_jusqu) + ')</button></div>' : '') + '</div>').join('');
 }
 function contesterUI(id) {
-  modal('Contester la décision', '<p class="mute small">Expliquez à Katana pourquoi vous contestez. Une seule contestation est possible, avant la fin du délai. La décision reste appliquée en attendant sa réponse.</p><label class="lab" for="ct-txt">Votre explication</label><textarea id="ct-txt" rows="4"></textarea><div id="ct-err" class="err" role="alert"></div>',
+  modal('Contester la décision', '<div data-brouillon="contester-' + id + '"><p class="mute small">Expliquez à Katana pourquoi vous contestez. Une seule contestation est possible, avant la fin du délai. La décision reste appliquée en attendant sa réponse.</p><label class="lab" for="ct-txt">Votre explication</label><textarea id="ct-txt" rows="4"></textarea><div id="ct-err" class="err" role="alert"></div></div>',
     [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer', onClick: async () => {
       const err = $('#ct-err'); err.textContent = '';
       if (!v('ct-txt')) { err.textContent = 'Écrivez votre explication.'; return false; }
       const { error } = await SB.rpc('contester_sanction', { p_sanction: Number(id), p_texte: v('ct-txt') });
       if (error) { err.textContent = erreurRpc(error); return false; }
-      toast('Contestation envoyée à Katana.'); afficherMesSanctions(); return true;
+      oublierBrouillon('contester-' + id); toast('Contestation envoyée à Katana.'); afficherMesSanctions(); return true;
     } }]);
 }
 ACTIONS['moi-contester'] = b => contesterUI(b.dataset.id);
@@ -3183,11 +3272,11 @@ async function afficherMesConvocations() {
       return '<div class="card-l"><div class="t"><div><b>Dossier n° ' + d.id + '</b> · match M-' + d.match_id + '<div class="small dim">' + esc(ROLES_LIT[c.role]) + ' · convoqué le ' + dateLoc(c.convoque_le) + '</div></div>' + badge(ouvert ? 'En cours' : 'Tranché', ouvert ? 'a' : 'o') + '</div>'
         + (c.confirme_le ? '<p class="small dim">Réception confirmée le ' + dateLoc(c.confirme_le) + '.</p>' : '<div class="row-btns"><button class="btn sm" type="button" data-act="moi-confirmer" data-id="' + d.id + '">Je confirme la réception' + (limC ? ' (avant le ' + dateLoc(limC) + ')' : '') + '</button></div>')
         + (msgs.length ? '<ul class="taches">' + msgs.map(x => '<li><span><b>' + esc(auteurMsg(x, DOS.m.id)) + '</b> : ' + esc(x.texte) + '</span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message.</p>')
-        + (ouvert ? '<label class="lab" for="mc-' + d.id + '">Votre message à Katana</label><textarea id="mc-' + d.id + '" rows="2"></textarea><div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-ecrire-lit" data-id="' + d.id + '">Envoyer</button></div>' : '<p class="mute small">Discussion fermée.</p>') + '</div>';
+        + (ouvert ? '<div data-brouillon="litige-' + d.id + '"><label class="lab" for="mc-' + d.id + '">Votre message à Katana</label><textarea id="mc-' + d.id + '" rows="2"></textarea><div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-ecrire-lit" data-id="' + d.id + '">Envoyer</button></div></div>' : '<p class="mute small">Discussion fermée.</p>') + '</div>';
     }).join('');
 }
 ACTIONS['moi-confirmer'] = async b => { const { error } = await SB.rpc('confirmer_convocation', { p_dossier: Number(b.dataset.id) }); if (error) { toast(erreurRpc(error), true); return; } toast('Réception confirmée.'); afficherMesConvocations(); };
-ACTIONS['moi-ecrire-lit'] = async b => { const t = v('mc-' + b.dataset.id); if (!t) return; const { error } = await SB.rpc('ecrire_litige', { p_dossier: Number(b.dataset.id), p_texte: t }); if (error) { toast(erreurRpc(error), true); return; } toast('Message envoyé.'); afficherMesConvocations(); };
+ACTIONS['moi-ecrire-lit'] = async b => { const t = v('mc-' + b.dataset.id); if (!t) return; const { error } = await SB.rpc('ecrire_litige', { p_dossier: Number(b.dataset.id), p_texte: t }); if (error) { toast(erreurRpc(error), true); return; } oublierBrouillon('litige-' + b.dataset.id); toast('Message envoyé.'); afficherMesConvocations(); };
 
 /* ----- Titres et lots (jamais publiés tant que sponsors et moyens ne sont pas confirmés) ----- */
 let LOTS = [], LOTA = null;
@@ -3375,8 +3464,8 @@ async function afficherMesMessages() {
   const recl = PUBS.filter(p => Date.now() - new Date(p.publie_le_iso || 0).getTime() < lim);
   const pubs = {}; PUBS.forEach(p => { pubs[p.id] = p; });
   z.innerHTML = '<h3 style="margin-top:12px">Messages avec Katana</h3>' + ((data || []).length ? '<ul class="taches">' + data.map(x => '<li><span><b>' + (x.de_katana ? 'Katana' : 'Vous') + '</b>' + (x.publication_id ? ' ' + badge('Réclamation · ' + (pubs[x.publication_id] ? libPub(pubs[x.publication_id]) : 'classement'), 'a') : '') + ' : <span style="white-space:pre-line">' + esc(x.texte) + '</span></span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message. Écrivez à Katana pour toute question, précision ou contestation.</p>')
-    + (recl.length ? '<label class="lab" for="mm-pub">Concerne</label><select id="mm-pub"><option value="">Message simple</option>' + recl.map(p => '<option value="' + p.id + '">Réclamation : ' + esc(libPub(p)) + '</option>').join('') + '</select>' : '')
-    + '<label class="lab" for="mm-txt">Votre message à Katana</label><textarea id="mm-txt" rows="3"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="mm-envoyer">Envoyer</button></div>';
+    + '<div data-brouillon="message-katana">' + (recl.length ? '<label class="lab" for="mm-pub">Concerne</label><select id="mm-pub"><option value="">Message simple</option>' + recl.map(p => '<option value="' + p.id + '">Réclamation : ' + esc(libPub(p)) + '</option>').join('') + '</select>' : '')
+    + '<label class="lab" for="mm-txt">Votre message à Katana</label><textarea id="mm-txt" rows="3"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="mm-envoyer">Envoyer</button></div></div>';
   if ((data || []).some(x => x.de_katana && !x.lu_le)) { await SB.rpc('marquer_messages_lus', {}); majPastilleCompte(); }
 }
 ACTIONS['mm-envoyer'] = async () => {
@@ -3384,7 +3473,7 @@ ACTIONS['mm-envoyer'] = async () => {
   const pub = v('mm-pub');
   const { error } = await SB.rpc('ecrire_a_katana', { p_texte: t, p_publication: pub ? Number(pub) : null });
   if (error) { toast(erreurRpc(error), true); return; }
-  toast(pub ? 'Réclamation envoyée à Katana.' : 'Message envoyé à Katana.'); afficherMesMessages();
+  oublierBrouillon('message-katana'); toast(pub ? 'Réclamation envoyée à Katana.' : 'Message envoyé à Katana.'); afficherMesMessages();
 };
 
 /* ----- Lot 3B : matchs libres (créneaux, captures des responsables, concordance) ----- */
@@ -3529,7 +3618,7 @@ async function afficherMesMatchsLibres() {
     return b + '</div>';
   }).join('') : '<p class="mute small">Aucun match libre annoncé pour l’instant.</p>';
   if (ouverts && actif) {
-    h += '<details class="card-l"><summary><b>Déclarer un match libre</b></summary><p class="small mute">Au moins ' + PARAM.delai_declaration_h + ' h avant l’heure de début. Les deux responsables doivent être membres ; vous pouvez en être un, et une même personne peut l’être des deux factions. Un créneau = un match.</p>'
+    h += '<details class="card-l" data-brouillon="match-libre"><summary><b>Déclarer un match libre</b></summary><p class="small mute">Au moins ' + PARAM.delai_declaration_h + ' h avant l’heure de début. Les deux responsables doivent être membres ; vous pouvez en être un, et une même personne peut l’être des deux factions. Un créneau = un match.</p>'
       + '<label class="lab" for="ml-debut">Date et heure de début (heure de Madagascar)</label><input type="datetime-local" id="ml-debut">'
       + '<label class="lab" for="ml-h">Responsable HAAVK : numéro de matricule (DFMM-…)</label><input type="number" id="ml-h" min="1" inputmode="numeric" value="' + (DOS.m.matricule || '') + '"><div class="err small" id="ml-h-err"></div>'
       + '<label class="lab" for="ml-g">Responsable GTI : numéro de matricule (DFMM-…)</label><input type="number" id="ml-g" min="1" inputmode="numeric"><div class="err small" id="ml-g-err"></div><div class="err small" id="ml-o-err"></div>'
@@ -3550,9 +3639,9 @@ ACTIONS['ml-declarer'] = async () => {
     if (ch.indexOf('resp_haavk') >= 0) $('#ml-h-err').textContent = NEUTRE;
     if (ch.indexOf('resp_gti') >= 0) $('#ml-g-err').textContent = NEUTRE;
     if (ch.indexOf('organisateur') >= 0) $('#ml-o-err').textContent = 'Votre demande ne peut pas être enregistrée pour l’instant. Elle est transmise à Katana, qui vous répondra.';
-    toast('Demande transmise à Katana.', true); return;
+    oublierBrouillon('match-libre'); toast('Demande transmise à Katana.', true); return;
   }
-  toast('Match libre enregistré. Les responsables sont avertis.'); afficherMesMatchsLibres();
+  oublierBrouillon('match-libre'); toast('Match libre enregistré. Les responsables sont avertis.'); afficherMesMatchsLibres();
 };
 ACTIONS['ml-annuler'] = async b => {
   if (!confirm('Annuler ce match libre ? Les responsables seront avertis.')) return;
