@@ -281,6 +281,22 @@ var L = (function () {
     return { bloquants: B, attente: A, alertes: W, criteres: C, total: total, h: h, g: g, membres: membres, requis: requis };
   }
 
+  // Lecture d'une capture par claude.ai : compare l'effectif annoncé ({HAAVK, GTI}, numéros des tableaux) aux lignes
+  // de l'éditeur, et signale les lignes sans pseudo. Ne change aucune règle : aide à repérer une ligne oubliée.
+  function verifierLecture(r, lignes) {
+    var P = [], eff = r && r.effectif, nb = { HAAVK: 0, GTI: 0 }, sansP = [], partis = 0;
+    (lignes || []).forEach(function (l, i) { if (nb[l.faction] !== undefined) nb[l.faction]++; if (!String(l.pseudo || '').trim()) sansP.push(i + 1); });
+    ((r && r.lignes) || []).forEach(function (x) { if (x && x.parti === true) partis++; });
+    if (eff && typeof eff === 'object') {
+      ['HAAVK', 'GTI'].forEach(function (f) {
+        var e = Number(eff[f]);
+        if (eff[f] !== null && eff[f] !== undefined && isFinite(e) && e !== nb[f]) P.push('La capture compte ' + e + ' joueur(s) ' + f + ', mais ' + nb[f] + ' ligne(s) ' + f + ' ont été lues : ' + (e > nb[f] ? 'ajoutez la ou les lignes oubliées' : 'retirez la ou les lignes en trop') + ' (« Ajouter une ligne »), en recopiant la capture.');
+      });
+    }
+    if (sansP.length) P.push('Pseudo à recopier depuis la capture, ligne(s) ' + sansP.join(', ') + '.');
+    return { problemes: P, effectif: eff || null, lu: nb, partis: partis };
+  }
+
   // Motif proposé à partir des contrôles : les critères non remplis (bloquants puis attente), une phrase par ligne.
   function motifDepuisControles(c) {
     var l = (c.bloquants || []).concat(c.attente || []);
@@ -571,7 +587,7 @@ var L = (function () {
     addDays: addDays, addMinutes: addMinutes, diffMinutes: diffMinutes, dow: dow,
     inPeriods: inPeriods, suspendedAt: suspendedAt, statutAffiche: statutAffiche,
     normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte, membresRequis: membresRequis,
-    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, motifDepuisControles: motifDepuisControles, comparerLectures: comparerLectures, alertesPerformance: alertesPerformance,
+    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, motifDepuisControles: motifDepuisControles, verifierLecture: verifierLecture, comparerLectures: comparerLectures, alertesPerformance: alertesPerformance,
     matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,
     agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots, classementDepuisPublication: classementDepuisPublication,
     coupurePour: coupurePour, coupureFinale: coupureFinale, finVerificationFinale: finVerificationFinale, publicationFinale: publicationFinale,
