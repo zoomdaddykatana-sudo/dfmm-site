@@ -4,6 +4,8 @@
 // (clé dans le secret VOLSEVER_API_KEY, jamais dans le code), puis enregistre le résultat.
 // Limites d'appels réglables ; sans réponse utilisable, la déclaration reste en attente
 // et Katana la valide à la main.
+// Deuxième usage (Katana seulement) : { reverifier_inscription: <n° de candidature> } relit chez volsever
+// l'UID d'une candidature en attente (bouton « Revérifier » dans Administration > Inscriptions).
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 
 // DEBUT-AIDES (JavaScript simple, testé automatiquement par tests/volsever.test.js)
@@ -33,6 +35,36 @@ const entetes = {
 };
 const reponse = (corps: unknown, statut = 200) => new Response(JSON.stringify(corps), { status: statut, headers: entetes });
 
+// Appel à volsever (ou pas, si la limite est atteinte ou la clé absente), noté dans « volsever_appels ».
+// Limites : 24 heures glissantes et dernière minute ; les refus pour limite ne comptent pas.
+// deno-lint-ignore no-explicit-any
+async function appelerVolsever(sb: any, uid: string, compteId: number) {
+  const { data: ps } = await sb.from('parametres').select('cle, valeur').in('cle', ['volsever_max_jour', 'volsever_max_minute', 'volsever_delai_s']);
+  const P: Record<string, number> = {};
+  (ps ?? []).forEach((p: { cle: string; valeur: unknown }) => { P[p.cle] = Number(p.valeur); });
+  const depuis = (ms: number) => new Date(Date.now() - ms).toISOString();
+  const compter = async (ms: number) => (await sb.from('volsever_appels').select('id', { count: 'exact', head: true })
+    .neq('resultat', 'quota').gte('cree_le', depuis(ms))).count ?? 0;
+  const [nbJour, nbMinute] = await Promise.all([compter(86400000), compter(60000)]);
+  let r: { resultat: string; pseudo: string | null; http: number | null };
+  const cle = Deno.env.get('VOLSEVER_API_KEY') ?? '';
+  if (limiteAtteinte(nbJour, nbMinute, P.volsever_max_jour, P.volsever_max_minute)) r = { resultat: 'quota', pseudo: null, http: null };
+  else if (!cle) r = { resultat: 'erreur', pseudo: null, http: null };
+  else {
+    const ctrl = new AbortController();
+    const minuteur = setTimeout(() => ctrl.abort(), (Number.isFinite(P.volsever_delai_s) ? P.volsever_delai_s : 15) * 1000);
+    try {
+      const rep = await fetch(ADRESSE_VOLSEVER + encodeURIComponent(uid), { headers: { 'X-API-KEY': cle, Accept: 'application/json' }, signal: ctrl.signal });
+      const corps = await rep.json().catch(() => null);
+      r = { ...interpreterVolsever(rep.status, corps), http: rep.status };
+    } catch (e) {
+      r = { resultat: e instanceof DOMException && e.name === 'AbortError' ? 'delai' : 'erreur', pseudo: null, http: null };
+    } finally { clearTimeout(minuteur); }
+  }
+  await sb.from('volsever_appels').insert({ compte_id: compteId, resultat: r.resultat, pseudo_trouve: r.pseudo, http: r.http });
+  return r;
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: entetes });
   if (req.method !== 'POST') return reponse({ erreur: 'Méthode non autorisée.' }, 405);
@@ -45,11 +77,27 @@ Deno.serve(async (req) => {
     const appelant = createClient(url, clePublique, { global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } } });
     const { data: qui } = await appelant.auth.getUser();
     if (!qui?.user) return reponse({ erreur: 'Connectez-vous d’abord.' }, 401);
-    const { compte_id, pseudo } = await req.json().catch(() => ({}));
+    const corpsDemande = await req.json().catch(() => ({}));
+    const { compte_id, pseudo, reverifier_inscription } = corpsDemande;
+    const sb = createClient(url, cleServeur, { auth: { persistSession: false } });
+
+    // 1 bis. Revérification d'une candidature par Katana
+    if (reverifier_inscription != null) {
+      const { data: adm } = await sb.from('admins').select('user_id').eq('user_id', qui.user.id).maybeSingle();
+      if (!adm) return reponse({ erreur: 'Accès réservé à l’administrateur.' }, 403);
+      const { data: cand } = await sb.from('membres').select('id, statut, comptes_jeu(id, uid)').eq('id', Number(reverifier_inscription)).maybeSingle();
+      if (!cand || ['en_attente', 'precisions'].indexOf(cand.statut) < 0) return reponse({ erreur: 'Candidature introuvable ou déjà traitée.' }, 400);
+      const cpt = (cand.comptes_jeu ?? []).sort((a: { id: number }, b: { id: number }) => a.id - b.id)[0];
+      if (!cpt) return reponse({ erreur: 'Aucun compte de jeu dans cette candidature.' }, 400);
+      const rv = await appelerVolsever(sb, cpt.uid, cpt.id);
+      const { data: verif, error: ev } = await sb.rpc('noter_reverification', { p_admin: qui.user.id, p_membre: cand.id, p_resultat: rv.resultat, p_trouve: rv.pseudo });
+      if (ev) return reponse({ erreur: ev.message }, 400);
+      return reponse({ verification: verif });
+    }
+
     const tape = String(pseudo ?? '').trim();
     if (!tape) return reponse({ erreur: 'Le nouveau pseudo est obligatoire.' }, 400);
 
-    const sb = createClient(url, cleServeur, { auth: { persistSession: false } });
     const { data: m } = await sb.from('membres').select('id, statut').eq('user_id', qui.user.id).maybeSingle();
     if (!m || m.statut !== 'actif') return reponse({ erreur: 'Cette démarche est réservée aux membres actifs.' }, 403);
     const { data: c } = await sb.from('comptes_jeu').select('id, uid, statut').eq('id', Number(compte_id)).eq('membre_id', m.id).maybeSingle();
@@ -58,32 +106,8 @@ Deno.serve(async (req) => {
       .in('statut', ['en_attente', 'precisions']).filter('details->>compte_id', 'eq', String(c.id)).limit(1);
     if (enCours && enCours.length) return reponse({ erreur: 'Une déclaration de pseudo est déjà en attente pour ce compte.' }, 409);
 
-    // 2. Limites d'appels (24 heures glissantes et dernière minute ; les refus pour limite ne comptent pas)
-    const { data: ps } = await sb.from('parametres').select('cle, valeur').in('cle', ['volsever_max_jour', 'volsever_max_minute', 'volsever_delai_s']);
-    const P: Record<string, number> = {};
-    (ps ?? []).forEach((p: { cle: string; valeur: unknown }) => { P[p.cle] = Number(p.valeur); });
-    const depuis = (ms: number) => new Date(Date.now() - ms).toISOString();
-    const compter = async (ms: number) => (await sb.from('volsever_appels').select('id', { count: 'exact', head: true })
-      .neq('resultat', 'quota').gte('cree_le', depuis(ms))).count ?? 0;
-    const [nbJour, nbMinute] = await Promise.all([compter(86400000), compter(60000)]);
-
-    // 3. Appel à volsever (ou pas, si la limite est atteinte ou la clé absente)
-    let r: { resultat: string; pseudo: string | null; http: number | null };
-    const cle = Deno.env.get('VOLSEVER_API_KEY') ?? '';
-    if (limiteAtteinte(nbJour, nbMinute, P.volsever_max_jour, P.volsever_max_minute)) r = { resultat: 'quota', pseudo: null, http: null };
-    else if (!cle) r = { resultat: 'erreur', pseudo: null, http: null };
-    else {
-      const ctrl = new AbortController();
-      const minuteur = setTimeout(() => ctrl.abort(), (Number.isFinite(P.volsever_delai_s) ? P.volsever_delai_s : 15) * 1000);
-      try {
-        const rep = await fetch(ADRESSE_VOLSEVER + encodeURIComponent(c.uid), { headers: { 'X-API-KEY': cle, Accept: 'application/json' }, signal: ctrl.signal });
-        const corps = await rep.json().catch(() => null);
-        r = { ...interpreterVolsever(rep.status, corps), http: rep.status };
-      } catch (e) {
-        r = { resultat: e instanceof DOMException && e.name === 'AbortError' ? 'delai' : 'erreur', pseudo: null, http: null };
-      } finally { clearTimeout(minuteur); }
-    }
-    await sb.from('volsever_appels').insert({ compte_id: c.id, resultat: r.resultat, pseudo_trouve: r.pseudo, http: r.http });
+    // 2 et 3. Limites d'appels, puis appel à volsever
+    const r = await appelerVolsever(sb, c.uid, c.id);
 
     // 4. Enregistrement (le pseudo trouvé remplace toujours l'actuel ; écart = vérification par Katana)
     const { data: issue, error } = await sb.rpc('enregistrer_declaration_pseudo',
