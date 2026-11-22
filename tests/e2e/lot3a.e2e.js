@@ -43,6 +43,17 @@ srv.listen(8765, async () => {
   try {
     await p.goto('http://localhost:8765/#admin-saison'); await p.waitForTimeout(800);
     await etape('onglets Matchs et Saison visibles', async () => { const t = await p.textContent('#adm-tabs'); if (!/Matchs/.test(t) || !/Saison/.test(t)) throw new Error(t); });
+    await etape('ancien prototype retiré : Tableau de bord, Décisions, Participer', async () => {
+      const t = await p.textContent('#adm-tabs'); if (/Tableau de bord|Décisions/.test(t)) throw new Error(t);
+      if (await p.$('#adm-decisions, [data-view="participer"], #dem-form')) throw new Error('élément de l’ancien prototype encore présent');
+      for (const h of ['#admin-bord', '#admin-decisions']) {
+        await p.goto('http://localhost:8765/' + h); await p.waitForTimeout(300);
+        const on = await p.textContent('#adm-tabs a.on'); if (!/Paramètres|Saison/.test(on)) throw new Error(h + ' → ' + on);
+      }
+      await p.goto('http://localhost:8765/#participer'); await p.waitForTimeout(300);
+      if (!(await p.isVisible('[data-view="inscription"]'))) throw new Error('#participer ne mène pas à Inscription');
+      await p.goto('http://localhost:8765/#admin-saison'); await p.waitForTimeout(500);
+    });
     await etape('créer la saison Aurora', async () => {
       await p.click('[data-act="sa-nouvelle"]'); await p.fill('#s-nom', 'Aurora'); await p.fill('#s-debut', '2026-11-10'); await p.fill('#s-fin', '2027-01-21');
       await p.click('#modal-f button:has-text("Enregistrer")'); await p.waitForTimeout(400);
