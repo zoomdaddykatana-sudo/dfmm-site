@@ -38,7 +38,7 @@ srv.listen(8765, async () => {
   const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
   await p.clock.setFixedTime(new Date('2026-11-22T07:00:00Z'));   // dimanche 22/11/2026, 10 h à Madagascar
   const erreurs = []; p.on('pageerror', e => erreurs.push('page : ' + e.message)); p.on('console', m => { if (m.type() === 'error') erreurs.push('console : ' + m.text()); });
-  p.on('dialog', d => d.accept());
+  p.on('dialog', d => d.accept(d.type() === 'prompt' ? (global.REPONSE_PROMPT || '') : undefined));
   const etape = async (nom, fn) => { try { await fn(); console.log('OK  ' + nom); } catch (e) { console.log('ÉCHEC ' + nom + ' : ' + e.message.split('\n')[0]); await p.screenshot({ path: path.join(ICI, 'echec.png'), fullPage: true }); throw e; } };
   try {
     await p.goto('http://localhost:8765/#admin-saison'); await p.waitForTimeout(800);
@@ -231,6 +231,50 @@ srv.listen(8765, async () => {
       if (!/motif/i.test(await p.textContent('#ed-err'))) throw new Error('pas de message');
       await p.fill('#e-motif', 'Essai'); await p.click('#modal-f button:has-text("Repasser en brouillon")'); await p.waitForTimeout(600);
       if (!/Brouillon/.test(await p.textContent('#modal-t'))) throw new Error(await p.textContent('#modal-t'));
+    });
+    await etape('matchs libres : créneaux, demande retenue acceptée', async () => {
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(300);
+      await p.evaluate(() => {
+        const DB = window.FAUSSE_BASE, s = DB.saisons[0].id;
+        DB.creneaux = [
+          { id: 700, saison_id: s, organisateur_id: 1, resp_haavk_id: 1, resp_gti_id: 2, debut: '2026-11-21T12:00:00Z', statut: 'annonce', vu_le: null },
+          { id: 701, saison_id: s, organisateur_id: 4, resp_haavk_id: 4, resp_gti_id: 3, debut: '2026-11-23T12:00:00Z', statut: 'retenu', retenu_motif: 'Matricule non autorisé : responsable GTI DFMM-3', vu_le: null }];
+        DB.matchs.push({ id: 710, saison_id: s, type: 'libre', demarrage: false, statut: 'brouillon', creneau_id: 700, fin: null, cree_le: '2026-11-20T10:00:00Z' });
+        DB.captures.push({ id: 720, match_id: 710, chemin: '710/m1-1.jpg', envoyee_le: '2026-11-21T12:50:00Z', statut: 'recue', envoyeur_id: 1, partie: 'unique' },
+                         { id: 721, match_id: 710, chemin: '710/m2-1.jpg', envoyee_le: '2026-11-21T13:20:00Z', statut: 'recue', envoyeur_id: 2, partie: 'unique' });
+      });
+      await p.goto('http://localhost:8765/#admin-creneaux'); await p.waitForTimeout(900);
+      const t = await p.textContent('#cr-liste');
+      if (!/L-700/.test(t) || !/En attente de Katana/.test(t) || !/responsable GTI DFMM-3/.test(t)) throw new Error(t.slice(0, 300));
+      if ((await p.evaluate(() => window.FAUSSE_BASE.creneaux[0].vu_le)) === null) throw new Error('alerte non marquée vue');
+      await p.click('[data-act="cr-decider"][data-d="accepter"]'); await p.waitForTimeout(700);
+      if ((await p.evaluate(() => window.FAUSSE_BASE.creneaux[1].statut)) !== 'annonce') throw new Error('non acceptée');
+    });
+    await etape('match libre : capture en retard signalée, retard accepté', async () => {
+      await p.click('#cr-liste .card-l:has-text("L-700") [data-act="m-ouvrir"]'); await p.waitForTimeout(800);
+      if (!/Match libre M-710/.test(await p.textContent('#modal-t')) || !/Match libre L-700/.test(await p.textContent('#modal-b'))) throw new Error(await p.textContent('#modal-t'));
+      await p.fill('#e-fin', '2026-11-21T15:45'); await p.dispatchEvent('#e-fin', 'change'); await p.waitForTimeout(500);
+      const t = await p.textContent('#ed-thumbs');
+      if (!/DFMM-2 Faux 2 \(responsable GTI\)/.test(t) || !/35 min après la fin/.test(t) || !/sera rejetée à la validation/.test(t)) throw new Error(t);
+      global.REPONSE_PROMPT = 'Coupure réseau, vidéo reçue';
+      await p.click('[data-act="ed-retard"]'); await p.waitForTimeout(600); global.REPONSE_PROMPT = '';
+      if (!/retard accepté : Coupure réseau/.test(await p.textContent('#ed-thumbs'))) throw new Error('retard non accepté');
+    });
+    await etape('match libre : lectures différentes → attente proposée ; identiques → une seule gardée', async () => {
+      const lec = (carte, elim) => JSON.stringify({ carte, mode: 'Conquête', fin: '2026-11-21T15:45', vainqueur: 'HAAVK', lisible: true, lignes: [
+        { faction: 'HAAVK', pseudo: 'PKL¬Un', score: 1000, elim, morts: 2, assist: 1, med: 0, ing: 0, obj: 3, tac: 1 },
+        { faction: 'GTI', pseudo: 'Joueur2', score: 900, elim: 4, morts: 3, assist: 0, med: 0, ing: 0, obj: 2, tac: 0 }] });
+      await p.fill('#lec-1', lec('Faille', 5)); await p.fill('#lec-2', lec('Faille', 6));
+      await p.click('[data-act="ed-comparer"]'); await p.waitForTimeout(600);
+      let t = await p.textContent('#ed-conc');
+      if (!/Captures différentes/.test(t) || !/PKL¬Un : Élim\. 5 \/ 6/.test(t)) throw new Error(t.slice(0, 300));
+      await p.fill('#lec-2', lec('Faille', 5)); await p.click('[data-act="ed-comparer"]'); await p.waitForTimeout(600);
+      t = await p.textContent('#ed-conc'); if (!/Captures concordantes/.test(t)) throw new Error(t.slice(0, 300));
+      await p.click('[data-act="ed-garder"]'); await p.waitForTimeout(800);
+      const st = await p.evaluate(() => window.FAUSSE_BASE.captures.filter(c => c.match_id === 710).map(c => c.statut).join(','));
+      if (st !== 'recue,ecartee') throw new Error(st);
+      if ((await p.$$('#ed-table tbody tr')).length !== 2) throw new Error('lignes : ' + (await p.$$('#ed-table tbody tr')).length);
+      if (!(await p.evaluate(() => window.FAUSSE_BASE.captures.find(c => c.id === 720).lecture))) throw new Error('lecture non gardée');
     });
     await p.screenshot({ path: path.join(ICI, 'editeur.png'), fullPage: false });
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);

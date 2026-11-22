@@ -1290,7 +1290,7 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'creneaux', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
 const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
@@ -1298,7 +1298,7 @@ function compteurTab(k) {
   if (k === 'sauvegarde') return ADM.sauvegardeEnRetard ? 1 : 0;
   if (k === 'acces') return ADM.vsAlerte ? 1 : 0;
   if (k === 'demandes') return ADM.nbDem || 0;
-  if (k === 'creneaux') return S.creneaux.filter(c => c.statut === 'En attente').length;
+  if (k === 'creneaux') return ADM.nbCreneaux || 0;
   if (k === 'matchs') return ADM.nbMatchs || 0;
   if (k === 'sanctions') return ADM.nbContest || 0;
   if (k === 'litiges') return ADM.nbDossiers || 0;
@@ -2081,7 +2081,7 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c, vs, mt, ct, li, ms] = await Promise.all([
+  const [a, b, c, vs, mt, ct, li, ms, cn] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
     SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
@@ -2089,8 +2089,10 @@ async function chargerCompteursAdmin() {
     SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente']),
     SB.from('sanctions').select('id', { count: 'exact', head: true }).not('conteste_le', 'is', null).is('decision_recours', null).eq('statut', 'active'),
     SB.from('dossiers').select('id', { count: 'exact', head: true }).eq('statut', 'ouvert'),
-    SB.from('messages').select('id', { count: 'exact', head: true }).eq('de_katana', false).is('lu_le', null)
+    SB.from('messages').select('id', { count: 'exact', head: true }).eq('de_katana', false).is('lu_le', null),
+    SB.from('creneaux').select('id', { count: 'exact', head: true }).is('vu_le', null)
   ]);
+  ADM.nbCreneaux = (cn && cn.count) || 0;
   ADM.nbMessages = (ms && ms.count) || 0;
   ADM.nbDossiers = (li && li.count) || 0;
   ADM.nbMatchs = mt.count || 0;
@@ -2208,10 +2210,10 @@ async function chargerMonDossier() {
   if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
   h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
-  h += '<div id="mes-messages"></div><div id="mes-sanctions"></div><div id="mes-convocations"></div>';
+  h += '<div id="mes-matchs-libres"></div><div id="mes-messages"></div><div id="mes-sanctions"></div><div id="mes-convocations"></div>';
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
   z.innerHTML = h;
-  afficherMesSanctions(); afficherMesConvocations(); afficherMesMessages();
+  afficherMesSanctions(); afficherMesConvocations(); afficherMesMessages(); afficherMesMatchsLibres();
 }
 function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
 function moiCompte2() {
@@ -2488,7 +2490,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages', 'creneaux'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -2530,7 +2532,7 @@ let SA = [], CX = null, MA = [];
 const ST_MATCH = { brouillon: 'Brouillon', valide: 'Validé', attente: 'En attente', refuse: 'Refusé', annule: 'Annulé' };
 const RES_DB = { auto: 'auto', manuel: 'manuel', a_identifier: 'à identifier', non_inscrit: 'non inscrit', non_inscrit_confirme: 'non inscrit confirmé' };
 const RES_JS = { 'auto': 'auto', 'manuel': 'manuel', 'à identifier': 'a_identifier', 'non inscrit': 'non_inscrit', 'non inscrit confirmé': 'non_inscrit_confirme', '': 'non_inscrit' };
-const TYPES_REG = { match_declare: 'Match enregistré', capture_recue: 'Capture reçue', capture_acceptee: 'Capture acceptée', capture_refusee: 'Capture refusée', match_en_attente: 'Match en attente', litige_ouvert: 'Litige ouvert', decision: 'Décision', sanction: 'Sanction' };
+const TYPES_REG = { match_declare: 'Match enregistré', capture_recue: 'Capture reçue', capture_acceptee: 'Capture acceptée', capture_refusee: 'Capture refusée', capture_annulee: 'Capture annulée par l’envoyeur', capture_ecartee: 'Capture écartée', match_en_attente: 'Match en attente', litige_ouvert: 'Litige ouvert', decision: 'Décision', sanction: 'Sanction' };
 const STATUTS_SA = { preparation: 'En préparation', en_cours: 'En cours', cloture: 'Clôturée (vérification)', terminee: 'Terminée' };
 const locISO = s => L.validDT(s) ? s + ':00+03:00' : null;          // heure de Madagascar → instant
 const isoLoc = iso => iso ? L.versLocal(iso) : '';                  // instant → heure de Madagascar
@@ -2599,11 +2601,12 @@ ACTIONS['sa-activer'] = b => activerSaisonSB(b.dataset.id);
 
 /* Contexte des règles : membres, comptes et matchs de la saison, en heure de Madagascar */
 async function chargerContexte(saisonId) {
-  const [a, b, c, sx] = await Promise.all([
+  const [a, b, c, sx, cr] = await Promise.all([
     SB.from('membres').select('id, matricule, nom_gamer, statut, periodes(debut, fin)').not('matricule', 'is', null),
     SB.from('comptes_jeu').select('id, membre_id, uid, pseudo, statut, comptes_periodes(debut, fin), pseudos_historique(pseudo, debut, fin)'),
-    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, statut, motif, notes, valide_le, attente_decide_le, match_lignes(*), captures(id, envoyee_le, statut)').eq('saison_id', saisonId) : Promise.resolve({ data: [] }),
-    SB.from('sanctions').select('membre_id, type, debut, fin, statut, match_id').in('type', ['suspension', 'retrait_statistiques'])
+    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, statut, motif, notes, valide_le, attente_decide_le, creneau_id, match_lignes(*), captures(id, envoyee_le, statut, exception)').eq('saison_id', saisonId) : Promise.resolve({ data: [] }),
+    SB.from('sanctions').select('membre_id, type, debut, fin, statut, match_id').in('type', ['suspension', 'retrait_statistiques']),
+    saisonId ? SB.from('creneaux').select('id, debut, statut').eq('saison_id', saisonId) : Promise.resolve({ data: [] })
   ]);
   const err = a.error || b.error || c.error; if (err) throw new Error(err.message);
   const per = l => (l || []).map(p => ({ debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' }));
@@ -2614,6 +2617,8 @@ async function chargerContexte(saisonId) {
   // Sanctions (lot 4A) : suspensions (matchs de la période non comptés) et statistiques retirées dans un match.
   const sanc = (sx && !sx.error && sx.data) || [];
   sanc.filter(x => x.type === 'suspension' && CX.parId[x.membre_id]).forEach(x => { CX.membres[CX.parId[x.membre_id]].suspensions.push({ debut: isoLoc(x.debut), fin: isoLoc(x.fin), annulee: x.statut === 'levee' }); });
+  // Créneaux des matchs libres (lot 3B) : plage de l'heure de fin et un seul match par créneau.
+  ((cr && !cr.error && cr.data) || []).forEach(x => { const d = isoLoc(x.debut); CX.creneaux[x.id] = { id: x.id, date: d.slice(0, 10), debut: d.slice(11, 16), statut: ST_CR[x.statut] || x.statut }; });
   CX.matchsList = (c.data || []).map(matchJS);
   const retraits = sanc.filter(x => x.type === 'retrait_statistiques' && x.statut === 'active');
   CX.matchsList.forEach(m => m.lignes.forEach(l => { if (retraits.some(x => x.match_id === m.dbid && CX.parId[x.membre_id] === l.mat)) l.exclue_sanction = true; }));
@@ -2624,11 +2629,18 @@ function ligneJS(l) {
   L.STATS.forEach(s => { o[s.k] = l[s.k] == null ? '' : Number(l[s.k]); });
   return o;
 }
+// Heure d'envoi contrôlée : la première capture valable sans retard accepté ; si toutes ont un retard accepté
+// par Katana (échec technique prouvé), le délai ne bloque plus.
+const capValable = x => x.statut !== 'refusee' && x.statut !== 'ecartee' && x.statut !== 'annulee';
+function envoiDepuis(caps) {
+  const ok = (caps || []).filter(capValable), sans = ok.filter(x => !x.exception).map(x => x.envoyee_le).sort();
+  return { envoi: sans.length ? isoLoc(sans[0]) : '', delai_exception: !!ok.length && !sans.length };
+}
 function matchJS(m) {
-  const caps = (m.captures || []).filter(x => x.statut !== 'refusee' && x.statut !== 'ecartee').map(x => x.envoyee_le).sort();
-  return { id: 'M-' + m.id, dbid: m.id, saison_id: m.saison_id, type: m.type === 'libre' ? 'Libre' : 'Katana', demarrage: !!m.demarrage, carte: m.carte || '', mode: m.mode || '', notes: m.notes || '',
-    fin: isoLoc(m.fin), envoi: caps.length ? isoLoc(caps[0]) : '', statut: ST_MATCH[m.statut] || m.statut, statut_db: m.statut, motif: m.motif || '', valide_le: isoLoc(m.valide_le), attente_decide_le: isoLoc(m.attente_decide_le),
-    captures: (m.captures || []).filter(x => x.statut !== 'refusee' && x.statut !== 'ecartee').map(x => x.id),
+  const e = envoiDepuis(m.captures);
+  return { id: 'M-' + m.id, dbid: m.id, saison_id: m.saison_id, type: m.type === 'libre' ? 'Libre' : 'Katana', creneau_id: m.creneau_id || null, demarrage: !!m.demarrage, carte: m.carte || '', mode: m.mode || '', notes: m.notes || '',
+    fin: isoLoc(m.fin), envoi: e.envoi, delai_exception: e.delai_exception, statut: ST_MATCH[m.statut] || m.statut, statut_db: m.statut, motif: m.motif || '', valide_le: isoLoc(m.valide_le), attente_decide_le: isoLoc(m.attente_decide_le),
+    captures: (m.captures || []).filter(capValable).map(x => x.id),
     lignes: (m.match_lignes || []).slice().sort((x, y) => x.rang - y.rang).map(ligneJS) };
 }
 
@@ -2653,14 +2665,14 @@ async function afficherMatchs() {
   z.innerHTML = '<p class="mute small">' + MA.length + ' match(s) · ' + MA.filter(m => m.statut === 'Validé').length + ' validé(s)</p><div class="scroll"><table><thead><tr><th>Match</th><th>Fin</th><th>Carte</th><th class="r">HAAVK–GTI</th><th class="r">Membres</th><th>Statut</th><th>Contrôles</th><th></th></tr></thead><tbody>' + MA.map(m => {
     const c = R ? L.controlesMatch(m, CX, s, R) : { bloquants: [], alertes: [], h: 0, g: 0, membres: 0, total: 0 };
     const aid = m.lignes.filter(l => l.res === 'à identifier').length;
-    return '<tr><td class="nowrap"><b>' + esc(m.id) + '</b>' + (m.demarrage ? '<div class="dim small">démarrage</div>' : '') + '</td><td class="nowrap">' + fDT(m.fin) + '</td><td>' + esc(m.carte || '—') + '</td><td class="num">' + c.h + '–' + c.g + '</td><td class="num">' + c.membres + '/' + c.total + '</td><td>' + badgeStatut(m.statut) + '</td>'
+    return '<tr><td class="nowrap"><b>' + esc(m.id) + '</b>' + (m.demarrage ? '<div class="dim small">démarrage</div>' : '') + (m.type === 'Libre' ? '<div class="dim small">libre' + (m.creneau_id ? ' · L-' + m.creneau_id : '') + '</div>' : '') + '</td><td class="nowrap">' + fDT(m.fin) + '</td><td>' + esc(m.carte || '—') + '</td><td class="num">' + c.h + '–' + c.g + '</td><td class="num">' + c.membres + '/' + c.total + '</td><td>' + badgeStatut(m.statut) + '</td>'
       + '<td class="small">' + (m.statut === 'Brouillon' || m.statut === 'En attente' ? (c.bloquants.length ? '<span class="err">' + c.bloquants.length + ' bloquant(s)</span>' : '<span class="res auto">prêt</span>') : '') + (aid ? ' <span class="res aid">' + aid + ' à identifier</span>' : '') + '</td>'
       + '<td><button class="btn sm ghost" type="button" data-act="m-ouvrir" data-id="' + m.dbid + '">Ouvrir</button></td></tr>';
   }).join('') + '</tbody></table></div>';
 }
 
 /* Éditeur d'un match */
-const PROMPT_CLAUDE = 'Tu lis une ou plusieurs captures d’écran du tableau de fin de match de Delta Force Mobile, avec les factions HAAVK et GTI.\nExtrais :\n- "carte" : le nom de la carte affiché dans l’en-tête, ou null ;\n- "mode" : le mode affiché, ou null ;\n- "fin" : la date et l’heure de fin affichées, au format AAAA-MM-JJTHH:MM, ou null si elles ne sont pas visibles ;\n- "lignes" : un objet par joueur visible, avec "faction" ("HAAVK" ou "GTI", selon le côté du tableau où il apparaît), "pseudo" (recopié exactement, caractère par caractère : majuscules, chiffres, symboles et tags de clan comme ¬ ou 么), puis les 8 colonnes chiffrées dans l’ordre de gauche à droite : "score", "elim" (éliminations), "morts", "assist" (assistances), "med" (contribution médicale), "ing" (contribution ingénieur), "obj" (contribution aux objectifs), "tac" (contribution tactique).\nRègles : n’invente rien ; si une valeur est illisible, mets null. Ignore les médailles et les badges. Si deux captures montrent le même joueur (haut et bas du tableau), ne le répète pas.\nRéponds uniquement avec un objet JSON de la forme {"carte":…,"mode":…,"fin":…,"lignes":[…]}, sans aucun texte autour.';
+const PROMPT_CLAUDE = 'Tu lis une ou plusieurs captures d’écran du tableau de fin de match de Delta Force Mobile, avec les factions HAAVK et GTI.\nExtrais :\n- "carte" : le nom de la carte affiché dans l’en-tête, ou null ;\n- "mode" : le mode affiché, ou null ;\n- "fin" : la date et l’heure de fin affichées, au format AAAA-MM-JJTHH:MM, ou null si elles ne sont pas visibles ;\n- "vainqueur" : "HAAVK" ou "GTI" selon la faction indiquée gagnante (victoire), ou null si ce n’est pas visible ;\n- "lisible" : false si une partie de la capture est floue, coupée ou illisible, sinon true ;\n- "lignes" : un objet par joueur visible, avec "faction" ("HAAVK" ou "GTI", selon le côté du tableau où il apparaît), "pseudo" (recopié exactement, caractère par caractère : majuscules, chiffres, symboles et tags de clan comme ¬ ou 么), puis les 8 colonnes chiffrées dans l’ordre de gauche à droite : "score", "elim" (éliminations), "morts", "assist" (assistances), "med" (contribution médicale), "ing" (contribution ingénieur), "obj" (contribution aux objectifs), "tac" (contribution tactique).\nRègles : n’invente rien ; si une valeur est illisible, mets null. Ignore les médailles et les badges. Si deux captures montrent le même joueur (haut et bas du tableau), ne le répète pas.\nRéponds uniquement avec un objet JSON de la forme {"carte":…,"mode":…,"fin":…,"vainqueur":…,"lisible":…,"lignes":[…]}, sans aucun texte autour.';
 function resoudreLigne(l) {
   if (!CX || l.res === 'manuel' || l.res === 'non inscrit confirmé') return;
   const r = L.resoudre(l, CX.comptesList, L.validDT(ED && ED.fin) ? ED.fin : now());
@@ -2697,7 +2709,7 @@ function docMatchSB() {
     lignes: ED.lignes.map(l => { const o = { faction: l.faction || '', pseudo: String(l.pseudo || '').trim(), compte_id: l.cpt ? Number(l.cpt) : null, resolution: RES_JS[l.res] || 'non_inscrit' }; L.STATS.forEach(s => { o[s.k] = l[s.k] === '' || l[s.k] == null ? null : Number(l[s.k]); }); return o; }) };
 }
 function matchCourant() {
-  return Object.assign({}, ED, { id: ED.dbid ? 'M-' + ED.dbid : '(nouveau)', type: 'Katana', demarrage: ED.demarrage, envoi: ED.envoi, captures: ED.caps.filter(c => c.statut !== 'refusee' && c.statut !== 'ecartee').map(c => c.id) });
+  return Object.assign({}, ED, envoiDepuis(ED.caps), { id: ED.dbid ? 'M-' + ED.dbid : '(nouveau)', type: ED.type || 'Katana', creneau_id: ED.creneau_id || null, demarrage: ED.demarrage, captures: ED.caps.filter(capValable).map(c => c.id) });
 }
 function majControles() {
   const box = $('#ed-ctrl'); if (!box || !ED) return;
@@ -2725,7 +2737,7 @@ function surSaisieEditeur(e) {
     ED.modifie = true; majControles(); return;
   }
   const id = el.id;
-  if (id === 'e-fin') { ED.fin = L.normDT(el.value); ED.lignes.forEach((l, i) => { resoudreLigne(l); const td = $('#res-' + i); if (td) td.innerHTML = resCell(l, false); }); }
+  if (id === 'e-fin') { ED.fin = L.normDT(el.value); ED.lignes.forEach((l, i) => { resoudreLigne(l); const td = $('#res-' + i); if (td) td.innerHTML = resCell(l, false); }); if (ED.type === 'Libre') afficherCaptures(); }
   else if (id === 'e-saison') ED.saison_id = el.value;
   else if (id === 'e-carte') ED.carte = el.value;
   else if (id === 'e-mode') ED.mode = el.value;
@@ -2746,10 +2758,11 @@ async function ouvrirMatch(id) {
       ]);
       if (a.error) throw new Error(a.error.message);
       m = a.data; reg = b.data || [];
+      if (m.creneau_id) { const r = await SB.from('creneaux').select('*').eq('id', m.creneau_id).single(); if (!r.error) m.cr = r.data; }
     }
     await chargerContexte(m ? m.saison_id : s.id);
     const j = m ? matchJS(m) : null;
-    ED = j ? Object.assign(j, { caps: (m.captures || []).sort((x, y) => String(x.envoyee_le).localeCompare(String(y.envoyee_le))), reg })
+    ED = j ? Object.assign(j, { caps: (m.captures || []).filter(x => x.statut !== 'annulee').sort((x, y) => String(x.envoyee_le).localeCompare(String(y.envoyee_le))), reg, cr: m.cr || null })
            : { dbid: null, saison_id: s.id, carte: '', mode: '', fin: '', notes: '', statut: 'Brouillon', motif: '', demarrage: PARAM.phase_demarrage === true, envoi: '', caps: [], reg: [], lignes: [] };
     ED.lock = !(ED.statut === 'Brouillon' || ED.statut === 'En attente');
     if (!ED.lock) ED.lignes.forEach(resoudreLigne);
@@ -2767,13 +2780,16 @@ function rendreEditeur() {
     if (ED.dbid) btns.push({ label: 'Refuser', cls: 'danger', onClick: () => deciderMatchSB('refuser') });
     btns.push({ label: 'Valider le match', id: 'ed-valider', onClick: () => deciderMatchSB('valider') });
   }
-  modal((ED.dbid ? 'Match M-' + ED.dbid : 'Nouveau match de Katana') + ' · ' + ED.statut, editeurHtmlSB(), btns, { large: true, mode: 'editeur' });
+  modal((ED.dbid ? (ED.type === 'Libre' ? 'Match libre M-' : 'Match M-') + ED.dbid : 'Nouveau match de Katana') + ' · ' + ED.statut, editeurHtmlSB(), btns, { large: true, mode: 'editeur' });
   majControles(); afficherCaptures();
 }
 function editeurHtmlSB() {
   const d = ED.lock ? ' disabled' : '';
   let h = (ED.statut !== 'Brouillon' ? note('Match ' + ED.statut.toLowerCase() + (ED.valide_le ? ' le ' + fDT(ED.valide_le) : '') + (ED.motif ? '. Motif : ' + esc(ED.motif) : '') + (ED.lock ? '. Pour le modifier, repassez-le en brouillon.' : '.'), ED.statut === 'Validé' ? '' : 'a') : '');
   if (ED.demarrage) h += note('<b>Saisie de démarrage</b> : votre seule capture suffit, sans délai de 10 minutes. Les autres règles s’appliquent.');
+  if (ED.cr) { const n = id => { const mat = CX.parId[id]; return mat ? mat + ' ' + esc(CX.membres[mat].nom_gamer) : '—'; };
+    h += note('<b>Match libre L-' + ED.cr.id + '</b> · début annoncé le ' + dateLoc(ED.cr.debut) + ' · organisateur ' + n(ED.cr.organisateur_id) + ' · HAAVK ' + n(ED.cr.resp_haavk_id) + ' · GTI ' + n(ED.cr.resp_gti_id)
+      + '. L’heure de fin doit tomber dans l’heure qui suit le début annoncé ; chaque capture envoyée plus de ' + PARAM.delai_capture_min + ' min après l’heure de fin est rejetée seule à la validation.' + (ED.cr.statut === 'annule' ? ' <b>Créneau annulé.</b>' : '')); }
   h += '<div class="grid-f"><div><label class="lab" for="e-saison">Saison</label><select id="e-saison"' + d + '>' + optSaisonsSB(ED.saison_id) + '</select></div>'
     + '<div><label class="lab" for="e-carte">Carte</label><select id="e-carte"' + d + '><option value="">Choisir…</option>' + L.CARTES.concat(ED.carte && L.CARTES.indexOf(ED.carte) < 0 ? [ED.carte] : []).concat(['Autre']).map(c => '<option' + (c === ED.carte ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>'
     + '<div><label class="lab" for="e-mode">Mode</label><input type="text" id="e-mode" value="' + esc(ED.mode) + '"' + d + '></div>'
@@ -2783,7 +2799,8 @@ function editeurHtmlSB() {
     + (ED.lock ? '' : '<input type="file" id="e-files" accept="image/*" multiple><div class="row-btns"><button class="btn sm" type="button" data-act="ed-envoyer">Envoyer la ou les captures</button></div><p class="dim small" id="ed-info">Au-delà de 8 joueurs par faction, envoyez les deux captures (haut puis bas). L’heure d’envoi est notée par le serveur.</p>');
   if (!ED.lock) h += '<h3 style="margin-top:16px">2. Lecture par claude.ai</h3><ol class="small"><li>Copiez le texte de consigne.</li><li>Dans claude.ai, nouvelle conversation : joignez la ou les captures, collez la consigne, envoyez.</li><li>Copiez toute la réponse de claude.ai et collez-la ci-dessous.</li></ol>'
     + '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-consigne">Copier la consigne pour claude.ai</button></div><textarea id="e-consigne" rows="5" readonly hidden></textarea>'
-    + '<label class="lab" for="e-coller">Réponse de claude.ai (ou lignes : faction, pseudo, puis 8 nombres)</label><textarea id="e-coller" rows="5" placeholder="{&quot;carte&quot;: …, &quot;lignes&quot;: […]}"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="ed-coller">Lire la réponse</button></div>';
+    + '<label class="lab" for="e-coller">Réponse de claude.ai (ou lignes : faction, pseudo, puis 8 nombres)</label><textarea id="e-coller" rows="5" placeholder="{&quot;carte&quot;: …, &quot;lignes&quot;: […]}"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="ed-coller">Lire la réponse</button></div>'
+    + htmlLecturesLibre();
   h += '<h3 style="margin-top:16px">' + (ED.lock ? 'Participants' : '3. Vérifier chaque ligne avec la capture') + '</h3><div class="scroll"><table class="lignes-t" id="ed-table">' + tableLignes(ED.lock) + '</table></div>';
   if (!ED.lock) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-ajout-ligne">Ajouter une ligne</button><button class="btn sm ghost" type="button" data-act="ed-vider">Effacer toutes les lignes</button></div>';
   h += '<div class="ctrl-box" id="ed-ctrl" aria-live="polite"></div>';
@@ -2794,8 +2811,15 @@ function editeurHtmlSB() {
 async function afficherCaptures() {
   const z = $('#ed-thumbs'); if (!z || !ED) return;
   if (!ED.caps.length) { z.innerHTML = '<p class="mute small">Aucune capture pour l’instant.</p>'; return; }
-  const ST_C = { recue: 'reçue', retenue: 'retenue', refusee: 'refusée', ecartee: 'écartée' };
-  z.innerHTML = ED.caps.map(c => '<figure style="margin:0"><a hidden target="_blank" rel="noopener" id="capl-' + c.id + '"><img id="capi-' + c.id + '" alt="Capture du match" style="width:220px;height:auto;max-height:none"></a><figcaption class="small dim">' + esc(ST_C[c.statut] || c.statut) + ' · envoyée le ' + dateLoc(c.envoyee_le) + '</figcaption></figure>').join('');
+  const ST_C = { recue: 'reçue', retenue: 'retenue', refusee: 'refusée', ecartee: 'écartée', annulee: 'annulée' };
+  const lim = Number(PARAM.delai_capture_min);
+  z.innerHTML = ED.caps.map(c => {
+    const d = ED.type === 'Libre' && !ED.demarrage ? minutesApres(ED.fin, c.envoyee_le) : null, retard = d !== null && d > lim && !c.exception && c.statut === 'recue';
+    return '<figure style="margin:0"><a hidden target="_blank" rel="noopener" id="capl-' + c.id + '"><img id="capi-' + c.id + '" alt="Capture du match" style="width:220px;height:auto;max-height:none"></a><figcaption class="small dim">'
+      + (ED.type === 'Libre' ? esc(nomEnvoyeur(c)) + ' · ' + esc(PARTIES[c.partie] || '') + '<br>' : '') + esc(ST_C[c.statut] || c.statut) + (c.motif ? ' (' + esc(c.motif) + ')' : '') + ' · envoyée le ' + dateLoc(c.envoyee_le)
+      + (d !== null ? ' · ' + d + ' min après la fin' : '') + (c.exception ? '<br>retard accepté : ' + esc(c.exception) : '')
+      + (retard ? '<br><span class="err">en retard : sera rejetée à la validation</span>' + (ED.lock ? '' : '<br><button class="btn sm ghost" type="button" data-act="ed-retard" data-id="' + c.id + '">Accepter le retard (échec technique prouvé)</button>') : '') + '</figcaption></figure>';
+  }).join('');
   for (const c of ED.caps) {
     const { data } = await SB.storage.from('captures').createSignedUrl(c.chemin, 600);
     const a = $('#capl-' + c.id), i = $('#capi-' + c.id);
@@ -2830,8 +2854,7 @@ async function envoyerCaptures() {
     } catch (e) { info.textContent = 'Envoi impossible : ' + e.message; break; }
   }
   if (n) {
-    const premiers = ED.caps.filter(c => c.statut !== 'refusee' && c.statut !== 'ecartee').map(c => c.envoyee_le).sort();
-    ED.envoi = premiers.length ? isoLoc(premiers[0]) : '';
+    Object.assign(ED, envoiDepuis(ED.caps));
     info.textContent = n + ' capture(s) envoyée(s). Faites-les lire par claude.ai (étape 2).';
     $('#e-files').value = '';
     afficherCaptures(); majControles();
@@ -2841,10 +2864,22 @@ function lireReponseClaude() {
   const t = v('e-coller'); if (!t) { toast('Collez d’abord la réponse de claude.ai.', true); return; }
   let r = null;
   try { r = JSON.parse(extraireJSON(t)); } catch (e) { r = null; }
-  const val = x => (x === null || x === undefined || x === '' || isNaN(Number(x))) ? '' : Number(x);
   let n = 0, ign = [];
-  if (r && Array.isArray(r.lignes)) {
-    r.lignes.forEach(x => {
+  if (r && Array.isArray(r.lignes)) n = remplirDepuisLecture(r, true);
+  else {
+    const p = L.parseLignes(t, '');
+    p.lignes.forEach(l => { ED.lignes.push(l); n++; }); ign = p.erreurs;
+  }
+  ED.lignes.forEach(resoudreLigne);
+  ED.modifie = true; redessinerLignes(); $('#e-coller').value = '';
+  toast(n + ' ligne(s) ajoutée(s)' + (ign.length ? ', ' + ign.length + ' ignorée(s) : ' + ign[0] : '. Vérifiez chaque valeur avec la capture.'), !!ign.length || !n);
+}
+// Remplir l'éditeur avec une lecture de claude.ai (objet JSON) ; renvoie le nombre de lignes ajoutées.
+function remplirDepuisLecture(r, sansRedessin) {
+  const val = x => (x === null || x === undefined || x === '' || isNaN(Number(x))) ? '' : Number(x);
+  let n = 0;
+  {
+    (r.lignes || []).forEach(x => {
       const l = { faction: /gti/i.test(x.faction) ? 'GTI' : /haavk/i.test(x.faction) ? 'HAAVK' : '', pseudo: String(x.pseudo || '').trim() };
       if (!l.pseudo) return;
       L.STATS.forEach(s => { l[s.k] = val(x[s.k]); });
@@ -2855,13 +2890,9 @@ function lireReponseClaude() {
     if (!ED.fin && L.validDT(fin)) { ED.fin = fin; $('#e-fin').value = fin; }
     if (!ED.carte && r.carte) { const c = L.CARTES.find(x => L.normPseudo(x) === L.normPseudo(r.carte)); ED.carte = c || String(r.carte); $('#e-carte').innerHTML = $('#e-carte').innerHTML + (c ? '' : '<option>' + esc(r.carte) + '</option>'); $('#e-carte').value = ED.carte; }
     if (!ED.mode && r.mode) { ED.mode = String(r.mode); $('#e-mode').value = ED.mode; }
-  } else {
-    const p = L.parseLignes(t, '');
-    p.lignes.forEach(l => { ED.lignes.push(l); n++; }); ign = p.erreurs;
   }
-  ED.lignes.forEach(resoudreLigne);
-  ED.modifie = true; redessinerLignes(); $('#e-coller').value = '';
-  toast(n + ' ligne(s) ajoutée(s)' + (ign.length ? ', ' + ign.length + ' ignorée(s) : ' + ign[0] : '. Vérifiez chaque valeur avec la capture.'), !!ign.length || !n);
+  if (!sansRedessin) { ED.lignes.forEach(resoudreLigne); ED.modifie = true; redessinerLignes(); }
+  return n;
 }
 async function deciderMatchSB(decision) {
   const err = $('#ed-err'); if (err) err.textContent = '';
@@ -3535,6 +3566,202 @@ ACTIONS['mm-envoyer'] = async () => {
   const { error } = await SB.rpc('ecrire_a_katana', { p_texte: t, p_publication: pub ? Number(pub) : null });
   if (error) { toast(erreurRpc(error), true); return; }
   toast(pub ? 'Réclamation envoyée à Katana.' : 'Message envoyé à Katana.'); afficherMesMessages();
+};
+
+/* ----- Lot 3B : matchs libres (créneaux, captures des responsables, concordance) ----- */
+const ST_CR = { annonce: 'Annoncé', retenu: 'En attente de Katana', refuse: 'Non retenu', annule: 'Annulé' };
+const PARTIES = { unique: 'capture complète', haut: 'haut du tableau', bas: 'bas du tableau' };
+function badgeCr(s) { return badge(ST_CR[s] || s, { annonce: 'g', retenu: 'a', refuse: 'r', annule: 'o' }[s] || 'o'); }
+function minutesApres(fin, iso) { return L.validDT(fin) && iso ? L.diffMinutes(fin, isoLoc(iso)) : null; }
+function nomEnvoyeur(c) {
+  if (!c.envoyeur_id) return 'Katana';
+  const mat = CX && CX.parId[c.envoyeur_id]; const r = [];
+  if (ED && ED.cr) { if (ED.cr.organisateur_id === c.envoyeur_id) r.push('organisateur'); if (ED.cr.resp_haavk_id === c.envoyeur_id) r.push('responsable HAAVK'); if (ED.cr.resp_gti_id === c.envoyeur_id) r.push('responsable GTI'); }
+  return (mat || 'membre') + (CX && mat && CX.membres[mat] ? ' ' + CX.membres[mat].nom_gamer : '') + (r.length ? ' (' + r.join(', ') + ')' : '');
+}
+// Envois groupés par envoyeur (1 ou 2 captures : haut et bas) ; une lecture de claude.ai par envoyeur.
+function groupesEnvois() {
+  const g = {};
+  ED.caps.filter(c => c.statut === 'recue' || c.statut === 'retenue').forEach(c => { const k = String(c.envoyeur_id || 'katana'); (g[k] = g[k] || { k, caps: [], nom: nomEnvoyeur(c) }).caps.push(c); });
+  return Object.values(g);
+}
+function htmlLecturesLibre() {
+  const gs = groupesEnvois();
+  if (gs.length < 2) return '';
+  return '<h3 style="margin-top:16px">2 bis. Plusieurs envois : une lecture par envoyeur</h3><p class="small mute">Faites lire par claude.ai les captures de chaque envoyeur séparément (même consigne), collez chaque réponse ici, puis comparez. Captures identiques : une seule est conservée ; captures différentes : le match passe en attente.</p>'
+    + gs.map(gr => { const l = gr.caps.find(c => c.lecture); return '<label class="lab" for="lec-' + gr.k + '">Lecture de claude.ai · ' + esc(gr.nom) + ' · ' + gr.caps.map(c => PARTIES[c.partie] || '').join(' + ') + '</label><textarea id="lec-' + gr.k + '" rows="3">' + (l ? esc(JSON.stringify(l.lecture)) : '') + '</textarea>'; }).join('')
+    + '<div class="row-btns"><button class="btn sm" type="button" data-act="ed-comparer">Comparer les lectures</button></div><div id="ed-conc" aria-live="polite"></div>';
+}
+async function comparerLecturesSB() {
+  const z = $('#ed-conc'), gs = groupesEnvois(), lectures = [];
+  for (const gr of gs) {
+    const t = v('lec-' + gr.k); if (!t) { z.innerHTML = note('Collez la lecture de ' + esc(gr.nom) + '.', 'r'); return; }
+    let r; try { r = JSON.parse(extraireJSON(t)); } catch (e) { z.innerHTML = note('Lecture de ' + esc(gr.nom) + ' illisible : collez toute la réponse de claude.ai.', 'r'); return; }
+    lectures.push({ nom: gr.nom, k: gr.k, caps: gr.caps, lecture: r });
+    const { error } = await SB.rpc('noter_lecture', { p_captures: gr.caps.map(c => c.id), p_lecture: r });
+    if (error) { z.innerHTML = note('Lecture non enregistrée : ' + esc(erreurRpc(error)), 'r'); return; }
+    gr.caps.forEach(c => { c.lecture = r; });
+  }
+  ED.lectures = lectures;
+  const c = L.comparerLectures(lectures);
+  let h = c.alertes.length ? chk({ W: c.alertes }) : '';
+  if (c.concordant) {
+    h += note('<b>Captures concordantes</b> : mêmes joueurs, mêmes statistiques, même carte, même vainqueur. Gardez la capture la plus lisible ; les autres sont écartées et supprimées.')
+      + '<label class="lab" for="ed-garder">Capture à garder</label><select id="ed-garder">' + lectures.map((x, i) => '<option value="' + i + '">' + esc(x.nom) + '</option>').join('') + '</select>'
+      + '<div class="row-btns"><button class="btn sm" type="button" data-act="ed-garder">Garder celle-ci, écarter les autres et remplir le tableau</button></div>';
+  } else {
+    h += note('<b>Captures différentes</b> : le match doit passer en attente (un dossier s’ouvre dans « Litiges »).', 'a') + chk({ B: c.ecarts.slice(0, 12) }) + (c.ecarts.length > 12 ? '<p class="small dim">… et ' + (c.ecarts.length - 12) + ' autre(s) écart(s).</p>' : '')
+      + '<div class="row-btns"><button class="btn sm" type="button" data-act="ed-attente-conc">Mettre en attente : captures différentes</button></div>';
+  }
+  z.innerHTML = h;
+}
+async function garderLectureSB() {
+  const x = ED.lectures && ED.lectures[Number(v('ed-garder'))]; if (!x) return;
+  const autres = ED.lectures.filter(y => y !== x).flatMap(y => y.caps.map(c => c.id));
+  if (!confirm('Écarter et supprimer ' + autres.length + ' capture(s) identique(s) ? Seule celle de ' + x.nom + ' est conservée.')) return;
+  const { data, error } = await SB.rpc('ecarter_captures', { p_match: ED.dbid, p_captures: autres, p_motif: 'Capture identique : une seule conservée' });
+  if (error) { toast(erreurRpc(error), true); return; }
+  if ((data || []).length) { const r = await SB.storage.from('captures').remove(data); if (r.error) toast('Captures écartées, mais fichiers non supprimés : ' + r.error.message, true); }
+  ED.caps.forEach(c => { if (autres.indexOf(c.id) >= 0) c.statut = 'ecartee'; });
+  ED.lignes = []; remplirDepuisLecture(x.lecture);
+  toast('Capture de ' + x.nom + ' conservée, tableau rempli. Vérifiez chaque ligne, puis validez.');
+  const z = $('#ed-conc'); if (z) z.innerHTML = ''; afficherCaptures();
+}
+async function accepterRetardSB(id) {
+  const motif = prompt('Retard accepté pour un échec technique prouvé. Écrivez la preuve reçue (obligatoire) :');
+  if (!motif || !motif.trim()) return;
+  const { error } = await SB.rpc('accepter_capture_retard', { p_capture: id, p_motif: motif.trim() });
+  if (error) { toast(erreurRpc(error), true); return; }
+  const c = ED.caps.find(x => x.id === id); if (c) { c.exception = motif.trim(); c.statut = 'recue'; }
+  Object.assign(ED, envoiDepuis(ED.caps)); toast('Retard accepté : la capture comptera.'); afficherCaptures(); majControles();
+}
+ACTIONS['ed-comparer'] = () => comparerLecturesSB();
+ACTIONS['ed-garder'] = () => garderLectureSB();
+ACTIONS['ed-attente-conc'] = () => { const c = L.comparerLectures(ED.lectures || []); const m = $('#e-motif'); if (m) m.value = 'Captures différentes : ' + c.ecarts.slice(0, 3).join(' '); deciderMatchSB('attente'); };
+ACTIONS['ed-retard'] = b => accepterRetardSB(Number(b.dataset.id));
+
+/* Administration : créneaux des matchs libres */
+TAB.creneaux = {
+  shell: () => '<div id="cr-etat"></div><div id="cr-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherCreneaux
+};
+async function afficherCreneaux() {
+  const z = $('#cr-liste'); if (!z) return;
+  $('#cr-etat').innerHTML = PARAM.matchs_libres_ouverts === true ? note('Matchs libres <b>ouverts</b> : les membres peuvent en déclarer (au moins ' + PARAM.delai_declaration_h + ' h avant).') : note('Matchs libres <b>fermés</b> (réglage « matchs_libres_ouverts » dans Paramètres) : les membres ne peuvent pas encore en déclarer.', 'a');
+  const { data, error } = await SB.from('creneaux').select('*, matchs(id, statut, captures(id, statut))').order('debut', { ascending: false }).limit(100);
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  await chargerContexte(null).catch(() => null);
+  const nom = id => { const mat = CX && CX.parId[id]; return mat ? mat + ' ' + esc(CX.membres[mat].nom_gamer) : '—'; };
+  const l = (data || []).slice().sort((a, b) => (a.statut === 'retenu' ? 0 : 1) - (b.statut === 'retenu' ? 0 : 1));
+  z.innerHTML = l.length ? l.map(c => {
+    const m = (c.matchs || [])[0], nCap = m ? (m.captures || []).filter(x => x.statut !== 'annulee').length : 0;
+    const passe = new Date(c.debut) < new Date(), finEnvoi = new Date(new Date(c.debut).getTime() + (Number(PARAM.plage_fin_h) * 60 + Number(PARAM.delai_capture_min)) * 60000);
+    return '<div class="card-l"><div class="t"><div><b>L-' + c.id + ' · ' + dateLoc(c.debut) + '</b>' + (c.vu_le ? '' : ' ' + badge('Nouveau', 'a'))
+      + '<div class="small dim">organisateur ' + nom(c.organisateur_id) + ' · HAAVK ' + nom(c.resp_haavk_id) + ' · GTI ' + nom(c.resp_gti_id) + '</div></div>' + badgeCr(c.statut) + '</div>'
+      + (c.statut === 'retenu' ? note('Demande retenue. ' + esc(c.retenu_motif || '') + '. Le joueur a reçu un message neutre. Acceptez-la (le match est enregistré) ou refusez-la.', 'a') : '')
+      + (c.motif ? '<p class="small">Motif : ' + esc(c.motif) + '</p>' : '')
+      + (m ? '<p class="small">Match M-' + m.id + ' · ' + esc(ST_MATCH[m.statut] || m.statut) + ' · ' + nCap + ' capture(s)' + (c.statut === 'annonce' && passe && new Date() > finEnvoi && !nCap ? ' · <span class="err">aucune capture reçue : à refuser</span>' : '') + '</p>' : '')
+      + '<div class="row-btns">' + (m ? '<button class="btn sm ghost" type="button" data-act="m-ouvrir" data-id="' + m.id + '">Ouvrir le match</button>' : '')
+      + (c.statut === 'retenu' ? '<button class="btn sm" type="button" data-act="cr-decider" data-d="accepter" data-id="' + c.id + '">Accepter</button><button class="btn sm danger" type="button" data-act="cr-decider" data-d="refuser" data-id="' + c.id + '">Refuser</button>' : '')
+      + ((c.statut === 'annonce' || c.statut === 'retenu') && !(m && m.statut === 'valide') ? '<button class="btn sm ghost" type="button" data-act="cr-annuler" data-id="' + c.id + '">Annuler</button>' : '') + '</div></div>';
+  }).join('') : note('Aucun match libre déclaré.');
+  if ((data || []).some(c => !c.vu_le && c.statut !== 'retenu')) { await SB.rpc('marquer_creneaux_vus', {}); chargerCompteursAdmin().then(redessinerOnglets); }
+}
+ACTIONS['cr-decider'] = async b => {
+  const d = b.dataset.d, motif = d === 'refuser' ? prompt('Motif du refus (facultatif, jamais montré au joueur) :') : '';
+  if (motif === null) return;
+  const { error } = await SB.rpc('decider_creneau', { p_creneau: Number(b.dataset.id), p_decision: d, p_motif: motif || null });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast(d === 'accepter' ? 'Demande acceptée : le match est enregistré et les responsables sont avertis.' : 'Demande refusée : le joueur a reçu un message neutre.');
+  await afficherCreneaux(); await chargerCompteursAdmin(); redessinerOnglets();
+};
+ACTIONS['cr-annuler'] = async b => {
+  const motif = prompt('Annuler ce match libre. Motif (facultatif, envoyé aux joueurs concernés) :');
+  if (motif === null) return;
+  const { error } = await SB.rpc('annuler_creneau', { p_creneau: Number(b.dataset.id), p_motif: motif || null });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Match libre annulé : l’organisateur et les responsables sont avertis.'); afficherCreneaux();
+};
+
+/* Mon compte : matchs libres */
+async function afficherMesMatchsLibres() {
+  const z = $('#mes-matchs-libres'); if (!z || !SB || !DOS || !DOS.m) return;
+  const { data, error } = await SB.rpc('liste_matchs_libres', {});
+  if (error) { z.innerHTML = ''; return; }
+  const ouverts = PARAM.matchs_libres_ouverts === true, actif = DOS.m.statut === 'actif';
+  let h = '<h3 style="margin-top:12px">Matchs libres</h3>';
+  if (!ouverts) h += note('Les matchs libres ouvriront au lancement de la ligue. En attendant, seuls les matchs de Katana comptent.');
+  const l = data || [];
+  h += l.length ? l.map(c => {
+    const moi = [c.moi_organisateur ? 'organisateur' : '', c.moi_haavk ? 'responsable HAAVK' : '', c.moi_gti ? 'responsable GTI' : ''].filter(Boolean);
+    const p = x => matTxt(x.matricule) + ' ' + esc(x.nom_gamer);
+    let b = '<div class="card-l"><div class="t"><div><b>' + dateLoc(c.debut) + '</b><div class="small dim">organisateur ' + p(c.organisateur) + ' · HAAVK ' + p(c.haavk) + ' · GTI ' + p(c.gti) + '</div>'
+      + (moi.length ? '<div class="small">Vous : ' + moi.join(', ') + '</div>' : '') + '</div>' + badgeCr(c.statut) + '</div>';
+    if (c.statut === 'retenu') b += '<p class="small">Votre demande est transmise à Katana, qui vous répondra.</p>';
+    if (c.peut_envoyer) {
+      b += note('Envoi des captures ouvert jusqu’au ' + dateLoc(c.fin_envoi) + '. Envoyez la capture de fin <b>au plus tard ' + PARAM.delai_capture_min + ' min après l’heure de fin affichée</b> : une capture en retard est rejetée. Au-delà de 8 joueurs par faction, envoyez le haut puis le bas du tableau.')
+        + '<label class="lab" for="ml-f-' + c.id + '">Capture de fin de match</label><input type="file" id="ml-f-' + c.id + '" accept="image/*">'
+        + '<label class="lab" for="ml-p-' + c.id + '">Partie</label><select id="ml-p-' + c.id + '"><option value="unique">Tableau complet</option><option value="haut">Haut du tableau</option><option value="bas">Bas du tableau</option></select>'
+        + '<div class="row-btns"><button class="btn sm" type="button" data-act="ml-envoyer" data-id="' + c.id + '" data-m="' + c.match_id + '">Envoyer la capture</button></div>';
+    }
+    if ((c.mes_captures || []).length) b += '<ul class="taches">' + c.mes_captures.map(x => '<li><span>Capture envoyée (' + esc(PARTIES[x.partie] || x.partie) + ') le ' + dateLoc(x.envoyee_le) + '</span>' + (c.peut_envoyer && x.statut === 'recue' ? '<button class="btn sm ghost" type="button" data-act="ml-annuler-cap" data-id="' + x.id + '">Annuler pour renvoyer</button>' : '') + '</li>').join('') + '</ul>';
+    if (c.moi_organisateur && (c.statut === 'annonce' || c.statut === 'retenu') && new Date(c.debut) > new Date()) b += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ml-annuler" data-id="' + c.id + '">Annuler ce match</button></div>';
+    return b + '</div>';
+  }).join('') : '<p class="mute small">Aucun match libre annoncé pour l’instant.</p>';
+  if (ouverts && actif) {
+    h += '<details class="card-l"><summary><b>Déclarer un match libre</b></summary><p class="small mute">Au moins ' + PARAM.delai_declaration_h + ' h avant l’heure de début. Les deux responsables doivent être membres ; vous pouvez en être un, et une même personne peut l’être des deux factions. Un créneau = un match.</p>'
+      + '<label class="lab" for="ml-debut">Date et heure de début (heure de Madagascar)</label><input type="datetime-local" id="ml-debut">'
+      + '<label class="lab" for="ml-h">Responsable HAAVK : numéro de matricule (DFMM-…)</label><input type="number" id="ml-h" min="1" inputmode="numeric" value="' + (DOS.m.matricule || '') + '"><div class="err small" id="ml-h-err"></div>'
+      + '<label class="lab" for="ml-g">Responsable GTI : numéro de matricule (DFMM-…)</label><input type="number" id="ml-g" min="1" inputmode="numeric"><div class="err small" id="ml-g-err"></div><div class="err small" id="ml-o-err"></div>'
+      + '<div class="row-btns"><button class="btn sm" type="button" data-act="ml-declarer">Déclarer le match</button></div></details>';
+  }
+  z.innerHTML = h;
+}
+const NEUTRE = 'Ce matricule ne peut pas être retenu pour l’instant. Votre demande est transmise à Katana, qui vous répondra.';
+ACTIONS['ml-declarer'] = async () => {
+  ['ml-h-err', 'ml-g-err', 'ml-o-err'].forEach(i => { $('#' + i).textContent = ''; });
+  const debut = L.normDT(v('ml-debut'));
+  if (!L.validDT(debut)) { toast('Indiquez la date et l’heure de début.', true); return; }
+  if (!v('ml-h') || !v('ml-g')) { toast('Indiquez les deux responsables.', true); return; }
+  const { data, error } = await SB.rpc('declarer_match_libre', { p: { debut: locISO(debut), resp_haavk: Number(v('ml-h')), resp_gti: Number(v('ml-g')) } });
+  if (error) { toast(erreurRpc(error), true); return; }
+  if (data.statut === 'retenu') {
+    const ch = data.champs || [];
+    if (ch.indexOf('resp_haavk') >= 0) $('#ml-h-err').textContent = NEUTRE;
+    if (ch.indexOf('resp_gti') >= 0) $('#ml-g-err').textContent = NEUTRE;
+    if (ch.indexOf('organisateur') >= 0) $('#ml-o-err').textContent = 'Votre demande ne peut pas être enregistrée pour l’instant. Elle est transmise à Katana, qui vous répondra.';
+    toast('Demande transmise à Katana.', true); return;
+  }
+  toast('Match libre enregistré. Les responsables sont avertis.'); afficherMesMatchsLibres();
+};
+ACTIONS['ml-annuler'] = async b => {
+  if (!confirm('Annuler ce match libre ? Les responsables seront avertis.')) return;
+  const { error } = await SB.rpc('annuler_creneau', { p_creneau: Number(b.dataset.id), p_motif: null });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Match libre annulé.'); afficherMesMatchsLibres();
+};
+ACTIONS['ml-envoyer'] = async b => {
+  const id = b.dataset.id, match = b.dataset.m, f = ($('#ml-f-' + id).files || [])[0];
+  if (!f) { toast('Choisissez d’abord la capture.', true); return; }
+  b.disabled = true; b.textContent = 'Envoi en cours…';
+  try {
+    const img = await reduireImage(f, 2000, 0.88);
+    const chemin = match + '/m' + DOS.m.id + '-' + Date.now() + '.jpg';
+    const up = await SB.storage.from('captures').upload(chemin, img, { contentType: 'image/jpeg' });
+    if (up.error) throw new Error(up.error.message);
+    const { error } = await SB.rpc('envoyer_capture', { p_chemin: chemin, p_partie: v('ml-p-' + id) });
+    if (error) { await SB.storage.from('captures').remove([chemin]); throw new Error(erreurRpc(error)); }
+    toast('Capture envoyée. L’heure d’envoi est notée par le serveur.');
+  } catch (e) { toast('Envoi impossible : ' + e.message, true); }
+  afficherMesMatchsLibres();
+};
+ACTIONS['ml-annuler-cap'] = async b => {
+  if (!confirm('Annuler cette capture pour en envoyer une autre ?')) return;
+  const { data, error } = await SB.rpc('annuler_ma_capture', { p_capture: Number(b.dataset.id) });
+  if (error) { toast(erreurRpc(error), true); return; }
+  if (data) await SB.storage.from('captures').remove([data]);
+  toast('Capture annulée : envoyez la bonne.'); afficherMesMatchsLibres();
 };
 
 async function demarrer() {

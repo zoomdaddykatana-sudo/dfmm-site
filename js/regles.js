@@ -223,7 +223,7 @@ var L = (function () {
     }
     if (!saison) B.push('Aucune saison choisie.');
     // Délai d'envoi : pour tous les matchs (Katana compris), sauf la saisie de démarrage.
-    if (!match.demarrage) {
+    if (!match.demarrage && !match.delai_exception) {
       if (!validDT(match.envoi)) B.push('Heure d’envoi de la capture manquante.');
       else if (validDT(match.fin)) {
         var d = diffMinutes(match.fin, match.envoi);
@@ -251,6 +251,34 @@ var L = (function () {
     alertesPerformance(match, ctx, R).forEach(function (a) { W.push(a); });
     if (!(match.captures && match.captures.length)) W.push('Aucune capture archivée pour ce match (preuve à conserver).');
     return { bloquants: B, attente: A, alertes: W, total: total, h: h, g: g, membres: membres, requis: requis };
+  }
+
+  // ---------- Concordance des captures d'un match libre (section 4) ----------
+  // lectures : [{nom, lecture: {carte, vainqueur, lisible, lignes:[{faction, pseudo, score…tac}]}}], une par envoyeur.
+  // Mêmes pseudos, mêmes statistiques par joueur, même carte, même vainqueur ; sinon le match passe en attente.
+  function comparerLectures(lectures) {
+    var ecarts = [], alertes = [];
+    var ls = (lectures || []).filter(function (x) { return x && x.lecture; });
+    ls.forEach(function (x) { if (x.lecture.lisible === false) alertes.push('Capture de ' + x.nom + ' jugée floue ou partiellement illisible par claude.ai : elle ne peut pas être acceptée.'); });
+    if (ls.length < 2) return { concordant: ecarts.length === 0, ecarts: ecarts, alertes: alertes, n: ls.length };
+    var ref = ls[0], cle = function (l) { return (l.faction || '') + '|' + normPseudo(l.pseudo); };
+    var idx = function (lec) { var o = {}; (lec.lignes || []).forEach(function (l) { o[cle(l)] = l; }); return o; };
+    var a = idx(ref.lecture);
+    ls.slice(1).forEach(function (x) {
+      var b = idx(x.lecture), qui = ref.nom + ' et ' + x.nom;
+      if (normPseudo(ref.lecture.carte || '') !== normPseudo(x.lecture.carte || '')) ecarts.push('Carte différente (' + qui + ') : ' + (ref.lecture.carte || '—') + ' / ' + (x.lecture.carte || '—') + '.');
+      var va = ref.lecture.vainqueur || '', vb = x.lecture.vainqueur || '';
+      if (va && vb && va !== vb) ecarts.push('Vainqueur différent (' + qui + ') : ' + va + ' / ' + vb + '.');
+      else if (!va || !vb) alertes.push('Vainqueur non lu sur une capture (' + qui + ') : à vérifier à l’œil.');
+      Object.keys(a).forEach(function (k) {
+        var la = a[k], lb = b[k];
+        if (!lb) { ecarts.push('Joueur ' + la.pseudo + ' (' + la.faction + ') absent de la capture de ' + x.nom + '.'); return; }
+        var d = STATS.filter(function (s) { return String(la[s.k]) !== String(lb[s.k]); }).map(function (s) { return s.court + ' ' + la[s.k] + ' / ' + lb[s.k]; });
+        if (d.length) ecarts.push('Joueur ' + la.pseudo + ' : ' + d.join(', ') + ' (' + qui + ').');
+      });
+      Object.keys(b).forEach(function (k) { if (!a[k]) ecarts.push('Joueur ' + b[k].pseudo + ' (' + b[k].faction + ') absent de la capture de ' + ref.nom + '.'); });
+    });
+    return { concordant: ecarts.length === 0, ecarts: ecarts, alertes: alertes, n: ls.length };
   }
 
   // Alerte d'anomalie de performance : jamais une preuve ni une sanction automatique. Seuils réglables.
@@ -509,7 +537,7 @@ var L = (function () {
     addDays: addDays, addMinutes: addMinutes, diffMinutes: diffMinutes, dow: dow,
     inPeriods: inPeriods, suspendedAt: suspendedAt, statutAffiche: statutAffiche,
     normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte, membresRequis: membresRequis,
-    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, alertesPerformance: alertesPerformance,
+    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, comparerLectures: comparerLectures, alertesPerformance: alertesPerformance,
     matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,
     agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots, classementDepuisPublication: classementDepuisPublication,
     coupurePour: coupurePour, coupureFinale: coupureFinale, finVerificationFinale: finVerificationFinale, publicationFinale: publicationFinale,
