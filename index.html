@@ -496,7 +496,10 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <p>Tous les matchs valides ont la même valeur pour les classements. Chaque match garde une étiquette « Katana » ou « libre ».</p>
           <h3>Matchs de Katana</h3>
           <ul>
-            <li>Matchs programmés par Katana, en général le mercredi et le samedi à 16 h (étiquette « Katana »). Sa seule capture suffit.<span class="chg">Mis à jour</span></li>
+            <li><b>Calendrier</b> : chaque mercredi et chaque samedi, début à <b>16 h 05</b> (salle ouverte vers 15 h 50). Étiquette « Katana ». Sa seule capture suffit.<span class="chg">Mis à jour</span></li>
+            <li><b>Cartes</b> : rotation fixe, en boucle, dans cet ordre : Craqué, Ascension, Ligne de tranchées, Accident de train, Canal d’Akh, Faille. La carte de chaque match est affichée dans « Prochains événements ».<span class="chg">Nouveau</span></li>
+            <li><b>Carte manquante</b> : si la carte manque chez des joueurs et que le jeu bloque le démarrage, le match est reporté au jour de match suivant. Il garde sa carte, et la rotation reprend après lui.<span class="chg">Nouveau</span></li>
+            <li><b>Date annulée</b> : Katana peut annuler une date. Elle ne prend pas de carte : la rotation continue au match suivant.<span class="chg">Nouveau</span></li>
             <li>Salon personnalisé du mode Victory Unite, rejoint par code. Chat écrit uniquement, sans micro.</li>
             <li>Les consignes de salon (escouades, capitaines…) sont un simple rappel. <b>Aucun nombre maximum de participants.</b> Aucune condition de grade.<span class="chg">Mis à jour</span></li>
           </ul>
@@ -505,9 +508,18 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Organisés par les joueurs, déclarés <b>au moins 2 h avant</b> : date et heure de début, responsables HAAVK et GTI, motif facultatif. Le match est enregistré automatiquement ; Katana est averti et peut l’annuler.<span class="chg">Mis à jour</span></li>
             <li><b>Fermés jusqu’au lancement</b> de la LEAGUE UV : d’ici là, seuls les matchs de Katana comptent (« saisie de démarrage »).</li>
             <li>Un seul match est comptabilisé par créneau déclaré.</li>
+            <li><b>Carte</b> : hors rotation, au libre choix de l’organisateur parmi toutes les cartes disponibles dans le mode.<span class="chg">Nouveau</span></li>
             <li>Un organisateur et un responsable par faction. Chaque responsable envoie sa capture par le site ; l’organisateur aussi s’il n’est pas responsable. Les captures doivent concorder, sinon le match est mis en attente.</li>
-            <li>La capture doit être envoyée au plus <b>10 minutes</b> après l’heure de fin affichée, selon l’heure d’envoi enregistrée par le site. L’heure de fin doit tomber entre l’heure annoncée et 1 h après.<span class="chg">Mis à jour</span></li>
+            <li>La capture doit être envoyée au plus <b>10 minutes</b> après l’heure de fin affichée, selon l’heure d’envoi enregistrée par le site.<span class="chg">Mis à jour</span></li>
             <li><b>Matricule non autorisé</b> : si un matricule déclaré comme organisateur ou responsable n’est pas autorisé pour la saison, la déclaration est retenue et Katana est averti. Le message affiché reste neutre.<span class="chg">Nouveau</span></li>
+          </ul>
+          <h3>Code et mot de passe de la salle</h3>
+          <ul>
+            <li>Saisis, et modifiables, par l’organisateur du match (Katana pour ses matchs, l’organisateur pour un match libre), vers la création de la salle, environ 15 minutes avant le début.<span class="chg">Nouveau</span></li>
+            <li>Visibles dans « Prochains événements » (rubrique réservée aux membres connectés), seulement par les <b>membres actifs non suspendus</b>.</li>
+            <li>Le site ne donne aucun moyen aux joueurs non inscrits d’obtenir le code. Chaque organisateur est responsable de l’endroit où il fait suivre le code.</li>
+            <li><b>Interdit</b> : partager le code ou le mot de passe hors du lieu prévu, c’est-à-dire ailleurs que sur le site ou à l’endroit choisi par l’organisateur pour faire suivre le code (par exemple dans la discussion mondiale du jeu). Voir la section 11.</li>
+            <li><b>« Je participe »</b> : pour le prochain match, chaque membre peut indiquer qu’il participe. Le nombre est visible par tous ; les noms, seulement par Katana et l’organisateur.</li>
           </ul>
           <h3>Phase de démarrage</h3>
           <p>Avant le lancement de la LEAGUE UV, seuls les matchs de Katana comptent. Ils sont saisis avec sa seule capture, sans délai de 10 minutes (« saisie de démarrage »). Les autres règles s’appliquent.<span class="chg">Nouveau</span></p>
@@ -518,11 +530,13 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <h3>Conditions de validité</h3>
           <ul>
             <li>Au moins <b>16 participants</b> (8 contre 8).<span class="chg">Mis à jour</span></li>
-            <li>Factions HAAVK et GTI équilibrées : même effectif ou un joueur d’écart au maximum, compté sur tous les participants de la capture (inscrits ou non). Au-delà, le match est invalidé automatiquement.</li>
+            <li>Factions HAAVK et GTI équilibrées : même effectif ou un joueur d’écart au maximum, compté sur tous les participants de la capture (inscrits ou non). Au-delà, le match est invalidé. <b>Jamais plus d’un joueur d’écart, sans exception.</b><span class="chg">Mis à jour</span></li>
             <li>Au moins <b>50 % de membres confirmés</b> parmi les participants, arrondi vers le bas (16 participants : 8 membres au minimum).<span class="chg">Mis à jour</span></li>
             <li>Les joueurs non inscrits ne bloquent pas le match, mais seuls les membres inscrits reçoivent des points.</li>
             <li>Un joueur ne participe qu’une seule fois au même match, y compris avec deux comptes.</li>
             <li>Le match doit se terminer pendant la saison, au plus tard à sa fin officielle dans le jeu.</li>
+            <li><b>Retard</b> : pour tous les matchs (de Katana et libres), l’heure de fin doit tomber entre l’heure de début annoncée et <b>1 h après</b>. Sinon, le match n’est pas validé.<span class="chg">Nouveau</span></li>
+            <li><b>Joueur parti pendant le match</b> (en gris en bas du tableau de la capture) : il est toujours compté dans l’effectif et dans l’écart des factions.<span class="chg">Nouveau</span></li>
           </ul>
           <h3>Preuves et validation</h3>
           <ul>
@@ -640,6 +654,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Organiser du farming d’éliminations, d’assistances ou de réanimations, ou s’entendre pour manipuler un match.</li>
             <li>Falsifier ou recadrer une capture de façon trompeuse, ou transmettre des captures contradictoires.</li>
             <li>Fournir une fausse identité, un pseudo ou un UID incorrect, ou contourner une sanction.</li>
+            <li>Partager le code ou le mot de passe d’une salle hors du lieu prévu.<span class="chg">Nouveau</span></li>
             <li>Avoir un comportement toxique envers les autres joueurs.</li>
           </ul>
           <h3>Tableau-guide des sanctions</h3>
@@ -657,9 +672,11 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
               <tr><td>Farming ou entente pour manipuler un match</td><td>Exclusion</td></tr>
               <tr><td>Récidive après une suspension</td><td>Exclusion</td></tr>
               <tr><td>Divulgation d’un litige : première fois / répétée / nuisant gravement à une personne</td><td>Avertissement / suspension de 14 jours au plus / exclusion</td></tr>
+              <tr><td>Partage du code ou du mot de passe d’une salle hors du lieu prévu : première fois / récidive</td><td>Avertissement / suspension, durée fixée par Katana (14 jours au plus)</td></tr>
               <tr><td>Compte inactif utilisé, ou écart de pseudo</td><td>Pas de sanction, simple notification</td></tr>
             </tbody>
           </table></div>
+          <p class="small">La règle sur le partage du code ou du mot de passe d’une salle s’applique à partir de sa publication sur le site.</p>
           <ul>
             <li><b>Suspension</b> : 14 jours au plus, avec une date de fin fixée par Katana. Elle porte sur tout le matricule. Le joueur reste membre, mais ses comptes sont inactifs et ses matchs de la période ne comptent pas.</li>
             <li><b>Exclusion</b> : définitive. Le matricule est conservé et n’est jamais réutilisé.</li>
@@ -695,6 +712,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Classement provisoire tous les 14 jours, le dimanche, avec coupure le samedi à 16 h selon l’heure d’envoi de la capture.</li>
             <li>Matchs en attente et litiges : dossier dans le site, convocations, décision sous 48 h, confidentialité.</li>
             <li>Sanctions : tableau-guide, recours de 48 h, aucune sanction publiée.</li>
+            <li>Matchs de Katana : calendrier automatique le mercredi et le samedi à 16 h 05, rotation fixe des 6 cartes, report si la carte manque, date annulable. Code et mot de passe de la salle réservés aux membres actifs non suspendus. Pour tous les matchs : heure de fin au plus 1 h après le début annoncé, joueurs partis comptés dans l’effectif, jamais plus d’un joueur d’écart.</li>
             <li>Phase de démarrage : seuls les matchs de Katana comptent avant le lancement.</li>
           </ul>
         </article>
@@ -719,12 +737,13 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           </ol>
         </div>
         <div class="flow">
-          <h3>Match de Katana</h3><p>En général le mercredi et le samedi à 16 h.</p>
+          <h3>Match de Katana</h3><p>Chaque mercredi et samedi, début à 16 h 05.</p>
           <ol class="rail">
-            <li><b>Salon personnalisé</b><span>Code communiqué, consignes de salon rappelées, sans nombre maximum.</span></li>
-            <li><b>Match</b><span>Victory Unite, chat écrit uniquement.</span></li>
+            <li><b>Calendrier</b><span>Date, heure et carte de la rotation dans « Prochains événements », avec « Je participe ».</span></li>
+            <li><b>Salle personnalisée</b><span>Créée vers 15 h 50. Code et mot de passe dans « Prochains événements », pour les membres actifs non suspendus. Consignes de salon rappelées, sans nombre maximum.</span></li>
+            <li><b>Match</b><span>Victory Unite, chat écrit uniquement. Carte manquante : match reporté au jour de match suivant, avec la même carte.</span></li>
             <li><b>Capture du résultat</b><span>Prise par l’organisation, deux captures au-delà de 8 joueurs par faction.</span></li>
-            <li><b>Saisie et contrôles</b><span>Lecture de la capture, rattachement des pseudos, contrôles automatiques.</span></li>
+            <li><b>Saisie et contrôles</b><span>Lecture de la capture, rattachement des pseudos, contrôles automatiques ; fin au plus 1 h après le début, joueurs partis comptés.</span></li>
             <li><b>Validation</b><span>Validé avant la publication, il compte dans le classement du dimanche.</span></li>
           </ol>
         </div>
@@ -733,7 +752,8 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <ol class="rail">
             <li><b>Déclaration</b><span>Date et heure de début, responsables HAAVK et GTI, motif facultatif.</span></li>
             <li><b>Enregistrement</b><span>Automatique ; Katana est averti et peut annuler.</span></li>
-            <li><b>Match dans le créneau</b><span>Au moins 16 joueurs, factions équilibrées à un joueur près.</span></li>
+            <li><b>Salle</b><span>Carte au choix parmi toutes les cartes disponibles dans le mode ; code et mot de passe saisis par l’organisateur dans « Prochains événements ».</span></li>
+            <li><b>Match dans le créneau</b><span>Fin au plus 1 h après l’heure de début, au moins 16 joueurs, factions équilibrées à un joueur près.</span></li>
             <li><b>Captures sous 10 minutes</b><span>Envoyées par le site : une par responsable, une par l’organisateur s’il n’est pas responsable.</span></li>
             <li><b>Contrôles et validation</b><span>Un seul match comptabilisé par créneau.</span></li>
           </ol>
@@ -743,7 +763,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <ol class="rail">
             <li><b>Lecture</b><span>Carte, heure de fin, pseudos et 8 statistiques par joueur.</span></li>
             <li><b>Rattachement</b><span>Pseudo reconnu, à identifier, ou joueur non inscrit.</span></li>
-            <li><b>Contrôles automatiques</b><span>16 participants, écart d’un joueur, 50 % de membres confirmés, valeurs manquantes, négatives ou en double.</span></li>
+            <li><b>Contrôles automatiques</b><span>16 participants, écart d’un joueur, 50 % de membres confirmés, heure de fin au plus 1 h après le début, valeurs manquantes, négatives ou en double.</span></li>
             <li><b>Décision</b><span>Validé : il compte. Invalidé : il est retiré pour tous.</span></li>
             <li class="stop"><b>Alerte de performance</b><span>Vérification humaine, jamais de sanction automatique.</span></li>
           </ol>
