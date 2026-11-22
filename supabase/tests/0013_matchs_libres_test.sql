@@ -277,6 +277,7 @@ begin
     insert into resultats (test, ok, detail) values ('Deuxième capture « unique » : refusée', false, 'accepté');
   exception when raise_exception then insert into resultats (test, ok, detail) values ('Deuxième capture « unique » : refusée', true, sqlerrm); end;
   t := public.annuler_ma_capture((select id from ids where nom = 'CB1'));
+  perform set_config('storage.allow_delete_query', 'true', true);  -- le vrai Supabase bloque l'effacement direct en SQL ; le site passe par le service de stockage, qui lève ce blocage
   delete from storage.objects where bucket_id = 'captures' and name = t;
   get diagnostics n = row_count;
   insert into resultats (test, ok, detail) values ('Capture annulée par l’envoyeur et fichier supprimé', n = 1, n || '');
