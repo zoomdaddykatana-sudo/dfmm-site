@@ -36,7 +36,10 @@ function match(total, nbMembres, extra) {
     if (i <= nbMembres) Object.assign(l, { mat: 'DFMM-' + i, cpt: 'C' + i, res: 'auto' }); else l.res = 'non inscrit';
     lignes.push(l);
   }
-  return Object.assign({ id: 'M1', saison_id: 1, type: 'Katana', statut: 'Validé', fin: '2026-11-21T16:30', envoi: '2026-11-21T16:35', captures: ['x'], lignes }, extra || {});
+  const m = Object.assign({ id: 'M1', saison_id: 1, type: 'Katana', statut: 'Validé', fin: '2026-11-21T16:30', envoi: '2026-11-21T16:35', captures: ['x'], lignes }, extra || {});
+  // Début annoncé (obligatoire pour un match de Katana depuis le 22/11/2026) : 30 min avant la fin, sauf indication.
+  if (!('debut_annonce' in (extra || {})) && L.validDT(m.fin)) m.debut_annonce = L.addMinutes(m.fin, -30);
+  return m;
 }
 
 // ---------- Paramètres ----------
@@ -292,4 +295,29 @@ test('lecture : pseudo illisible gardé et signalé ; ancienne réponse sans eff
   assert.match(L.verifierLecture({}, lignes).problemes.join(), /Pseudo à recopier.*ligne\(s\) 1/);
   assert.deepEqual(L.verifierLecture({ lignes: [] }, [{ faction: 'GTI', pseudo: 'A' }]).problemes, []);
   assert.equal(L.normPseudo('· · · · · · ˎ') !== '', true);
+});
+
+// ---------- Retard pour tous les matchs (décisions de Katana du 22/11/2026, choix 1 B et 2 oui) ----------
+test('match de Katana : fin au plus 1 h après le début annoncé, sinon match en attente', () => {
+  const ok = L.controlesMatch(match(16, 8, { debut_annonce: '2026-11-25T16:05', fin: '2026-11-25T17:05', envoi: '2026-11-25T17:10' }), ctxAvec(16), SAISON, R);
+  assert.deepEqual(ok.attente, []); assert.equal(ok.criteres.find(x => /après le début annoncé/.test(x.nom)).etat, 'ok');
+  const tard = L.controlesMatch(match(16, 8, { debut_annonce: '2026-11-25T16:05', fin: '2026-11-25T17:06', envoi: '2026-11-25T17:10' }), ctxAvec(16), SAISON, R);
+  assert.equal(tard.bloquants.length, 0); assert.equal(tard.attente.length, 1); assert.match(tard.attente[0], /hors de la plage du début annoncé.*match en attente/);
+  assert.equal(tard.criteres.find(x => /après le début annoncé/.test(x.nom)).etat, 'attente');
+  assert.match(L.motifDepuisControles(tard), /hors de la plage du début annoncé/);
+  const avant = L.controlesMatch(match(16, 8, { debut_annonce: '2026-11-25T16:05', fin: '2026-11-25T16:00', envoi: '2026-11-25T16:05' }), ctxAvec(16), SAISON, R);
+  assert.equal(avant.attente.length, 1);
+});
+test('match de Katana sans début annoncé (anciens matchs) : critère non rempli, validation bloquée', () => {
+  const c = L.controlesMatch(match(16, 8, { debut_annonce: '' }), ctxAvec(16), SAISON, R);
+  assert.match(c.bloquants.join(), /Début annoncé du match manquant/);
+  assert.equal(c.criteres.find(x => x.nom === 'Début annoncé du match').etat, 'non');
+  assert.equal(c.criteres.find(x => /après le début annoncé/.test(x.nom)).etat, 'sans_objet');
+  const d = L.controlesMatch(match(16, 8, { demarrage: true, envoi: '', debut_annonce: '' }), ctxAvec(16), SAISON, R);
+  assert.match(d.bloquants.join(), /Début annoncé/);
+});
+test('match libre : pas de critère de début annoncé (la plage vient du créneau)', () => {
+  const ctx = ctxAvec(16); ctx.creneaux = { L1: { id: 'L1', date: '2026-11-21', debut: '15:00', statut: 'Annoncé' } };
+  const lib = L.controlesMatch(match(16, 8, { type: 'Libre', creneau_id: 'L1', fin: '2026-11-21T16:00', envoi: '2026-11-21T16:05', debut_annonce: '' }), ctx, SAISON, R);
+  assert.ok(!lib.criteres.some(x => /début annoncé/.test(x.nom))); assert.deepEqual(lib.bloquants, []);
 });

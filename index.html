@@ -228,6 +228,7 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 .kv{display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr);gap:4px 12px;font-size:15px;margin:6px 0}
 .kv dt{color:var(--mute)}
 .kv dd{margin:0;overflow-wrap:anywhere}
+.code-salle{font-size:20px;letter-spacing:.06em;font-family:ui-monospace,Menlo,Consolas,monospace}
 .lignes-t input,.lignes-t select{min-height:38px;padding:5px 6px;font-size:16px}
 .lignes-t input[type=number]{width:74px}
 .lignes-t td{padding:4px 4px;vertical-align:middle}
@@ -279,6 +280,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
     <a href="#classements" data-nav="classements">Classements</a>
     <a href="#reglement" data-nav="reglement">Règlement</a>
     <a href="#processus" data-nav="processus">Processus</a>
+    <a href="#evenements" data-nav="evenements" id="nav-evenements" hidden>Prochains événements</a>
     <a href="#compte" data-nav="compte" id="nav-compte">Connexion</a>
     <a href="#admin" data-nav="admin" class="adm" id="nav-admin" hidden>Administration</a>
   </nav>
@@ -327,7 +329,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
       <div class="sec-head"><h2>Comment ça marche</h2><p>La ligue suit vos performances individuelles sur toute la saison, à partir des captures de fin de match.</p></div>
       <div class="steps">
         <div class="step"><span class="n">Étape 1</span><h3>S’inscrire</h3><p>Formulaire d’inscription, puis vérification par l’organisation. Vous recevez un matricule permanent DFMM-n.</p></div>
-        <div class="step"><span class="n">Étape 2</span><h3>Jouer</h3><p>Matchs de Katana, en général le mercredi et le samedi à 16 h, ou matchs libres déclarés au moins 2 h à l’avance (ouverts au lancement).</p></div>
+        <div class="step"><span class="n">Étape 2</span><h3>Jouer</h3><p>Matchs de Katana, chaque mercredi et chaque samedi à 16 h 05, ou matchs libres déclarés au moins 2 h à l’avance (ouverts au lancement).</p></div>
         <div class="step"><span class="n">Étape 3</span><h3>Prouver</h3><p>La capture du résultat de fin de match est contrôlée, puis validée manuellement par l’organisation.</p></div>
         <div class="step"><span class="n">Étape 4</span><h3>Être classé</h3><p>Classement provisoire un dimanche sur deux, classement final le dimanche qui suit les 48 h de vérification de fin de saison.</p></div>
       </div>
@@ -832,6 +834,16 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   </div>
 </section>
 
+<!-- ============ PROCHAINS ÉVÉNEMENTS (membres connectés) ============ -->
+<section class="view" data-view="evenements" hidden>
+  <div class="band">
+    <div class="wrap" style="max-width:820px">
+      <div class="sec-head"><h1>Prochains événements</h1><p>Réservé aux membres connectés : matchs de la LEAGUE UV, matchs libres annoncés et événements de la communauté.</p></div>
+      <div id="ev-zone"></div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ COMPTE ============ -->
 <section class="view" data-view="compte" hidden>
   <div class="band">
@@ -1012,6 +1024,7 @@ function rendre() {
   if (UI.vue === 'admin') rendreAdmin();
   if (UI.vue === 'compte') rendreCompte();
   if (UI.vue === 'inscription') rendreInscription();
+  if (UI.vue === 'evenements') rendreEvenements();
 }
 function rendreChip() {
   const s = (ADMIN && saisonActiveSB()) || (PUB && PUB.saison);
@@ -1050,7 +1063,7 @@ function heureTxt(h) { return String(h).replace(':', ' h ').replace(/ h 00$/, ' 
 function calHtml() {
   const R = reglesSite(), s = PUB && PUB.saison;
   if (!R) return '<p class="mute small">Le calendrier s’affichera dès que les réglages de la ligue seront chargés.</p>';
-  const base = '<dt>Matchs de Katana</dt><dd>en général le mercredi et le samedi à 16 h</dd><dt>Classement provisoire</dt><dd>le ' + JOURS[R.publication_jour] + ', tous les ' + R.periodicite_jours + ' jours</dd><dt>Coupure</dt><dd>le ' + JOURS[R.coupure_jour] + ' qui précède, à ' + heureTxt(R.coupure_heure) + ', selon l’heure d’envoi de la capture</dd><dt>Classement final</dt><dd>les matchs comptent jusqu’à la fin officielle de la saison ; vérification pendant ' + R.verification_finale_h + ' h, puis publication le ' + JOURS[R.publication_jour] + ' qui suit</dd>';
+  const base = '<dt>Matchs de Katana</dt><dd>' + (PARAM.calendrier_heure ? 'chaque ' + JOURS[PARAM.calendrier_jour_1] + ' et chaque ' + JOURS[PARAM.calendrier_jour_2] + ', début à ' + heureTxt(PARAM.calendrier_heure) : 'chaque mercredi et chaque samedi, début à 16 h 05') + '</dd><dt>Classement provisoire</dt><dd>le ' + JOURS[R.publication_jour] + ', tous les ' + R.periodicite_jours + ' jours</dd><dt>Coupure</dt><dd>le ' + JOURS[R.coupure_jour] + ' qui précède, à ' + heureTxt(R.coupure_heure) + ', selon l’heure d’envoi de la capture</dd><dt>Classement final</dt><dd>les matchs comptent jusqu’à la fin officielle de la saison ; vérification pendant ' + R.verification_finale_h + ' h, puis publication le ' + JOURS[R.publication_jour] + ' qui suit</dd>';
   if (!s) return '<dl class="kv">' + base + '</dl><p class="mute small">Les dates de la saison seront annoncées par l’organisation.</p>';
   const prochaine = L.publicationsPrevues(s, now().slice(0, 10), 1, R)[0];
   return '<dl class="kv"><dt>Saison</dt><dd>' + esc(s.nom) + '</dd><dt>Dates</dt><dd>du ' + fD(s.debut) + ' au ' + fD(s.fin) + '</dd><dt>Prochain classement</dt><dd>' + (prochaine ? fD(prochaine) : '—') + '</dd>' + base + '</dl>';
@@ -1147,8 +1160,8 @@ function verifierChamps(champs, o) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'creneaux', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
-const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde']];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'calendrier', 'creneaux', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['calendrier', 'Calendrier'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
@@ -1629,7 +1642,7 @@ const ACTIONS = {
 Object.keys(ACT_MB).forEach(k => { ACTIONS['mb-' + k] = b => ACT_MB[k](b.dataset.id); });
 
 /* ---------------- Navigation et démarrage ---------------- */
-const VUES = ['accueil', 'classements', 'reglement', 'processus', 'inscription', 'compte', 'admin'];
+const VUES = ['accueil', 'classements', 'reglement', 'processus', 'evenements', 'inscription', 'compte', 'admin'];
 function router() {
   const h = (location.hash || '').slice(1);
   let vue = h, t = '';
@@ -1708,6 +1721,7 @@ async function majSession(session) {
   ADMIN = adm;
   if (ADMIN) await chargerCompteursAdmin();
   $('#nav-admin').hidden = !ADMIN;
+  $('#nav-evenements').hidden = !SESSION;
   await majPastilleCompte();
   UI.tabRendu = '';
   rendre();
@@ -2269,7 +2283,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages', 'creneaux', 'inscription_essais', 'declarations_pseudo'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages', 'creneaux', 'inscription_essais', 'declarations_pseudo', 'jours_match', 'salles', 'participations', 'evenements'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -2384,7 +2398,7 @@ async function chargerContexte(saisonId) {
   const [a, b, c, sx, cr] = await Promise.all([
     SB.from('membres').select('id, matricule, nom_gamer, statut, periodes(debut, fin)').not('matricule', 'is', null),
     SB.from('comptes_jeu').select('id, membre_id, uid, pseudo, statut, comptes_periodes(debut, fin), pseudos_historique(pseudo, debut, fin)'),
-    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, statut, motif, notes, valide_le, attente_decide_le, creneau_id, match_lignes(*), captures(id, envoyee_le, statut, exception)').eq('saison_id', saisonId) : Promise.resolve({ data: [] }),
+    saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, debut_annonce, jour_id, statut, motif, notes, valide_le, attente_decide_le, creneau_id, match_lignes(*), captures(id, envoyee_le, statut, exception)').eq('saison_id', saisonId) : Promise.resolve({ data: [] }),
     SB.from('sanctions').select('membre_id, type, debut, fin, statut, match_id').in('type', ['suspension', 'retrait_statistiques']),
     saisonId ? SB.from('creneaux').select('id, debut, statut').eq('saison_id', saisonId) : Promise.resolve({ data: [] })
   ]);
@@ -2419,7 +2433,7 @@ function envoiDepuis(caps) {
 function matchJS(m) {
   const e = envoiDepuis(m.captures);
   return { id: 'M-' + m.id, dbid: m.id, saison_id: m.saison_id, type: m.type === 'libre' ? 'Libre' : 'Katana', creneau_id: m.creneau_id || null, demarrage: !!m.demarrage, carte: m.carte || '', mode: m.mode || '', notes: m.notes || '',
-    fin: isoLoc(m.fin), envoi: e.envoi, delai_exception: e.delai_exception, statut: ST_MATCH[m.statut] || m.statut, statut_db: m.statut, motif: m.motif || '', valide_le: isoLoc(m.valide_le), attente_decide_le: isoLoc(m.attente_decide_le),
+    fin: isoLoc(m.fin), debut_annonce: isoLoc(m.debut_annonce), jour_id: m.jour_id || null, envoi: e.envoi, delai_exception: e.delai_exception, statut: ST_MATCH[m.statut] || m.statut, statut_db: m.statut, motif: m.motif || '', valide_le: isoLoc(m.valide_le), attente_decide_le: isoLoc(m.attente_decide_le),
     captures: (m.captures || []).filter(capValable).map(x => x.id),
     lignes: (m.match_lignes || []).slice().sort((x, y) => x.rang - y.rang).map(ligneJS) };
 }
@@ -2486,6 +2500,7 @@ function tableLignes(lock) {
 }
 function docMatchSB() {
   return { id: ED.dbid || null, saison_id: Number(ED.saison_id), carte: ED.carte, mode: ED.mode, fin: locISO(ED.fin), notes: ED.notes,
+    debut_annonce: locISO(ED.debut_annonce), jour_id: ED.jour_id || null,
     lignes: ED.lignes.map(l => { const o = { faction: l.faction || '', pseudo: String(l.pseudo || '').trim(), compte_id: l.cpt ? Number(l.cpt) : null, resolution: RES_JS[l.res] || 'non_inscrit' }; L.STATS.forEach(s => { o[s.k] = l[s.k] === '' || l[s.k] == null ? null : Number(l[s.k]); }); return o; }) };
 }
 function matchCourant() {
@@ -2533,6 +2548,7 @@ function surSaisieEditeur(e) {
   }
   const id = el.id;
   if (id === 'e-fin') { ED.fin = L.normDT(el.value); ED.lignes.forEach((l, i) => { resoudreLigne(l); const td = $('#res-' + i); if (td) td.innerHTML = resCell(l, false); }); if (ED.type === 'Libre') afficherCaptures(); }
+  else if (id === 'e-debut') ED.debut_annonce = L.normDT(el.value);
   else if (id === 'e-saison') ED.saison_id = el.value;
   else if (id === 'e-carte') ED.carte = el.value;
   else if (id === 'e-mode') ED.mode = el.value;
@@ -2540,7 +2556,8 @@ function surSaisieEditeur(e) {
   else return;
   ED.modifie = true; majControles();
 }
-async function ouvrirMatch(id) {
+// jour : date du calendrier (Administration > Calendrier > « Saisir ce match ») : carte et début annoncé repris.
+async function ouvrirMatch(id, jour) {
   try {
     await chargerSaisons();
     const s = saisonActiveSB();
@@ -2558,14 +2575,15 @@ async function ouvrirMatch(id) {
     await chargerContexte(m ? m.saison_id : s.id);
     const j = m ? matchJS(m) : null;
     ED = j ? Object.assign(j, { caps: (m.captures || []).filter(x => x.statut !== 'annulee').sort((x, y) => String(x.envoyee_le).localeCompare(String(y.envoyee_le))), reg, cr: m.cr || null })
-           : { dbid: null, saison_id: s.id, carte: '', mode: '', fin: '', notes: '', statut: 'Brouillon', motif: '', demarrage: PARAM.phase_demarrage === true, envoi: '', caps: [], reg: [], lignes: [] };
+           : { dbid: null, saison_id: s.id, carte: (jour && jour.carte) || '', mode: '', fin: '', notes: '', statut: 'Brouillon', motif: '', demarrage: PARAM.phase_demarrage === true, envoi: '', caps: [], reg: [], lignes: [],
+               debut_annonce: jour ? isoLoc(jour.debut) : '', jour_id: jour ? jour.id : null };
     ED.lock = !(ED.statut === 'Brouillon' || ED.statut === 'En attente');
     if (!ED.lock) ED.lignes.forEach(resoudreLigne);
   } catch (e) { toast('Ouverture impossible : ' + e.message, true); return; }
   rendreEditeur();
 }
 function rendreEditeur() {
-  const btns = [{ label: 'Fermer', cls: 'ghost', onClick: async () => { if (ED && ED.modifie && !confirm('Fermer sans enregistrer les changements ?')) return false; await afficherMatchs(); return true; } }];
+  const btns = [{ label: 'Fermer', cls: 'ghost', onClick: async () => { if (ED && ED.modifie && !confirm('Fermer sans enregistrer les changements ?')) return false; await afficherMatchs(); if ($('#cal-liste')) afficherCalendrierAdmin(); return true; } }];
   if (ED.lock) {
     btns.push({ label: 'Repasser en brouillon', cls: 'ghost', onClick: () => deciderMatchSB('brouillon') });
     if (ED.statut !== 'Annulé') btns.push({ label: 'Annuler le match', cls: 'danger', onClick: () => deciderMatchSB('annuler') });
@@ -2582,12 +2600,15 @@ function editeurHtmlSB() {
   const d = ED.lock ? ' disabled' : '';
   let h = (ED.statut !== 'Brouillon' ? note('Match ' + ED.statut.toLowerCase() + (ED.valide_le ? ' le ' + fDT(ED.valide_le) : '') + (ED.motif ? '. Motif : ' + esc(ED.motif) : '') + (ED.lock ? '. Pour le modifier, repassez-le en brouillon.' : '.'), ED.statut === 'Validé' ? '' : 'a') : '');
   if (ED.demarrage) h += note('<b>Saisie de démarrage</b> : votre seule capture suffit, sans délai de 10 minutes. Les autres règles s’appliquent.');
+  if (ED.type !== 'Libre') h += note(ED.jour_id ? '<b>Match du calendrier</b> : carte et début annoncé repris de la date. L’heure de fin doit tomber au plus ' + esc(PARAM.plage_fin_h) + ' h après le début annoncé, sinon le match est mis en attente.'
+    : 'Début annoncé obligatoire : l’heure de fin doit tomber au plus ' + esc(PARAM.plage_fin_h) + ' h après, sinon le match est mis en attente.');
   if (ED.cr) { const n = id => { const mat = CX.parId[id]; return mat ? mat + ' ' + esc(CX.membres[mat].nom_gamer) : '—'; };
     h += note('<b>Match libre L-' + ED.cr.id + '</b> · début annoncé le ' + dateLoc(ED.cr.debut) + ' · organisateur ' + n(ED.cr.organisateur_id) + ' · HAAVK ' + n(ED.cr.resp_haavk_id) + ' · GTI ' + n(ED.cr.resp_gti_id)
       + '. L’heure de fin doit tomber dans l’heure qui suit le début annoncé ; chaque capture envoyée plus de ' + PARAM.delai_capture_min + ' min après l’heure de fin est rejetée seule à la validation.' + (ED.cr.statut === 'annule' ? ' <b>Créneau annulé.</b>' : '')); }
   h += '<div class="grid-f"><div><label class="lab" for="e-saison">Saison</label><select id="e-saison"' + d + '>' + optSaisonsSB(ED.saison_id) + '</select></div>'
     + '<div><label class="lab" for="e-carte">Carte</label><select id="e-carte"' + d + '><option value="">Choisir…</option>' + L.CARTES.concat(ED.carte && L.CARTES.indexOf(ED.carte) < 0 ? [ED.carte] : []).concat(['Autre']).map(c => '<option' + (c === ED.carte ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>'
     + '<div><label class="lab" for="e-mode">Mode</label><input type="text" id="e-mode" value="' + esc(ED.mode) + '"' + d + '></div>'
+    + (ED.type === 'Libre' ? '' : '<div><label class="lab" for="e-debut">Début annoncé (heure de Madagascar' + (ED.jour_id ? ', repris du calendrier' : ', à taper pour un match joué avant le calendrier') + ')</label><input type="datetime-local" id="e-debut" value="' + esc(ED.debut_annonce || '') + '"' + d + '></div>')
     + '<div><label class="lab" for="e-fin">Fin du match (heure lue sur la capture, heure de Madagascar)</label><input type="datetime-local" id="e-fin" value="' + esc(ED.fin) + '"' + d + '></div></div>'
     + '<label class="lab" for="e-notes">Notes</label><textarea id="e-notes" rows="2"' + d + '>' + esc(ED.notes) + '</textarea>';
   h += '<h3 style="margin-top:16px">1. Captures</h3><div class="thumbs" id="ed-thumbs"></div>'
@@ -3560,6 +3581,175 @@ ACTIONS['ml-annuler-cap'] = async b => {
   if (error) { toast(erreurRpc(error), true); return; }
   if (data) await SB.storage.from('captures').remove([data]);
   toast('Capture annulée : envoyez la bonne.'); afficherMesMatchsLibres();
+};
+
+/* ----- Prochains événements (migration 0016, décisions de Katana du 22/11/2026) ----- */
+// Rubrique des membres connectés : prochain match de Katana (calendrier automatique, rotation des cartes, « Je participe »,
+// code et mot de passe de la salle pour les membres actifs non suspendus), matchs libres annoncés, événements communautaires.
+const ST_JOUR = { prevu: 'Prévu', reporte: 'Reporté', annule: 'Annulé' };
+const heureLoc = loc => loc ? loc.slice(11, 13) + ' h ' + loc.slice(14, 16) : '—';
+const jourTxt = iso => { const l = isoLoc(iso); return l ? fD(l.slice(0, 10)) + ' à ' + heureLoc(l) : '—'; };
+const ouvertureTxt = (iso, min) => { if (!iso) return ''; return heureLoc(L.versLocal(new Date(new Date(iso).getTime() - Number(min || 0) * 60000).toISOString())); };
+let EVT_SEQ = 0, EVT = null;
+async function rendreEvenements() {
+  const z = $('#ev-zone'); if (!z) return;
+  if (!SB) { z.innerHTML = note('Connexion impossible pour le moment.', 'r'); return; }
+  if (!PRET) { z.innerHTML = '<p class="mute">Chargement…</p>'; return; }
+  if (!SESSION) { z.innerHTML = note('Cette rubrique est réservée aux membres connectés. <a href="#compte">Connectez-vous</a>.'); return; }
+  const n = ++EVT_SEQ;
+  if (!EVT) z.innerHTML = '<p class="mute">Chargement…</p>';
+  const { data, error } = await SB.rpc('prochains_evenements');
+  if (n !== EVT_SEQ || !z.isConnected) return;
+  if (error) { z.innerHTML = note(esc(erreurRpc(error)) + (/membres/.test(error.message || '') ? ' Votre inscription doit être approuvée.' : ''), 'a'); return; }
+  EVT = data; z.innerHTML = htmlEvenements(data);
+}
+function blocSalle(code, mdp, voit, saisie, ouverture) {
+  if (!voit) return '<p class="mute small">Code et mot de passe de la salle : réservés aux membres actifs non suspendus.</p>';
+  if (!code && !mdp) return '<p class="mute small">' + (saisie ? 'Code et mot de passe : pas encore saisis.' : 'Le code et le mot de passe de la salle seront affichés ici' + (ouverture ? ' vers ' + ouverture : '') + ', à la création de la salle.') + '</p>';
+  return '<dl class="kv salle"><dt>Code de la salle</dt><dd><b class="code-salle">' + esc(code || '—') + '</b></dd><dt>Mot de passe</dt><dd><b class="code-salle">' + esc(mdp || '—') + '</b></dd></dl>'
+    + '<p class="small"><b>Ne partagez jamais</b> le code ni le mot de passe <b> hors du lieu prévu</b> (règlement, section 4) : avertissement, puis suspension en cas de récidive.</p>';
+}
+function htmlEvenements(d) {
+  const jours = d.jours || [], prochain = jours.find(j => j.statut === 'prevu'), autres = jours.filter(j => j !== prochain);
+  const maint = new Date(d.maintenant || Date.now());
+  let h = '<div class="panel" id="ev-ligue"><h2 style="margin-top:0">LEAGUE UV</h2>';
+  if (!prochain) h += note('Aucun match de Katana prévu pour l’instant.');
+  else {
+    const commence = new Date(prochain.debut) <= maint;
+    h += '<div class="card-l" id="ev-prochain"><div class="t"><div><div class="small dim">' + (commence ? 'Match en cours' : 'Prochain match de Katana') + '</div><b>' + esc(jourTxt(prochain.debut)) + '</b></div>' + badge('Katana', 'g') + '</div>'
+      + (prochain.reporte_de ? note('Match reporté du ' + esc(fD(prochain.reporte_de)) + ' (carte manquante) : il garde sa carte.', 'a') : '')
+      + '<dl class="kv"><dt>Carte</dt><dd><b>' + esc(prochain.carte || '—') + '</b> (rotation)</dd><dt>Salle ouverte</dt><dd>vers ' + esc(ouvertureTxt(prochain.debut, d.salle_ouverture_min)) + '</dd>'
+      + '<dt>Organisateur</dt><dd>Katana</dd><dt>Participants annoncés</dt><dd id="ev-nb">' + Number(prochain.participants || 0) + '</dd></dl>';
+    if (prochain.noms) h += '<p class="small"><b>Noms</b> (visibles par vous seulement) : ' + (prochain.noms.length ? prochain.noms.map(x => esc(matTxt(x.matricule) + ' ' + x.nom_gamer)).join(', ') : 'personne pour l’instant') + '</p>';
+    if (d.peut_participer && !commence) h += '<div class="row-btns">' + (prochain.moi ? '<span class="res auto">Vous participez</span><button class="btn sm ghost" type="button" data-act="ev-participer" data-id="' + prochain.id + '" data-oui="0">Je ne participe plus</button>' : '<button class="btn sm" type="button" data-act="ev-participer" data-id="' + prochain.id + '" data-oui="1">Je participe</button>') + '</div>';
+    h += blocSalle(prochain.code, prochain.mot_de_passe, d.voit_code, prochain.salle_saisie, ouvertureTxt(prochain.debut, d.salle_ouverture_min)) + '</div>';
+  }
+  if (autres.length) h += '<h3>Dates suivantes</h3><div class="scroll"><table id="ev-dates"><thead><tr><th>Date</th><th>Carte</th><th>État</th></tr></thead><tbody>' + autres.map(j => '<tr><td>' + esc(jourTxt(j.debut)) + '</td><td>' + esc(j.statut === 'annule' ? '—' : (j.carte || '—')) + '</td><td>' + esc(ST_JOUR[j.statut] || j.statut) + (j.motif ? ' <span class="dim">(' + esc(j.motif) + ')</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>';
+  if ((d.rotation || []).length) h += '<p class="small mute">Rotation des cartes des matchs de Katana, en boucle : ' + d.rotation.map(esc).join(' → ') + '. Chaque mercredi et samedi, début à ' + esc(heureLoc('0000-00-00T' + (d.heure || ''))) + '.</p>';
+  h += '</div><div class="panel" id="ev-libres"><h2 style="margin-top:0">Matchs libres annoncés</h2>';
+  const lib = d.libres || [];
+  if (!lib.length) h += '<p class="mute">Aucun match libre annoncé.' + (PARAM.matchs_libres_ouverts === true ? '' : ' Les matchs libres ouvriront au lancement de la LEAGUE UV.') + '</p>';
+  lib.forEach(c => {
+    const per = x => x ? esc(matTxt(x.matricule) + ' ' + x.nom_gamer) : '—';
+    h += '<div class="card-l"><div class="t"><div><b>' + esc(jourTxt(c.debut)) + '</b><div class="small dim">L-' + c.id + ' · carte au choix de l’organisateur</div></div>' + badge('Libre', 'o') + '</div>'
+      + '<dl class="kv"><dt>Organisateur</dt><dd>' + per(c.organisateur) + '</dd><dt>Responsable HAAVK</dt><dd>' + per(c.haavk) + '</dd><dt>Responsable GTI</dt><dd>' + per(c.gti) + '</dd></dl>'
+      + blocSalle(c.code, c.mot_de_passe, d.voit_code || c.moi_organisateur, c.salle_saisie, ouvertureTxt(c.debut, d.salle_ouverture_min));
+    if (c.moi_organisateur && d.peut_participer) h += '<div class="grid-f"><div><label class="lab" for="evl-code-' + c.id + '">Code de la salle</label><input type="text" id="evl-code-' + c.id + '" value="' + esc(c.code || '') + '" maxlength="100" autocomplete="off"></div>'
+      + '<div><label class="lab" for="evl-mdp-' + c.id + '">Mot de passe</label><input type="text" id="evl-mdp-' + c.id + '" value="' + esc(c.mot_de_passe || '') + '" maxlength="100" autocomplete="off"></div></div>'
+      + '<div class="row-btns"><button class="btn sm" type="button" data-act="ev-salle-libre" data-id="' + c.id + '">Enregistrer le code</button></div><p class="dim small">Vous êtes l’organisateur : saisissez le code et le mot de passe vers la création de la salle, environ ' + Number(d.salle_ouverture_min || 15) + ' min avant le début. Les vider les efface.</p>';
+    h += '</div>';
+  });
+  h += '</div><div class="panel" id="ev-communaute"><h2 style="margin-top:0">Événements communautaires</h2>';
+  const ev = d.evenements || [];
+  h += ev.length ? ev.map(e => '<div class="card-l"><div class="t"><div><b>' + esc(e.titre) + '</b><div class="small dim">' + esc(jourTxt(e.debut)) + (e.fin ? ' → ' + esc(jourTxt(e.fin)) : '') + '</div></div></div>' + (e.description ? '<p style="white-space:pre-line">' + esc(e.description) + '</p>' : '') + '</div>').join('') : '<p class="mute">Aucun événement communautaire annoncé.</p>';
+  return h + '</div>';
+}
+ACTIONS['ev-participer'] = async b => {
+  b.disabled = true;
+  const { error } = await SB.rpc('participer', { p_jour: Number(b.dataset.id), p_oui: b.dataset.oui === '1' });
+  if (error) { toast(erreurRpc(error), true); b.disabled = false; return; }
+  toast(b.dataset.oui === '1' ? 'C’est noté : vous participez.' : 'C’est noté : vous ne participez plus.'); rendreEvenements();
+};
+ACTIONS['ev-salle-libre'] = async b => {
+  const id = b.dataset.id;
+  const { error } = await SB.rpc('noter_salle', { p: { creneau_id: Number(id), code: v('evl-code-' + id), mot_de_passe: v('evl-mdp-' + id) } });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Code de la salle enregistré : les membres actifs non suspendus le voient.'); rendreEvenements();
+};
+
+/* Administration : calendrier des matchs de Katana et événements communautaires */
+TAB.calendrier = {
+  shell: () => note('Calendrier automatique : chaque mercredi et samedi, début à 16 h 05 (réglages dans Paramètres > Calendrier). Carte manquante : « Reporter » (la date suivante garde la carte). « Annuler la date » : pas de carte, la rotation continue.')
+    + '<div id="cal-liste"><p class="mute">Chargement…</p></div>'
+    + '<div class="panel" style="margin-top:16px"><h3>Nouvel événement communautaire</h3><p class="mute small">Visible seulement par les membres connectés, dans « Prochains événements », jusqu’à sa fin (ou jusqu’au lendemain s’il n’a pas de fin).</p>'
+    + '<label class="lab" for="evc-titre">Titre</label><input type="text" id="evc-titre" maxlength="100">'
+    + '<div class="grid-f"><div><label class="lab" for="evc-debut">Début (heure de Madagascar)</label><input type="datetime-local" id="evc-debut"></div><div><label class="lab" for="evc-fin">Fin (facultative)</label><input type="datetime-local" id="evc-fin"></div></div>'
+    + '<label class="lab" for="evc-desc">Description</label><textarea id="evc-desc" rows="3"></textarea><div class="row-btns"><button class="btn" type="button" data-act="evc-creer">Créer l’événement</button></div></div>'
+    + '<div id="evc-liste"></div>',
+  body: () => '',
+  charger: afficherCalendrierAdmin
+};
+let CAL = [];
+async function afficherCalendrierAdmin() {
+  const z = $('#cal-liste'); if (!z) return;
+  const [r, e] = await Promise.all([SB.rpc('calendrier_admin'), SB.from('evenements').select('*').order('debut', { ascending: false })]);
+  if (!z.isConnected) return;
+  if (r.error) { z.innerHTML = note('Lecture impossible : ' + esc(erreurRpc(r.error)), 'r'); return; }
+  CAL = r.data || [];
+  z.innerHTML = CAL.length ? CAL.map(j => {
+    const loc = isoLoc(j.debut);
+    const etat = j.statut === 'prevu' ? (j.passe ? badge('Passé', 'o') : badge('Prévu', 'g')) : badge(ST_JOUR[j.statut], j.statut === 'reporte' ? 'a' : 'o');
+    let h = '<div class="card-l" data-jour="' + j.id + '"><div class="t"><div><b>' + esc(fD(loc.slice(0, 10))) + ' à ' + esc(heureLoc(loc)) + '</b><div class="small dim">Carte : ' + esc(j.statut === 'annule' ? '—' : (j.carte || '—')) + (j.motif ? ' · ' + esc(j.motif) : '') + '</div></div>' + etat + '</div>';
+    h += '<p class="small">Participants : <b>' + j.noms.length + '</b>' + (j.noms.length ? ' — ' + j.noms.map(x => esc(matTxt(x.matricule) + ' ' + x.nom_gamer)).join(', ') : '') + '</p>';
+    if (j.statut === 'prevu' && j.salle_ouverte) h += '<div class="grid-f"><div><label class="lab" for="cal-code-' + j.id + '">Code de la salle</label><input type="text" id="cal-code-' + j.id + '" value="' + esc(j.code || '') + '" maxlength="100" autocomplete="off"></div><div><label class="lab" for="cal-mdp-' + j.id + '">Mot de passe</label><input type="text" id="cal-mdp-' + j.id + '" value="' + esc(j.mot_de_passe || '') + '" maxlength="100" autocomplete="off"></div></div>';
+    else if (j.code || j.mot_de_passe) h += '<p class="small dim">Code ' + esc(j.code || '—') + ' · mot de passe ' + esc(j.mot_de_passe || '—') + ' (plus affichés aux membres)</p>';
+    const btn = [];
+    if (j.statut === 'prevu' && j.salle_ouverte) btn.push('<button class="btn sm" type="button" data-act="cal-salle" data-id="' + j.id + '">Enregistrer le code</button>');
+    if (j.match_id) btn.push('<button class="btn sm ghost" type="button" data-act="m-ouvrir" data-id="' + j.match_id + '">Ouvrir le match M-' + j.match_id + '</button>');
+    else if (j.statut === 'prevu') btn.push('<button class="btn sm ghost" type="button" data-act="cal-saisir" data-id="' + j.id + '">Saisir ce match</button>');
+    if (j.modifiable && !j.match_id && j.statut === 'prevu') btn.push('<button class="btn sm ghost" type="button" data-act="cal-decider" data-d="reporter" data-id="' + j.id + '">Reporter (carte manquante)</button><button class="btn sm danger" type="button" data-act="cal-decider" data-d="annuler" data-id="' + j.id + '">Annuler la date</button>');
+    if (j.modifiable && j.statut !== 'prevu') btn.push('<button class="btn sm ghost" type="button" data-act="cal-decider" data-d="retablir" data-id="' + j.id + '">Rétablir</button>');
+    return h + (btn.length ? '<div class="row-btns">' + btn.join('') + '</div>' : '') + '</div>';
+  }).join('') : note('Aucune date dans le calendrier.');
+  const zl = $('#evc-liste'); if (!zl) return;
+  const ev = (e && !e.error && e.data) || [];
+  zl.innerHTML = ev.length ? '<h3>Événements communautaires</h3>' + ev.map(x => '<div class="card-l"><div class="t"><div><b>' + esc(x.titre) + '</b><div class="small dim">' + esc(jourTxt(x.debut)) + (x.fin ? ' → ' + esc(jourTxt(x.fin)) : '') + (x.retire_le ? ' · retiré le ' + dateLoc(x.retire_le) : '') + '</div></div>' + (x.retire_le ? badge('Retiré', 'o') : badge('En ligne', 'g')) + '</div>'
+    + (x.description ? '<p style="white-space:pre-line">' + esc(x.description) + '</p>' : '') + (x.retire_le ? '' : '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="evc-modifier" data-id="' + x.id + '">Modifier</button><button class="btn sm ghost" type="button" data-act="evc-retirer" data-id="' + x.id + '">Retirer</button></div>') + '</div>').join('') : '';
+  UI.evc = ev;
+}
+ACTIONS['cal-salle'] = async b => {
+  const id = b.dataset.id;
+  const { error } = await SB.rpc('noter_salle', { p: { jour_id: Number(id), code: v('cal-code-' + id), mot_de_passe: v('cal-mdp-' + id) } });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast('Code de la salle enregistré : les membres actifs non suspendus le voient dans « Prochains événements ».'); afficherCalendrierAdmin();
+};
+ACTIONS['cal-decider'] = async b => {
+  const d = b.dataset.d;
+  const q = { reporter: 'Reporter ce match (carte manquante) ? La date suivante gardera sa carte. Motif (facultatif, « Carte manquante » par défaut) :', annuler: 'Annuler cette date ? Elle ne prend pas de carte ; la rotation continue au match suivant. Motif (facultatif, affiché aux membres) :' };
+  let motif = null;
+  if (q[d]) { motif = prompt(q[d]); if (motif === null) return; }
+  const { error } = await SB.rpc('decider_jour', { p_jour: Number(b.dataset.id), p_decision: d, p_motif: motif || null });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast({ reporter: 'Match reporté : la date suivante garde sa carte.', annuler: 'Date annulée : la rotation continue au match suivant.', retablir: 'Date rétablie.' }[d]); afficherCalendrierAdmin();
+};
+ACTIONS['cal-saisir'] = b => { const j = CAL.find(x => String(x.id) === b.dataset.id); if (j) ouvrirMatch('', j); };
+function lireEvenementForm(pre) {
+  return { titre: v(pre + '-titre'), description: v(pre + '-desc') || null, debut: locISO(L.normDT(v(pre + '-debut'))), fin: v(pre + '-fin') ? locISO(L.normDT(v(pre + '-fin'))) : null };
+}
+function erreurEvenement(o) {
+  if (!o.titre) return 'Le titre est obligatoire.';
+  if (!o.debut) return 'La date et l’heure de début sont obligatoires.';
+  if (o.fin && new Date(o.fin) <= new Date(o.debut)) return 'La fin doit suivre le début.';
+  return '';
+}
+ACTIONS['evc-creer'] = async () => {
+  const o = lireEvenementForm('evc'), e = erreurEvenement(o);
+  if (e) { toast(e, true); return; }
+  const { error } = await SB.from('evenements').insert(o);
+  if (error) { toast('Création impossible : ' + error.message, true); return; }
+  await SB.from('journal').insert({ type: 'Événement', objet: o.titre, decision: 'Événement communautaire créé' });
+  ['evc-titre', 'evc-debut', 'evc-fin', 'evc-desc'].forEach(i => { $('#' + i).value = ''; });
+  toast('Événement créé : les membres le voient dans « Prochains événements ».'); afficherCalendrierAdmin();
+};
+ACTIONS['evc-modifier'] = b => {
+  const x = (UI.evc || []).find(e => String(e.id) === b.dataset.id); if (!x) return;
+  modal('Modifier l’événement', '<label class="lab" for="eve-titre">Titre</label><input type="text" id="eve-titre" maxlength="100" value="' + esc(x.titre) + '">'
+    + '<div class="grid-f"><div><label class="lab" for="eve-debut">Début</label><input type="datetime-local" id="eve-debut" value="' + esc(isoLoc(x.debut)) + '"></div><div><label class="lab" for="eve-fin">Fin (facultative)</label><input type="datetime-local" id="eve-fin" value="' + esc(isoLoc(x.fin)) + '"></div></div>'
+    + '<label class="lab" for="eve-desc">Description</label><textarea id="eve-desc" rows="3">' + esc(x.description || '') + '</textarea><div id="a-err" class="err" role="alert"></div>',
+    [{ label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', onClick: async () => {
+      const o = lireEvenementForm('eve'), e = erreurEvenement(o);
+      if (e) return erreurA(e);
+      o.modifie_le = new Date().toISOString();
+      const { error } = await SB.from('evenements').update(o).eq('id', x.id);
+      if (error) return erreurA('Enregistrement impossible : ' + error.message);
+      toast('Événement modifié.'); afficherCalendrierAdmin(); return true;
+    } }]);
+};
+ACTIONS['evc-retirer'] = async b => {
+  if (!confirm('Retirer cet événement ? Les membres ne le verront plus.')) return;
+  const { error } = await SB.from('evenements').update({ retire_le: new Date().toISOString() }).eq('id', Number(b.dataset.id));
+  if (error) { toast('Impossible : ' + error.message, true); return; }
+  toast('Événement retiré.'); afficherCalendrierAdmin();
 };
 
 async function demarrer() {

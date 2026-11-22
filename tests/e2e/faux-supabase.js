@@ -3,6 +3,7 @@
   const iso = () => new Date().toISOString();
   let seq = 100;
   const DB = window.FAUSSE_BASE;
+  const ROTATION = ['Craqué', 'Ascension', 'Ligne de tranchées', 'Accident de train', "Canal d'Akh", 'Faille'];
   const FK = { matchs: 'creneau_id', convocations: 'dossier_id', messages_litige: 'dossier_id', periodes: 'membre_id', comptes_jeu: 'membre_id', comptes_periodes: 'compte_id', pseudos_historique: 'compte_id', match_lignes: 'match_id', captures: 'match_id', membres_prives: 'membre_id', demandes: 'membre_id' };
   function projeter(table, row, sel) {
     const out = Object.assign({}, row);
@@ -65,7 +66,10 @@
       p = p.p; let m;
       if (!p.id) { m = { id: ++seq, saison_id: p.saison_id, type: 'katana', demarrage: DB.parametres.find(x => x.cle === 'phase_demarrage').valeur === true, statut: 'brouillon', cree_le: iso() }; DB.matchs.push(m); DB.registre.push({ id: ++seq, match_id: m.id, type: 'match_declare', detail: 'Match de Katana enregistré', date: iso() }); }
       else { m = DB.matchs.find(x => x.id === p.id); if (!['brouillon', 'attente'].includes(m.statut)) throw new Error('Ce match est déjà tranché'); }
-      Object.assign(m, { saison_id: p.saison_id, carte: p.carte || null, mode: p.mode || null, fin: p.fin, notes: p.notes || null });
+      const jr = p.jour_id ? (DB.jours_match || []).find(j => j.id === p.jour_id) : null;
+      if (jr && DB.matchs.some(x => x.jour_id === jr.id && x.id !== m.id)) throw new Error('Un match est déjà saisi pour cette date du calendrier.');
+      Object.assign(m, { saison_id: p.saison_id, carte: p.carte || (jr && jr.carte) || null, mode: p.mode || null, fin: p.fin, notes: p.notes || null });
+      if (m.type === 'katana') Object.assign(m, { jour_id: p.jour_id || null, debut_annonce: p.debut_annonce || (jr && jr.debut) || null });
       DB.match_lignes = DB.match_lignes.filter(l => l.match_id !== m.id);
       (p.lignes || []).forEach((l, i) => { const c = l.compte_id ? DB.comptes_jeu.find(x => x.id === l.compte_id) : null; DB.match_lignes.push(Object.assign({ id: ++seq, match_id: m.id, rang: i + 1, membre_id: c ? c.membre_id : null }, l)); });
       return m.id;
@@ -107,6 +111,59 @@
     noter_lecture: p => { DB.captures.filter(c => p.p_captures.includes(c.id)).forEach(c => { c.lecture = p.p_lecture; }); return null; },
     accepter_capture_retard: p => { const c = DB.captures.find(x => x.id === p.p_capture); c.exception = p.p_motif; c.statut = 'recue'; return null; },
     ecarter_captures: p => { const l = DB.captures.filter(c => c.match_id === p.p_match && p.p_captures.includes(c.id) && c.statut === 'recue'); l.forEach(c => { c.statut = 'ecartee'; c.motif = p.p_motif; }); return l.map(c => c.chemin); },
+    // Prochains événements (migration 0016). Rôle imité : window.FAUX_ROLE = 'admin' (par défaut), 'membre' ou 'suspendu' ;
+    // window.FAUX_MOI = identifiant du membre imité (1 par défaut).
+    prochains_evenements: () => {
+      const role = window.FAUX_ROLE || 'admin', adm = role === 'admin', moi = adm ? null : (window.FAUX_MOI || 1), actif = role === 'membre';
+      const t = Date.now(), plage = 3600000, mb = id => { const x = DB.membres.find(m => m.id === id); return x ? { matricule: x.matricule, nom_gamer: x.nom_gamer } : null; };
+      const J = (DB.jours_match || []).slice().sort((a, b) => a.jour.localeCompare(b.jour));
+      const jours = J.filter(j => new Date(j.debut).getTime() + plage > t).slice(0, 6).map(j => {
+        const sa = (DB.salles || []).find(x => x.jour_id === j.id), parts = (DB.participations || []).filter(x => x.jour_id === j.id);
+        const ouv = j.statut === 'prevu' && t < new Date(j.debut).getTime() + plage, prev = J.filter(x => x.jour < j.jour && x.statut !== 'annule').pop();
+        return { id: j.id, jour: j.jour, debut: j.debut, carte: j.statut === 'annule' ? null : j.carte, statut: j.statut, motif: j.motif || null, reporte_de: prev && prev.statut === 'reporte' ? prev.jour : null,
+          participants: parts.length, moi: moi !== null && parts.some(x => x.membre_id === moi), noms: adm ? parts.map(x => mb(x.membre_id)) : null,
+          code: role !== 'suspendu' && ouv && sa ? sa.code : null, mot_de_passe: role !== 'suspendu' && ouv && sa ? sa.mot_de_passe : null, salle_saisie: !!sa && ouv };
+      });
+      const libres = (DB.creneaux || []).filter(c => c.statut === 'annonce' && new Date(c.debut).getTime() + plage > t).map(c => {
+        const sa = (DB.salles || []).find(x => x.creneau_id === c.id), orga = c.organisateur_id === moi, voit = role !== 'suspendu' || false;
+        return { id: c.id, debut: c.debut, organisateur: mb(c.organisateur_id), haavk: mb(c.resp_haavk_id), gti: mb(c.resp_gti_id), moi_organisateur: orga,
+          code: voit && sa ? sa.code : null, mot_de_passe: voit && sa ? sa.mot_de_passe : null, salle_saisie: !!sa };
+      });
+      const evenements = (DB.evenements || []).filter(e => !e.retire_le && new Date(e.fin || new Date(e.debut).getTime() + 86400000).getTime() > t).sort((a, b) => String(a.debut).localeCompare(String(b.debut)));
+      return { maintenant: new Date().toISOString(), voit_code: role !== 'suspendu', peut_participer: actif, admin: adm, rotation: ROTATION, heure: '16:05', salle_ouverture_min: 15, jours, libres, evenements };
+    },
+    participer: p => {
+      if (window.FAUX_ROLE !== 'membre') throw new Error('Démarche impossible pendant une suspension.');
+      const moi = window.FAUX_MOI || 1; DB.participations = (DB.participations || []).filter(x => !(x.jour_id === p.p_jour && x.membre_id === moi));
+      if (p.p_oui) DB.participations.push({ jour_id: p.p_jour, membre_id: moi, cree_le: iso() }); return null;
+    },
+    noter_salle: p => {
+      p = p.p; DB.salles = DB.salles || [];
+      const k = p.jour_id ? 'jour_id' : 'creneau_id', id = p.jour_id || p.creneau_id;
+      DB.salles = DB.salles.filter(x => x[k] !== id);
+      if (p.code || p.mot_de_passe) DB.salles.push({ id: ++seq, [k]: id, code: p.code || null, mot_de_passe: p.mot_de_passe || null, modifie_le: iso() });
+      return null;
+    },
+    calendrier_admin: () => (DB.jours_match || []).slice().sort((a, b) => a.jour.localeCompare(b.jour)).map(j => {
+      const sa = (DB.salles || []).find(x => x.jour_id === j.id), mt = DB.matchs.find(m => m.jour_id === j.id), t = Date.now();
+      return { id: j.id, jour: j.jour, debut: j.debut, carte: j.carte, statut: j.statut, motif: j.motif || null, modifiable: true, passe: new Date(j.debut).getTime() <= t,
+        salle_ouverte: t < new Date(j.debut).getTime() + 3600000, code: sa ? sa.code : null, mot_de_passe: sa ? sa.mot_de_passe : null,
+        match_id: mt ? mt.id : null, match_statut: mt ? mt.statut : null,
+        noms: (DB.participations || []).filter(x => x.jour_id === j.id).map(x => { const m = DB.membres.find(y => y.id === x.membre_id); return { matricule: m.matricule, nom_gamer: m.nom_gamer }; }) };
+    }),
+    decider_jour: p => {
+      const j = DB.jours_match.find(x => x.id === p.p_jour);
+      if (p.p_decision === 'retablir') { j.statut = 'prevu'; j.motif = null; }
+      else { j.statut = p.p_decision === 'reporter' ? 'reporte' : 'annule'; j.motif = p.p_motif || (p.p_decision === 'reporter' ? 'Carte manquante' : null); }
+      // Même calcul que calendrier_recalculer() : la 1re date garde sa carte ; reporte = même carte à la date suivante.
+      const J = DB.jours_match.slice().sort((a, b) => a.jour.localeCompare(b.jour)); let idx = 0;
+      J.forEach((r, i) => {
+        if (i === 0) { const ps = ROTATION.indexOf(r.carte); if (ps >= 0) idx = ps + (r.statut === 'prevu' ? 1 : 0); return; }
+        if (r.statut === 'annule') { r.carte = null; return; }
+        r.carte = ROTATION[idx % ROTATION.length]; if (r.statut === 'prevu') idx++;
+      });
+      return null;
+    },
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {
