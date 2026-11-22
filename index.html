@@ -398,12 +398,13 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         <button type="button" data-goto="r-statut">3. Statut de membre</button>
         <button type="button" data-goto="r-matchs">4. Matchs de Katana et matchs libres</button>
         <button type="button" data-goto="r-valid">5. Validité et preuves</button>
-        <button type="button" data-goto="r-stats">6. Statistiques et distinctions</button>
-        <button type="button" data-goto="r-dep">7. Départages et égalités</button>
-        <button type="button" data-goto="r-cal">8. Calendrier et réclamations</button>
-        <button type="button" data-goto="r-lots">9. Récompenses</button>
-        <button type="button" data-goto="r-sanc">10. Intégrité et sanctions</button>
-        <button type="button" data-goto="r-conf">11. Confidentialité</button>
+        <button type="button" data-goto="r-attente">6. Matchs en attente et litiges</button>
+        <button type="button" data-goto="r-stats">7. Statistiques et distinctions</button>
+        <button type="button" data-goto="r-dep">8. Départages et égalités</button>
+        <button type="button" data-goto="r-cal">9. Calendrier et réclamations</button>
+        <button type="button" data-goto="r-lots">10. Récompenses</button>
+        <button type="button" data-goto="r-sanc">11. Intégrité et sanctions</button>
+        <button type="button" data-goto="r-conf">12. Confidentialité</button>
         <button type="button" data-goto="r-chg">Ce qui change</button>
       </nav>
       <div>
@@ -490,7 +491,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
 
         <article class="chap" id="r-matchs">
           <h2><span class="cn">4</span>Matchs de Katana et matchs libres</h2>
-          <p>Tous les matchs valides ont la même valeur pour les classements. Chaque match garde une étiquette « officiel » ou « libre ».</p>
+          <p>Tous les matchs valides ont la même valeur pour les classements. Chaque match garde une étiquette « Katana » ou « libre ».</p>
           <h3>Matchs de Katana</h3>
           <ul>
             <li>Matchs programmés par Katana, en général le mercredi et le samedi à 16 h (étiquette « Katana »). Sa seule capture suffit.<span class="chg">Mis à jour</span></li>
@@ -504,7 +505,10 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Un seul match est comptabilisé par créneau déclaré.</li>
             <li>Un organisateur et un responsable par faction. Chaque responsable envoie sa capture par le site ; l’organisateur aussi s’il n’est pas responsable. Les captures doivent concorder, sinon le match est mis en attente.</li>
             <li>La capture doit être envoyée au plus <b>10 minutes</b> après l’heure de fin affichée, selon l’heure d’envoi enregistrée par le site. L’heure de fin doit tomber entre l’heure annoncée et 1 h après.<span class="chg">Mis à jour</span></li>
+            <li><b>Matricule non autorisé</b> : si un matricule déclaré comme organisateur ou responsable n’est pas autorisé pour la saison, la déclaration est retenue et Katana est averti. Le message affiché reste neutre.<span class="chg">Nouveau</span></li>
           </ul>
+          <h3>Phase de démarrage</h3>
+          <p>Avant le lancement de la LEAGUE UV, seuls les matchs de Katana comptent. Ils sont saisis avec sa seule capture, sans délai de 10 minutes (« saisie de démarrage »). Les autres règles s’appliquent.<span class="chg">Nouveau</span></p>
         </article>
 
         <article class="chap" id="r-valid">
@@ -527,11 +531,29 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Une déconnexion ou un abandon n’efface pas automatiquement les statistiques déjà acquises : la validité générale du match est examinée.</li>
             <li>Un match invalidé est retiré pour tous ses participants, sans sanction individuelle automatique.</li>
             <li>La date d’une capture peut être falsifiée : l’organisation peut refuser un match suspect.</li>
+            <li><b>Lisibilité</b> : une capture floue ou partiellement illisible n’est jamais acceptée. Si plusieurs captures sont complètes et lisibles, la plus visible est retenue, sans mélange entre captures.<span class="chg">Nouveau</span></li>
+            <li><b>Aucune capture valable à temps</b> : le match est refusé. Il est gardé avec son motif, mais il ne compte pas.</li>
+            <li><b>Concordance</b> : plusieurs captures doivent montrer les mêmes pseudos, les mêmes statistiques par joueur, la même carte, avec une victoire d’un côté et une défaite de l’autre. Sinon, le match est mis en attente.</li>
+            <li><b>Compte inactif</b> : la ligne ne compte pas, et le joueur reçoit une simple notification.</li>
+            <li><b>Temps de jeu</b> : il n’est pas mesuré ; seul compte le résultat final de la capture.</li>
           </ul>
         </article>
 
+        <article class="chap" id="r-attente">
+          <h2><span class="cn">6</span>Matchs en attente et litiges</h2>
+          <p>Un match qui ne peut pas être validé automatiquement est <b>mis en attente</b>. Katana le tranche dans les <b>48 heures</b> qui suivent la fin du match.<span class="chg">Nouveau</span></p>
+          <ul>
+            <li>Un dossier s’ouvre dans le site, avec une discussion réservée à Katana et aux personnes convoquées. Elle a lieu uniquement dans le site, et les échanges ne sont pas simultanés.</li>
+            <li>Katana convoque les responsables et l’organisateur, et des témoins des deux factions si besoin. Chaque personne convoquée <b>confirme la réception sous 12 heures</b> et reste disponible.</li>
+            <li>Katana décide : vraie capture retenue, match refusé ou match annulé. <b>La discussion est alors fermée.</b></li>
+            <li>Une synthèse du dossier est validée par Katana, puis archivée. Seule la vraie capture est conservée.</li>
+            <li>Un match tranché après la coupure d’un samedi compte pour le classement provisoire suivant.</li>
+          </ul>
+          <p><b>Litige ou non</b> : une capture contradictoire ou falsifiée est un litige. Un écart de pseudo ou un compte inactif n’en est pas un : c’est une simple notification.</p>
+        </article>
+
         <article class="chap" id="r-stats">
-          <h2><span class="cn">6</span>Statistiques et distinctions</h2>
+          <h2><span class="cn">7</span>Statistiques et distinctions</h2>
           <div class="scroll"><table>
             <thead><tr><th>N°</th><th>Statistique</th><th>Utilisation</th></tr></thead>
             <tbody>
@@ -555,7 +577,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-dep">
-          <h2><span class="cn">7</span>Départages et égalités</h2>
+          <h2><span class="cn">8</span>Départages et égalités</h2>
           <div class="scroll"><table>
             <thead><tr><th>Distinction</th><th>Critère principal</th><th>2e critère</th><th>3e critère</th></tr></thead>
             <tbody>
@@ -571,7 +593,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-cal">
-          <h2><span class="cn">8</span>Calendrier, publication et réclamations</h2>
+          <h2><span class="cn">9</span>Calendrier, publication et réclamations</h2>
           <ul>
             <li>Classement provisoire publié le <b>dimanche, tous les 14 jours</b>.<span class="chg">Confirmé</span></li>
             <li>Coupure le <b>samedi à 16 h</b>, selon l’<b>heure d’envoi</b> de la capture : envoyée avant 16 h, elle compte pour le provisoire du lendemain, même validée après ; sinon pour le suivant. Seul le match de Katana compte encore à 16 h ou après. Un match en attente tranché ou une ligne identifiée après la coupure compte pour le classement suivant.<span class="chg">Mis à jour</span></li>
@@ -582,7 +604,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-lots">
-          <h2><span class="cn">9</span>Récompenses et redistribution</h2>
+          <h2><span class="cn">10</span>Récompenses et redistribution</h2>
           <ul>
             <li>Un joueur peut remporter plusieurs titres, mais ne reçoit qu’<b>un seul lot matériel</b> sur toute la distribution. Il ne choisit pas la distinction à laquelle son lot est rattaché.</li>
             <li>Les lots dépendent des moyens et des partenaires réellement confirmés. Aucun lot n’est annoncé avant confirmation.</li>
@@ -608,7 +630,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         </article>
 
         <article class="chap" id="r-sanc">
-          <h2><span class="cn">10</span>Intégrité et sanctions</h2>
+          <h2><span class="cn">11</span>Intégrité et sanctions</h2>
           <h3>Comportements interdits</h3>
           <ul>
             <li>Utiliser plusieurs comptes pour cumuler des statistiques ou occuper plusieurs places dans un match.</li>
@@ -618,17 +640,42 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Fournir une fausse identité, un pseudo ou un UID incorrect, ou contourner une sanction.</li>
             <li>Avoir un comportement toxique envers les autres joueurs.</li>
           </ul>
-          <h3>Mesures possibles</h3>
-          <p>Demande d’explication, avertissement, retrait de statistiques, invalidation d’un résultat, <b>suspension temporaire</b> (date de fin fixée par l’organisation, matchs non comptabilisés pendant la période) ou <b>exclusion définitive</b> (faits graves ou répétés). Pendant une sanction, le matricule est conservé et les comptes de jeu sont inactifs.</p>
-          <p>Une anomalie statistique n’est jamais, à elle seule, une preuve de fraude : elle déclenche une vérification humaine, jamais une sanction automatique. Le joueur est toujours informé du motif, peut présenter sa version des faits et dispose d’un recours sous 48 heures.</p>
+          <h3>Tableau-guide des sanctions</h3>
+          <p>Le tableau est un <b>guide</b> : Katana décide au cas par cas, avec ou sans avertissement préalable.<span class="chg">Nouveau</span></p>
+          <div class="scroll"><table>
+            <thead><tr><th>Situation</th><th>Sanction</th></tr></thead>
+            <tbody>
+              <tr><td>Comportement toxique prouvé, première fois</td><td>Avertissement</td></tr>
+              <tr><td>Comportement toxique répété</td><td>Suspension, 14 jours au plus</td></tr>
+              <tr><td>Capture falsifiée</td><td>Suspension du fraudeur ; il ne peut plus être organisateur ni responsable pendant la saison ; le match compte si le vrai résultat est retrouvé, sinon il est annulé pour tous</td></tr>
+              <tr><td>Deux comptes d’une même personne dans un match, ou compte prêté</td><td>Suspension ; le match reste valide, seules les statistiques de cette personne ne comptent pas</td></tr>
+              <tr><td>Compte d’un ami inscrit comme le sien</td><td>Suspension, compte retiré</td></tr>
+              <tr><td>Fausse identité</td><td>Compte supprimé, accès fermé, données gardées en privé pour enquête</td></tr>
+              <tr><td>Double inscription, ou nouveau matricule pour contourner une sanction</td><td>Les deux comptes supprimés, bannissement</td></tr>
+              <tr><td>Farming ou entente pour manipuler un match</td><td>Exclusion</td></tr>
+              <tr><td>Récidive après une suspension</td><td>Exclusion</td></tr>
+              <tr><td>Divulgation d’un litige : première fois / répétée / nuisant gravement à une personne</td><td>Avertissement / suspension de 14 jours au plus / exclusion</td></tr>
+              <tr><td>Compte inactif utilisé, ou écart de pseudo</td><td>Pas de sanction, simple notification</td></tr>
+            </tbody>
+          </table></div>
+          <ul>
+            <li><b>Suspension</b> : 14 jours au plus, avec une date de fin fixée par Katana. Elle porte sur tout le matricule. Le joueur reste membre, mais ses comptes sont inactifs et ses matchs de la période ne comptent pas.</li>
+            <li><b>Exclusion</b> : définitive. Le matricule est conservé et n’est jamais réutilisé.</li>
+            <li><b>Pendant une sanction</b> : le joueur lit les annonces et peut contester. Il ne fait aucune demande et n’envoie aucune capture.</li>
+            <li><b>Recours</b> : la sanction s’applique dès la décision, et le joueur reçoit le motif. Il peut contester <b>dans les 48 heures</b>, dans « Mon compte ». Passé ce délai, la décision est définitive. Si la contestation aboutit, la sanction est levée et les matchs concernés sont recomptés.</li>
+            <li><b>Captures écartées</b> : supprimées à la fin du délai de recours s’il y a une sanction, tout de suite sinon. Le registre et la synthèse du dossier sont conservés.</li>
+            <li><b>Aucune sanction n’est publiée</b> : ni nom, ni motif, ni catégorie.</li>
+            <li>Une anomalie statistique n’est jamais une preuve à elle seule : elle entraîne une vérification humaine, jamais une sanction automatique.</li>
+          </ul>
         </article>
 
         <article class="chap" id="r-conf">
-          <h2><span class="cn">11</span>Confidentialité</h2>
+          <h2><span class="cn">12</span>Confidentialité</h2>
           <ul>
             <li>Publics : nom de gamer, pseudos, matricule et statistiques des classements.</li>
             <li>Privés : identité, e-mail, date de naissance, UID (visible uniquement par l’organisation et le joueur concerné) et historique des comptes.</li>
             <li>Ne publiez jamais les informations personnelles ou l’UID d’un autre joueur. Pour toute question ou contestation, utilisez le canal privé indiqué par l’organisation.</li>
+            <li><b>Litiges</b> : les discussions, témoignages, captures et échanges avec Katana sont confidentiels. Seuls Katana et les personnes convoquées y ont accès. Il est interdit de les divulguer, de les copier ou de les publier, sur quelque support que ce soit. Une personne convoquée peut dire qu’elle a été convoquée et parler de ce qui la concerne directement, sans reprendre les témoignages ni les captures des autres. Les décisions publiées ne sont pas concernées.<span class="chg">Nouveau</span></li>
           </ul>
         </article>
 
@@ -644,6 +691,9 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
             <li>Langue : comprendre le malgache est essentiel ; le parler est une information non bloquante.</li>
             <li>Statuts : suspension, retrait, réintégration et périodes de comptabilisation.</li>
             <li>Classement provisoire tous les 14 jours, le dimanche, avec coupure le samedi à 16 h selon l’heure d’envoi de la capture.</li>
+            <li>Matchs en attente et litiges : dossier dans le site, convocations, décision sous 48 h, confidentialité.</li>
+            <li>Sanctions : tableau-guide, recours de 48 h, aucune sanction publiée.</li>
+            <li>Phase de démarrage : seuls les matchs de Katana comptent avant le lancement.</li>
           </ul>
         </article>
       </div>
