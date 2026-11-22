@@ -91,11 +91,19 @@ srv.listen(8765, async () => {
       if (!/17 participant/.test(c) || !/à identifier/.test(c)) throw new Error(c);
       if (await p.isDisabled('#ed-valider')) throw new Error('bouton bloqué');
     });
-    await etape('écart de 3 → validation bloquée', async () => {
+    await etape('écart de 3 → validation bloquée, critère non rempli, motif proposé', async () => {
       await p.selectOption('tr[data-i="9"] select[data-f="faction"]', 'GTI'); await p.waitForTimeout(200);
       const c = await p.textContent('#ed-ctrl'); if (!/Écart/.test(c)) throw new Error(c);
       if (!(await p.isDisabled('#ed-valider'))) throw new Error('bouton actif');
+      const nonRemplis = await p.$$eval('#ed-criteres li.b', x => x.map(e => e.textContent));
+      if (nonRemplis.length !== 1 || !/écart 3/.test(nonRemplis[0])) throw new Error('critères : ' + JSON.stringify(nonRemplis));
+      const remplis = await p.$$eval('#ed-criteres li.o', x => x.length); if (remplis < 8) throw new Error(remplis + ' critères remplis');
+      await p.click('[data-act="ed-motif-auto"]'); await p.waitForTimeout(100);
+      const motif = await p.inputValue('#e-motif'); if (!/^Critère\(s\) non rempli\(s\) : Écart d’effectif de 3/.test(motif)) throw new Error('motif : ' + motif);
+      await p.locator('#ed-ctrl').screenshot({ path: path.join(ICI, 'criteres.png') });
+      await p.fill('#e-motif', '');
       await p.selectOption('tr[data-i="9"] select[data-f="faction"]', 'HAAVK'); await p.waitForTimeout(200);
+      if (await p.$('[data-act="ed-motif-auto"]')) throw new Error('bouton du motif encore là');
     });
     await etape('valider le match', async () => {
       await p.click('#ed-valider'); await p.waitForTimeout(800);
