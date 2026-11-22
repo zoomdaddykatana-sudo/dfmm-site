@@ -16,7 +16,11 @@ for (const f of fs.readdirSync(dm).sort()) {
 }
 PARAMS.inscriptions_ouvertes.valeur = true;
 const base = { parametres: Object.values(PARAMS), membres: [], periodes: [], comptes_jeu: [], comptes_periodes: [], pseudos_historique: [],
-  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], lots: [], actualites: [], messages: [{ id: 900, membre_id: 2, de_katana: false, texte: 'Bonjour Katana, une question', publication_id: null, cree_le: '2026-11-21T10:00:00Z', lu_le: null }], publications: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
+  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], lots: [], actualites: [], messages: [{ id: 900, membre_id: 2, de_katana: false, texte: 'Bonjour Katana, une question', publication_id: null, cree_le: '2026-11-21T10:00:00Z', lu_le: null }], publications: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [],
+  // Calendrier des matchs de Katana (migration 0016) : 1re date le mercredi 25/11/2026 sur Ascension, à 16 h 05.
+  jours_match: [['2026-11-25', 'Ascension'], ['2026-11-28', 'Ligne de tranchées'], ['2026-12-02', 'Accident de train'], ['2026-12-05', "Canal d'Akh"]]
+    .map(([jour, carte], i) => ({ id: 800 + i, jour, debut: jour + 'T13:05:00Z', carte, statut: 'prevu', motif: null })),
+  salles: [], participations: [], evenements: [] };
 for (let i = 1; i <= 8; i++) {
   base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', date_approbation: '2026-11-18T00:00:00+03:00' });
   base.periodes.push({ id: 100 + i, membre_id: i, debut: '2026-11-17T21:00:00Z', fin: null });
@@ -85,6 +89,17 @@ srv.listen(8765, async () => {
       const carte = await p.inputValue('#e-carte'); if (carte !== 'Faille') throw new Error('carte ' + carte);
       const r1 = await p.textContent('#res-0'); if (!/DFMM-1/.test(r1)) throw new Error('ligne 1 : ' + r1);
       const r17 = await p.textContent('#res-16'); if (!/identifier/i.test(r17)) throw new Error('ligne 17 : ' + r17);
+    });
+    await etape('début annoncé obligatoire pour un match de Katana (retard pour tous les matchs)', async () => {
+      if (!(await p.isDisabled('#ed-valider'))) throw new Error('bouton actif sans début annoncé');
+      const nr = await p.$$eval('#ed-criteres li.b', x => x.map(e => e.textContent));
+      if (!nr.some(t => /Début annoncé du match/.test(t))) throw new Error(JSON.stringify(nr));
+      await p.fill('#e-debut', '2026-11-18T17:00'); await p.dispatchEvent('#e-debut', 'change'); await p.waitForTimeout(200);
+      const at = await p.$$eval('#ed-criteres li.w', x => x.map(e => e.textContent));
+      if (!at.some(t => /Fin au plus 1 h après le début annoncé/.test(t))) throw new Error('fin avant le début non signalée : ' + JSON.stringify(at));
+      await p.fill('#e-debut', '2026-11-18T16:00'); await p.dispatchEvent('#e-debut', 'change'); await p.waitForTimeout(200);
+      const ok = await p.$$eval('#ed-criteres li.o', x => x.map(e => e.textContent));
+      if (!ok.some(t => /Fin au plus 1 h après le début annoncé/.test(t)) || !ok.some(t => /Début annoncé du match/.test(t))) throw new Error(JSON.stringify(ok));
     });
     await etape('contrôles : 17 joueurs, écart 1 accepté, 1 ligne à identifier, critères en bas', async () => {
       const c = await p.textContent('#ed-ctrl'); console.log('     ' + c.replace(/\s+/g, ' ').slice(0, 220));
@@ -337,6 +352,73 @@ srv.listen(8765, async () => {
       const appel = await p.evaluate(() => (window.APPELS || []).find(a => a[0] === 'fonction:pseudo-volsever'));
       if (!appel || appel[1].reverifier_inscription !== 51) throw new Error(JSON.stringify(appel));
       await p.screenshot({ path: path.join(ICI, 'inscriptions.png'), fullPage: false });
+    });
+    await etape('calendrier : dates, code de la salle, report puis rétablissement', async () => {
+      await p.goto('http://localhost:8765/#admin-calendrier'); await p.waitForTimeout(900);
+      const t = await p.textContent('#cal-liste');
+      if (!/mercredi 25 novembre 2026 à 16 h 05/.test(t) || !/Carte : Ascension/.test(t) || !/samedi 28 novembre 2026/.test(t)) throw new Error(t.slice(0, 300));
+      await p.fill('#cal-code-800', '4242'); await p.fill('#cal-mdp-800', 'uv'); await p.click('[data-act="cal-salle"][data-id="800"]'); await p.waitForTimeout(500);
+      const sa = await p.evaluate(() => JSON.stringify(window.FAUSSE_BASE.salles.map(x => [x.jour_id, x.code, x.mot_de_passe])));
+      if (sa !== '[[800,"4242","uv"]]') throw new Error(sa);
+      global.REPONSE_PROMPT = '';
+      await p.click('[data-act="cal-decider"][data-d="reporter"][data-id="801"]'); await p.waitForTimeout(600);
+      let c = await p.evaluate(() => window.FAUSSE_BASE.jours_match.map(j => j.statut + ' ' + j.carte).join(' | '));
+      if (c !== 'prevu Ascension | reporte Ligne de tranchées | prevu Ligne de tranchées | prevu Accident de train') throw new Error(c);
+      if (!/Carte manquante/.test(await p.textContent('#cal-liste'))) throw new Error('motif absent');
+      await p.click('[data-act="cal-decider"][data-d="retablir"][data-id="801"]'); await p.waitForTimeout(600);
+      c = await p.evaluate(() => window.FAUSSE_BASE.jours_match.map(j => j.carte).join(' | '));
+      if (c !== "Ascension | Ligne de tranchées | Accident de train | Canal d'Akh") throw new Error(c);
+    });
+    await etape('calendrier : « Saisir ce match » reprend la carte et le début annoncé', async () => {
+      await p.click('[data-act="cal-saisir"][data-id="800"]'); await p.waitForTimeout(700);
+      if (await p.inputValue('#e-debut') !== '2026-11-25T16:05' || await p.inputValue('#e-carte') !== 'Ascension') throw new Error(await p.inputValue('#e-debut') + ' ' + await p.inputValue('#e-carte'));
+      if (!/Match du calendrier/.test(await p.textContent('#modal-b'))) throw new Error('note absente');
+      await p.click('#modal-f button:has-text("Enregistrer")'); await p.waitForTimeout(500);
+      const m = await p.evaluate(() => { const x = window.FAUSSE_BASE.matchs.find(m => m.jour_id === 800); return x ? x.carte + ' ' + x.debut_annonce : 'aucun'; });
+      if (m !== 'Ascension 2026-11-25T16:05:00+03:00') throw new Error(m);
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(600);
+      if (!/Ouvrir le match M-/.test(await p.textContent('#cal-liste [data-jour="800"]'))) throw new Error('lien vers le match absent');
+    });
+    await etape('événement communautaire créé par Katana', async () => {
+      await p.fill('#evc-titre', 'Tournoi de Noël'); await p.fill('#evc-debut', '2026-12-20T15:00'); await p.fill('#evc-desc', 'Ouvert à tous les membres.');
+      await p.click('[data-act="evc-creer"]'); await p.waitForTimeout(600);
+      const e = await p.evaluate(() => JSON.stringify(window.FAUSSE_BASE.evenements.map(x => [x.titre, x.debut])));
+      if (e !== '[["Tournoi de Noël","2026-12-20T15:00:00+03:00"]]') throw new Error(e);
+      if (!/Tournoi de Noël/.test(await p.textContent('#evc-liste'))) throw new Error('liste');
+    });
+    await etape('prochains événements : vue de Katana (noms, code, rotation, événement)', async () => {
+      if (await p.isHidden('#nav-evenements')) throw new Error('lien du menu caché');
+      await p.evaluate(() => { window.FAUSSE_BASE.participations.push({ jour_id: 800, membre_id: 3, cree_le: '2026-11-22T06:00:00Z' }); });
+      await p.goto('http://localhost:8765/#evenements'); await p.waitForTimeout(800);
+      const t = await p.textContent('#ev-zone');
+      for (const x of ['Prochain match de Katana', 'mercredi 25 novembre 2026 à 16 h 05', 'Ascension', 'vers 15 h 50', '4242', 'DFMM-3 Faux 3', 'Craqué → Ascension', 'Tournoi de Noël', 'Matchs libres annoncés'])
+        if (t.indexOf(x) < 0) throw new Error('absent : ' + x + ' — ' + t.slice(0, 300));
+      if (await p.$('[data-act="ev-participer"]')) throw new Error('« Je participe » affiché à Katana (pas membre)');
+    });
+    await etape('prochains événements : membre actif (Je participe, code, organisateur d’un match libre)', async () => {
+      await p.evaluate(() => { window.FAUX_ROLE = 'membre'; window.FAUX_MOI = 4; });
+      await p.goto('http://localhost:8765/#accueil'); await p.goto('http://localhost:8765/#evenements'); await p.waitForTimeout(800);
+      let t = await p.textContent('#ev-zone');
+      if (/Noms/.test(t) || !/4242/.test(t)) throw new Error(t.slice(0, 300));
+      await p.click('[data-act="ev-participer"][data-oui="1"]'); await p.waitForTimeout(600);
+      if (await p.textContent('#ev-nb') !== '2' || !/Vous participez/.test(await p.textContent('#ev-prochain'))) throw new Error(await p.textContent('#ev-prochain'));
+      // Match libre L-701 (organisateur DFMM-4, accepté plus haut) : l'organisateur saisit le code.
+      await p.fill('#evl-code-701', 'L701'); await p.fill('#evl-mdp-701', 'libre'); await p.click('[data-act="ev-salle-libre"][data-id="701"]'); await p.waitForTimeout(600);
+      t = await p.textContent('#ev-libres'); if (!/L701/.test(t) || !/DFMM-4 Faux 4/.test(t)) throw new Error(t.slice(0, 300));
+      await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
+      await p.screenshot({ path: path.join(ICI, 'evenements-telephone.png'), fullPage: true });
+      const deborde = await p.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1);
+      if (deborde) throw new Error('la page déborde sur téléphone');
+      await p.setViewportSize({ width: 1280, height: 900 });
+      await p.click('[data-act="ev-participer"][data-oui="0"]'); await p.waitForTimeout(600);
+      if (await p.textContent('#ev-nb') !== '1') throw new Error('désinscription');
+    });
+    await etape('prochains événements : membre suspendu (ni code ni « Je participe »)', async () => {
+      await p.evaluate(() => { window.FAUX_ROLE = 'suspendu'; window.FAUX_MOI = 2; });
+      await p.goto('http://localhost:8765/#accueil'); await p.goto('http://localhost:8765/#evenements'); await p.waitForTimeout(800);
+      const t = await p.textContent('#ev-zone');
+      if (/4242|L701/.test(t) || !/réservés aux membres actifs non suspendus/.test(t) || await p.$('[data-act="ev-participer"]')) throw new Error(t.slice(0, 300));
+      await p.evaluate(() => { window.FAUX_ROLE = 'admin'; });
     });
     await p.screenshot({ path: path.join(ICI, 'editeur.png'), fullPage: false });
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);

@@ -178,6 +178,12 @@ var L = (function () {
     return { deb: deb, fin: addMinutes(deb, R.plage_fin_h * 60) };
   }
 
+  // Plage de l'heure de fin d'un match de Katana : du début annoncé à « plage_fin_h » heures après (null sans début).
+  function bornesKatana(match, R) {
+    if (!validDT(match.debut_annonce)) return null;
+    return { deb: match.debut_annonce, fin: addMinutes(match.debut_annonce, R.plage_fin_h * 60) };
+  }
+
   function valeurManquante(v) { return v === '' || v === null || v === undefined || isNaN(Number(v)); }
 
   // ---------- Contrôles d'un match ----------
@@ -246,6 +252,12 @@ var L = (function () {
         var deja = autres.filter(function (m) { return m.creneau_id === cr.id && m.statut === 'Validé'; });
         if (deja.length) B.push('Un match est déjà validé pour ce créneau (' + deja[0].id + ') : un seul match par créneau.');
       }
+    } else {
+      // Retard (décision de Katana du 22/11/2026, pour tous les matchs) : la fin doit tomber entre le début annoncé
+      // et « plage_fin_h » heures après ; sinon match en attente, comme un match libre (choix 1 B). Début annoncé obligatoire.
+      var bK = bornesKatana(match, R);
+      if (!bK) B.push('Début annoncé du match manquant (heure de début prévue, par exemple 16:05).');
+      else if (validDT(match.fin) && (match.fin < bK.deb || match.fin > bK.fin)) A.push('Heure de fin hors de la plage du début annoncé (' + bK.deb.replace('T', ' ') + ' → ' + bK.fin.replace('T', ' ') + ') : match en attente.');
     }
     lignes.forEach(function (l, i) {
       if (l.mat) { var st = ligneCompte(l, match, ctx); if (!st.ok) W.push('Ligne ' + (i + 1) + ' (' + l.pseudo + ') : non comptée, ' + st.raison + '.'); }
@@ -277,6 +289,11 @@ var L = (function () {
       else crit('Fin dans la plage du créneau', 'sans_objet', crL ? 'heure de fin manquante' : 'aucun créneau');
       var dejaL = crL ? autres.filter(function (m) { return m.creneau_id === crL.id && m.statut === 'Validé'; }) : [];
       crit('Un seul match validé par créneau', dejaL.length ? 'non' : 'ok', dejaL.length ? 'déjà validé : ' + dejaL[0].id : '');
+    } else {
+      var bK2 = bornesKatana(match, R), nomK = 'Fin au plus ' + R.plage_fin_h + ' h après le début annoncé';
+      crit('Début annoncé du match', bK2 ? 'ok' : 'non', bK2 ? bK2.deb.replace('T', ' ') : 'manquant');
+      if (bK2 && validDT(match.fin)) crit(nomK, match.fin < bK2.deb || match.fin > bK2.fin ? 'attente' : 'ok', bK2.deb.replace('T', ' ') + ' → ' + bK2.fin.replace('T', ' '));
+      else crit(nomK, 'sans_objet', bK2 ? 'heure de fin manquante' : 'début annoncé manquant');
     }
     return { bloquants: B, attente: A, alertes: W, criteres: C, total: total, h: h, g: g, membres: membres, requis: requis };
   }
