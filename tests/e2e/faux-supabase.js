@@ -3,7 +3,7 @@
   const iso = () => new Date().toISOString();
   let seq = 100;
   const DB = window.FAUSSE_BASE;
-  const FK = { convocations: 'dossier_id', messages_litige: 'dossier_id', periodes: 'membre_id', comptes_jeu: 'membre_id', comptes_periodes: 'compte_id', pseudos_historique: 'compte_id', match_lignes: 'match_id', captures: 'match_id', membres_prives: 'membre_id', demandes: 'membre_id' };
+  const FK = { matchs: 'creneau_id', convocations: 'dossier_id', messages_litige: 'dossier_id', periodes: 'membre_id', comptes_jeu: 'membre_id', comptes_periodes: 'compte_id', pseudos_historique: 'compte_id', match_lignes: 'match_id', captures: 'match_id', membres_prives: 'membre_id', demandes: 'membre_id' };
   function projeter(table, row, sel) {
     const out = Object.assign({}, row);
     const re = /([a-z_]+)\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g; let m;
@@ -101,6 +101,12 @@
     sanctionner_dossier: p => { DB.sanctions.find(x => x.id === p.p_sanction).dossier_id = p.p_dossier; return null; },
     repondre_membre: p => { (DB.messages = DB.messages || []).push({ id: ++seq, membre_id: p.p_membre, de_katana: true, texte: p.p_texte, publication_id: null, cree_le: iso(), lu_le: null }); DB.notifications.push({ id: ++seq, membre_id: p.p_membre, texte: 'Nouveau message de Katana', lu: false }); return null; },
     marquer_messages_lus: p => { (DB.messages || []).filter(m => m.membre_id === p.p_membre && !m.de_katana && !m.lu_le).forEach(m => { m.lu_le = iso(); }); return null; },
+    marquer_creneaux_vus: () => { DB.creneaux.filter(c => !c.vu_le && c.statut !== 'retenu').forEach(c => { c.vu_le = iso(); }); return null; },
+    decider_creneau: p => { const c = DB.creneaux.find(x => x.id === p.p_creneau); c.statut = p.p_decision === 'accepter' ? 'annonce' : 'refuse'; c.vu_le = iso(); if (c.statut === 'annonce') DB.matchs.push({ id: ++seq, saison_id: c.saison_id, type: 'libre', demarrage: false, statut: 'brouillon', creneau_id: c.id, cree_le: iso() }); return null; },
+    annuler_creneau: p => { const c = DB.creneaux.find(x => x.id === p.p_creneau); c.statut = 'annule'; c.motif = p.p_motif; DB.matchs.filter(m => m.creneau_id === c.id).forEach(m => { m.statut = 'annule'; }); return null; },
+    noter_lecture: p => { DB.captures.filter(c => p.p_captures.includes(c.id)).forEach(c => { c.lecture = p.p_lecture; }); return null; },
+    accepter_capture_retard: p => { const c = DB.captures.find(x => x.id === p.p_capture); c.exception = p.p_motif; c.statut = 'recue'; return null; },
+    ecarter_captures: p => { const l = DB.captures.filter(c => c.match_id === p.p_match && p.p_captures.includes(c.id) && c.statut === 'recue'); l.forEach(c => { c.statut = 'ecartee'; c.motif = p.p_motif; }); return l.map(c => c.chemin); },
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {

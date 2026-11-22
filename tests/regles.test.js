@@ -221,3 +221,28 @@ test('alertes de performance : seuils réglables, jamais bloquantes', () => {
 test('heure de Madagascar : un envoi enregistré par le serveur à 13:05 UTC est 16:05 à Madagascar', () => {
   assert.equal(L.versLocal('2026-11-21T13:05:00Z'), '2026-11-21T16:05');
 });
+
+// ---------- Lot 3B : concordance des captures d'un match libre ----------
+test('Concordance : captures identiques, puis écarts de carte, de statistique et de joueur', () => {
+  const lec = (carte, vainqueur, lignes) => ({ carte, vainqueur, lignes });
+  const l1 = [{ faction: 'HAAVK', pseudo: 'PKL¬Un', ...stats(10) }, { faction: 'GTI', pseudo: 'Joueur2', ...stats(5) }];
+  const ok = L.comparerLectures([{ nom: 'DFMM-1', lecture: lec('Faille', 'HAAVK', l1) }, { nom: 'DFMM-2', lecture: lec('faille', 'HAAVK', l1.map(x => ({ ...x }))) }]);
+  assert.equal(ok.concordant, true); assert.deepEqual(ok.ecarts, []);
+  const l2 = [{ ...l1[0], elim: 11 }, { faction: 'GTI', pseudo: 'Autre', ...stats(5) }];
+  const ko = L.comparerLectures([{ nom: 'DFMM-1', lecture: lec('Faille', 'HAAVK', l1) }, { nom: 'DFMM-2', lecture: lec('Barrage', 'GTI', l2) }]);
+  assert.equal(ko.concordant, false);
+  assert.ok(ko.ecarts.some(e => /Carte différente/.test(e)));
+  assert.ok(ko.ecarts.some(e => /Vainqueur différent/.test(e)));
+  assert.ok(ko.ecarts.some(e => /PKL¬Un : Élim\. 10 \/ 11/.test(e)));
+  assert.ok(ko.ecarts.some(e => /Joueur2 \(GTI\) absent de la capture de DFMM-2/.test(e)));
+  assert.ok(ko.ecarts.some(e => /Autre \(GTI\) absent de la capture de DFMM-1/.test(e)));
+  const flou = L.comparerLectures([{ nom: 'DFMM-1', lecture: { ...lec('Faille', 'HAAVK', l1), lisible: false } }]);
+  assert.equal(flou.alertes.length, 1);
+});
+
+test('Match libre : retard accepté par Katana (échec technique) = pas de blocage du délai', () => {
+  const ctx = ctxAvec(16);
+  const m = match(16, 16, { envoi: '2026-11-21T17:30' });
+  assert.ok(L.controlesMatch(m, ctx, SAISON, R).bloquants.some(b => /min après la fin/.test(b)));
+  assert.ok(!L.controlesMatch({ ...m, delai_exception: true }, ctx, SAISON, R).bloquants.some(b => /min après la fin/.test(b)));
+});
