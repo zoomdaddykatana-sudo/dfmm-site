@@ -78,7 +78,7 @@ srv.listen(8765, async () => {
     for (let i = 1; i <= 8; i++) lignes.push({ faction: i % 2 ? 'GTI' : 'HAAVK', pseudo: 'Invité' + i, score: 900, elim: 3, morts: 4, assist: 1, med: 0, ing: 0, obj: 5, tac: 1 });
     lignes.push({ faction: 'GTI', pseudo: 'Joueur9', score: 1, elim: 0, morts: 0, assist: 0, med: 0, ing: 0, obj: 0, tac: 0 });
     await etape('coller la réponse de claude.ai', async () => {
-      await p.fill('#e-coller', 'Voici le résultat :\n```json\n' + JSON.stringify({ carte: 'Faille', mode: 'Warfare', fin: '2026-11-18T16:40', lignes }) + '\n```');
+      await p.fill('#e-coller', 'Voici le résultat :\n```json\n' + JSON.stringify({ carte: 'Faille', mode: 'Warfare', fin: '2026-11-18T16:40', effectif: { HAAVK: 8, GTI: 9 }, lignes }) + '\n```');
       await p.click('[data-act="ed-coller"]'); await p.waitForTimeout(300);
       const n = await p.$$eval('#ed-table tbody tr[data-i]', x => x.length); if (n !== 17) throw new Error(n + ' lignes');
       const fin = await p.inputValue('#e-fin'); if (fin !== '2026-11-18T16:40') throw new Error('fin ' + fin);
@@ -86,10 +86,14 @@ srv.listen(8765, async () => {
       const r1 = await p.textContent('#res-0'); if (!/DFMM-1/.test(r1)) throw new Error('ligne 1 : ' + r1);
       const r17 = await p.textContent('#res-16'); if (!/identifier/i.test(r17)) throw new Error('ligne 17 : ' + r17);
     });
-    await etape('contrôles : 17 joueurs, écart 1 accepté, 1 ligne à identifier', async () => {
+    await etape('contrôles : 17 joueurs, écart 1 accepté, 1 ligne à identifier, critères en bas', async () => {
       const c = await p.textContent('#ed-ctrl'); console.log('     ' + c.replace(/\s+/g, ' ').slice(0, 220));
       if (!/17 participant/.test(c) || !/à identifier/.test(c)) throw new Error(c);
       if (await p.isDisabled('#ed-valider')) throw new Error('bouton bloqué');
+      if (/Lecture de la capture à corriger/.test(c)) throw new Error('effectif juste signalé à tort');
+      const place = await p.evaluate(() => { const b = document.getElementById('ed-ctrl'), t = document.getElementById('ed-table'), m = document.getElementById('e-motif');
+        return { colle: getComputedStyle(b).position, apresTableau: !!(t.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING), avantMotif: !!(b.compareDocumentPosition(m) & Node.DOCUMENT_POSITION_FOLLOWING) }; });
+      if (place.colle === 'sticky' || place.colle === 'fixed' || !place.apresTableau || !place.avantMotif) throw new Error('critères mal placés : ' + JSON.stringify(place));
     });
     await etape('écart de 3 → validation bloquée, critère non rempli, motif proposé', async () => {
       await p.selectOption('tr[data-i="9"] select[data-f="faction"]', 'GTI'); await p.waitForTimeout(200);

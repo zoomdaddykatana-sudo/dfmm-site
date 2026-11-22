@@ -275,3 +275,21 @@ test('critères du match : délai non exigé en saisie de démarrage ; critères
   assert.equal(tard.criteres.find(x => /plage du créneau/.test(x.nom)).etat, 'attente');
   assert.match(L.motifDepuisControles(tard), /plage du créneau/);
 });
+
+// ---------- Lecture d'une capture : effectif annoncé et lignes oubliées (M-3, 22/11/2026) ----------
+test('lecture : 10 GTI annoncés mais 9 lignes lues → ligne oubliée signalée', () => {
+  const lignes = [];
+  for (let i = 0; i < 9; i++) lignes.push({ faction: 'GTI', pseudo: 'G' + i });
+  for (let i = 0; i < 8; i++) lignes.push({ faction: 'HAAVK', pseudo: 'H' + i });
+  const v = L.verifierLecture({ effectif: { HAAVK: 8, GTI: 10 }, lignes: [{ parti: true }] }, lignes);
+  assert.equal(v.problemes.length, 1); assert.match(v.problemes[0], /10 joueur\(s\) GTI, mais 9 ligne\(s\) GTI/);
+  assert.equal(v.partis, 1);
+  lignes.push({ faction: 'GTI', pseudo: '· · · · · · ˎ' });
+  assert.deepEqual(L.verifierLecture({ effectif: { HAAVK: 8, GTI: 10 } }, lignes).problemes, []);
+});
+test('lecture : pseudo illisible gardé et signalé ; ancienne réponse sans effectif acceptée', () => {
+  const lignes = [{ faction: 'GTI', pseudo: '' }, { faction: 'HAAVK', pseudo: 'A' }];
+  assert.match(L.verifierLecture({}, lignes).problemes.join(), /Pseudo à recopier.*ligne\(s\) 1/);
+  assert.deepEqual(L.verifierLecture({ lignes: [] }, [{ faction: 'GTI', pseudo: 'A' }]).problemes, []);
+  assert.equal(L.normPseudo('· · · · · · ˎ') !== '', true);
+});
