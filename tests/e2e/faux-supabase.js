@@ -99,6 +99,8 @@
     captures_a_supprimer: p => { const d = DB.dossiers.find(x => x.id === p.p_dossier); return DB.captures.filter(c => c.match_id === d.match_id && c.statut === 'ecartee').map(c => c.chemin); },
     noter_captures_supprimees: p => { DB.dossiers.find(x => x.id === p.p_dossier).captures_supprimees_le = iso(); return null; },
     sanctionner_dossier: p => { DB.sanctions.find(x => x.id === p.p_sanction).dossier_id = p.p_dossier; return null; },
+    repondre_membre: p => { (DB.messages = DB.messages || []).push({ id: ++seq, membre_id: p.p_membre, de_katana: true, texte: p.p_texte, publication_id: null, cree_le: iso(), lu_le: null }); DB.notifications.push({ id: ++seq, membre_id: p.p_membre, texte: 'Nouveau message de Katana', lu: false }); return null; },
+    marquer_messages_lus: p => { (DB.messages || []).filter(m => m.membre_id === p.p_membre && !m.de_katana && !m.lu_le).forEach(m => { m.lu_le = iso(); }); return null; },
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {

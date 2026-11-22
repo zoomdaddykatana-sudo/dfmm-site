@@ -320,6 +320,13 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
     </div>
   </div>
 
+  <div class="band" id="home-actus-band" hidden>
+    <div class="wrap">
+      <div class="sec-head"><h2>Actualités</h2><p>Annonces de Katana, réservées aux membres.</p></div>
+      <div id="home-actus"></div>
+    </div>
+  </div>
+
   <div class="band alt">
     <div class="wrap">
       <div class="sec-head"><h2>Comment ça marche</h2><p>La ligue suit vos performances individuelles sur toute la saison, à partir des captures de fin de match.</p></div>
@@ -1106,6 +1113,7 @@ function rendreAccueil() {
   h += '<div class="board-f">' + (p ? 'Matchs terminés avant le ' + fDT(p.coupure) + '. <a href="#classements">Voir les classements complets</a>' : 'Le premier classement provisoire sera publié un dimanche, après les premiers matchs validés.') + '</div>';
   $('#home-board').innerHTML = h;
   $('#home-cal').innerHTML = calHtml();
+  afficherActualites();
 }
 function reglesSite() { try { return L.regles(PARAM); } catch (e) { return null; } }
 function heureTxt(h) { return String(h).replace(':', ' h ').replace(/ h 00$/, ' h'); }
@@ -1282,8 +1290,8 @@ function soumettreDemande(e) {
 }
 
 /* ---------------- Administration ---------------- */
-const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'lots', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
-const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
+const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
@@ -1294,6 +1302,7 @@ function compteurTab(k) {
   if (k === 'matchs') return ADM.nbMatchs || 0;
   if (k === 'sanctions') return ADM.nbContest || 0;
   if (k === 'litiges') return ADM.nbDossiers || 0;
+  if (k === 'messages') return ADM.nbMessages || 0;
   return 0;
 }
 function rendreAdmin() {
@@ -2072,15 +2081,17 @@ const STATUTS_MB = { en_attente: 'En attente', precisions: 'Précisions demandé
 const matTxt = n => n ? 'DFMM-' + n : '—';
 async function chargerCompteursAdmin() {
   if (!SB) return;
-  const [a, b, c, vs, mt, ct, li] = await Promise.all([
+  const [a, b, c, vs, mt, ct, li, ms] = await Promise.all([
     SB.from('membres').select('id', { count: 'exact', head: true }).in('statut', ['en_attente', 'precisions']),
     SB.from('journal').select('date').eq('type', 'Sauvegarde').order('date', { ascending: false }).limit(1),
     SB.from('demandes').select('id', { count: 'exact', head: true }).eq('statut', 'en_attente'),
     SB.from('volsever_appels').select('id', { count: 'exact', head: true }).neq('resultat', 'quota').gte('cree_le', new Date(Date.now() - 86400000).toISOString()),
     SB.from('matchs').select('id', { count: 'exact', head: true }).in('statut', ['brouillon', 'attente']),
     SB.from('sanctions').select('id', { count: 'exact', head: true }).not('conteste_le', 'is', null).is('decision_recours', null).eq('statut', 'active'),
-    SB.from('dossiers').select('id', { count: 'exact', head: true }).eq('statut', 'ouvert')
+    SB.from('dossiers').select('id', { count: 'exact', head: true }).eq('statut', 'ouvert'),
+    SB.from('messages').select('id', { count: 'exact', head: true }).eq('de_katana', false).is('lu_le', null)
   ]);
+  ADM.nbMessages = (ms && ms.count) || 0;
   ADM.nbDossiers = (li && li.count) || 0;
   ADM.nbMatchs = mt.count || 0;
   ADM.nbContest = (ct && ct.count) || 0;
@@ -2091,6 +2102,11 @@ async function chargerCompteursAdmin() {
   ADM.vsAlerte = limJ > 0 && pctA > 0 && ADM.vsJour >= limJ * pctA / 100;
   ADM.derniereSauvegarde = b.data && b.data[0] ? b.data[0].date : null;
   ADM.sauvegardeEnRetard = !ADM.derniereSauvegarde || Date.now() - new Date(ADM.derniereSauvegarde).getTime() > 7 * 86400000;
+}
+
+function redessinerOnglets() {
+  const z = $('#adm-tabs'); if (!z) return;
+  z.innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, lb]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(lb) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
 }
 
 /* ----- Formulaire public d'inscription ----- */
@@ -2146,9 +2162,13 @@ const STATUTS_CPT = { actif: 'actif', en_pause: 'en pause', remplace: 'remplacé
 const dateLoc = iso => iso ? fDT(L.versLocal(iso)) : '—';
 async function majPastilleCompte() {
   const lien = $('#nav-compte');
+  if (UI.vue !== 'accueil') chargerActualites().then(majPastilleActus);
   if (!SESSION) { lien.textContent = 'Connexion'; return; }
   let n = 0;
-  if (SB && !ADMIN) { const r = await SB.from('notifications').select('id', { count: 'exact', head: true }).eq('lu', false); n = r.count || 0; }
+  if (SB && !ADMIN) {
+    const [r, mg] = await Promise.all([SB.from('notifications').select('id', { count: 'exact', head: true }).eq('lu', false), SB.from('messages').select('id', { count: 'exact', head: true }).eq('de_katana', true).is('lu_le', null)]);
+    n = (r.count || 0) + ((mg && mg.count) || 0);
+  }
   lien.innerHTML = 'Mon compte' + (n ? '<span class="cpt" aria-label="' + n + ' notification(s) non lue(s)">' + n + '</span>' : '');
 }
 function historiquePseudos(c) {
@@ -2188,10 +2208,10 @@ async function chargerMonDossier() {
   if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
   h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
-  h += '<div id="mes-sanctions"></div><div id="mes-convocations"></div>';
+  h += '<div id="mes-messages"></div><div id="mes-sanctions"></div><div id="mes-convocations"></div>';
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
   z.innerHTML = h;
-  afficherMesSanctions(); afficherMesConvocations();
+  afficherMesSanctions(); afficherMesConvocations(); afficherMesMessages();
 }
 function erreurRpc(error) { return error ? String(error.message || error).replace(/^.*?: /, '') : ''; }
 function moiCompte2() {
@@ -2468,7 +2488,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -2498,7 +2518,7 @@ async function telechargerSauvegarde(b) {
     const { error } = await SB.from('journal').insert({ type: 'Sauvegarde', decision: 'Sauvegarde complète téléchargée' });
     etat.textContent = error ? 'Fichier téléchargé, mais la date n’a pas pu être notée : ' + error.message : 'Sauvegarde téléchargée.';
     await chargerCompteursAdmin(); TAB.sauvegarde.charger();
-    $('#adm-tabs').innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, lb]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(lb) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
+    redessinerOnglets();
   } catch (x) { etat.textContent = 'Échec : ' + x.message; }
   finally { b.disabled = false; }
 }
@@ -2886,7 +2906,7 @@ document.addEventListener('change', e => { if (e.target && e.target.id === 'ma-s
 let PUBS = [], CLC = null;
 function pubDepuisLigne(r) {
   const c = r.contenu || {};
-  return Object.assign({}, c, { id: r.id, saison_id: r.saison_id, type: r.type === 'final' ? 'Final' : 'Provisoire', numero: r.numero, publie_le: isoLoc(r.publie_le), coupure: isoLoc(r.coupure) });
+  return Object.assign({}, c, { id: r.id, saison_id: r.saison_id, type: r.type === 'final' ? 'Final' : 'Provisoire', numero: r.numero, publie_le: isoLoc(r.publie_le), publie_le_iso: r.publie_le, coupure: isoLoc(r.coupure) });
 }
 async function chargerPublic() {
   if (!SB) return;
@@ -3396,6 +3416,126 @@ ACTIONS['lo-remis'] = async b => {
   toast('Lot marqué comme remis.'); afficherLots();
 };
 document.addEventListener('change', e => { if (e.target && e.target.id === 'lo2-s') { UI.lotSaison = e.target.value; afficherLots(); } });
+
+/* ----- Lot 5 : actualités (membres connectés) et messagerie avec Katana ----- */
+let ACTUS = [], CONV = [];
+const VU_ACTUS = 'dfmm_actus_vues';
+function lireVu() { try { return localStorage.getItem(VU_ACTUS) || ''; } catch (e) { return ''; } }
+function noterVu(d) { try { localStorage.setItem(VU_ACTUS, d); } catch (e) { /* stockage indisponible : sans conséquence */ } }
+async function chargerActualites() {
+  if (!SB || !SESSION) { ACTUS = []; return; }
+  const { data, error } = await SB.from('actualites').select('*').is('retire_le', null).order('publie_le', { ascending: false }).limit(20);
+  ACTUS = error ? [] : (data || []);
+}
+async function afficherActualites() {
+  const band = $('#home-actus-band'), z = $('#home-actus'); if (!band || !z) return;
+  await chargerActualites();
+  if (!SESSION || !ACTUS.length) { band.hidden = true; majPastilleActus(); return; }
+  const vu = lireVu();
+  band.hidden = false;
+  z.innerHTML = ACTUS.map(a => '<div class="card-l"><div class="t"><div><b>' + esc(a.titre) + '</b><div class="small dim">' + dateLoc(a.publie_le) + '</div></div>' + (a.publie_le > vu ? badge('Nouveau', 'g') : '') + '</div><p style="white-space:pre-line">' + esc(a.texte) + '</p></div>').join('');
+  if (UI.vue === 'accueil') noterVu(ACTUS[0].publie_le);
+  majPastilleActus();
+}
+function majPastilleActus() {
+  const l = document.querySelector('[data-nav="accueil"]'); if (!l) return;
+  const n = UI.vue === 'accueil' ? 0 : ACTUS.filter(a => a.publie_le > lireVu()).length;
+  l.innerHTML = 'Accueil' + (n ? '<span class="cpt" aria-label="' + n + ' actualité(s) nouvelle(s)">' + n + '</span>' : '');
+}
+
+/* Administration : actualités */
+TAB.actualites = {
+  shell: () => '<div class="panel"><h3>Nouvelle actualité</h3><p class="mute small">Visible seulement par les membres connectés (pas par le public). Les membres lisent, sans pouvoir répondre ici.</p>'
+    + '<label class="lab" for="ac-titre">Titre</label><input type="text" id="ac-titre"><label class="lab" for="ac-texte">Texte</label><textarea id="ac-texte" rows="5"></textarea>'
+    + '<div class="row-btns"><button class="btn" type="button" data-act="ac-publier">Publier</button></div></div><div id="ac-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherActualitesAdmin
+};
+async function afficherActualitesAdmin() {
+  const z = $('#ac-liste'); if (!z) return;
+  const { data, error } = await SB.from('actualites').select('*').order('publie_le', { ascending: false });
+  if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
+  z.innerHTML = (data || []).length ? data.map(a => '<div class="card-l"><div class="t"><div><b>' + esc(a.titre) + '</b><div class="small dim">publiée le ' + dateLoc(a.publie_le) + (a.retire_le ? ' · retirée le ' + dateLoc(a.retire_le) : '') + '</div></div>' + (a.retire_le ? badge('Retirée', 'o') : badge('En ligne', 'g')) + '</div><p style="white-space:pre-line">' + esc(a.texte) + '</p>'
+    + (a.retire_le ? '' : '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ac-retirer" data-id="' + a.id + '">Retirer</button></div>') + '</div>').join('') : note('Aucune actualité pour l’instant.');
+}
+ACTIONS['ac-publier'] = async () => {
+  const titre = v('ac-titre'), texte = v('ac-texte');
+  if (!titre || !texte) { toast('Le titre et le texte sont obligatoires.', true); return; }
+  const { error } = await SB.from('actualites').insert({ titre, texte });
+  if (error) { toast('Publication impossible : ' + error.message, true); return; }
+  await SB.from('journal').insert({ type: 'Actualité', objet: titre, decision: 'Actualité publiée' });
+  $('#ac-titre').value = ''; $('#ac-texte').value = ''; toast('Actualité publiée : les membres la voient sur l’accueil.'); afficherActualitesAdmin();
+};
+ACTIONS['ac-retirer'] = async b => {
+  if (!confirm('Retirer cette actualité ? Les membres ne la verront plus.')) return;
+  const { error } = await SB.from('actualites').update({ retire_le: new Date().toISOString() }).eq('id', Number(b.dataset.id));
+  if (error) { toast('Impossible : ' + error.message, true); return; }
+  toast('Actualité retirée.'); afficherActualitesAdmin();
+};
+
+/* Administration : messages */
+TAB.messages = {
+  shell: () => '<div class="row-btns" style="margin:0 0 12px;align-items:flex-end"><div style="min-width:240px"><label class="lab" for="ms-mb">Écrire à un membre</label><select id="ms-mb"><option value="">Choisir…</option></select></div><button class="btn sm ghost" type="button" data-act="ms-nouveau">Ouvrir la conversation</button></div>'
+    + note('Messagerie privée entre vous et chaque membre. Pas de messagerie entre joueurs. Les réclamations sur un classement arrivent ici (48 h après sa publication).') + '<div id="ms-liste"><p class="mute">Chargement…</p></div>',
+  body: () => '',
+  charger: afficherConversations
+};
+async function afficherConversations() {
+  const z = $('#ms-liste'); if (!z) return;
+  const [a, b] = await Promise.all([
+    SB.from('messages').select('*, membres(matricule, nom_gamer)').order('cree_le', { ascending: false }),
+    SB.from('membres').select('id, matricule, nom_gamer').not('matricule', 'is', null).order('matricule')
+  ]);
+  if (a.error) { z.innerHTML = note('Lecture impossible : ' + esc(a.error.message), 'r'); return; }
+  const sel = $('#ms-mb'); if (sel) sel.innerHTML = '<option value="">Choisir…</option>' + (b.data || []).map(m => '<option value="' + m.id + '">' + esc(matTxt(m.matricule) + ' · ' + m.nom_gamer) + '</option>').join('');
+  const parMb = {};
+  (a.data || []).forEach(x => { const c = parMb[x.membre_id] = parMb[x.membre_id] || { membre_id: x.membre_id, m: x.membres, dernier: x, nonLus: 0, recl: 0 }; if (!x.de_katana && !x.lu_le) c.nonLus++; if (x.publication_id && !x.de_katana && !x.lu_le) c.recl++; });
+  CONV = Object.values(parMb);
+  if (!CONV.length) { z.innerHTML = note('Aucun message pour l’instant.'); return; }
+  z.innerHTML = '<ul class="taches">' + CONV.map(c => '<li><span><b>' + esc(matTxt(c.m && c.m.matricule) + ' ' + ((c.m && c.m.nom_gamer) || '')) + '</b>' + (c.nonLus ? ' <span class="cpt">' + c.nonLus + '</span>' : '') + (c.recl ? ' ' + badge('Réclamation', 'a') : '') + '<div class="small dim">' + esc((c.dernier.de_katana ? 'Vous : ' : '') + String(c.dernier.texte).slice(0, 80)) + ' · ' + dateLoc(c.dernier.cree_le) + '</div></span>'
+    + '<button class="btn sm ghost" type="button" data-act="ms-ouvrir" data-id="' + c.membre_id + '">Ouvrir</button></li>').join('') + '</ul>';
+}
+async function ouvrirConversation(membreId) {
+  const [a, b] = await Promise.all([
+    SB.from('messages').select('*').eq('membre_id', membreId).order('cree_le'),
+    SB.from('membres').select('matricule, nom_gamer').eq('id', membreId).single()
+  ]);
+  if (a.error || b.error) { toast('Lecture impossible.', true); return; }
+  await SB.rpc('marquer_messages_lus', { p_membre: membreId });
+  const pubs = {}; PUBS.forEach(p => { pubs[p.id] = p; });
+  const h = (a.data || []).length ? '<ul class="taches">' + a.data.map(x => '<li><span><b>' + (x.de_katana ? 'Vous' : esc(b.data.nom_gamer)) + '</b>' + (x.publication_id ? ' ' + badge('Réclamation · ' + (pubs[x.publication_id] ? libPub(pubs[x.publication_id]) : 'classement'), 'a') : '') + ' : <span style="white-space:pre-line">' + esc(x.texte) + '</span></span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message.</p>';
+  modal('Messages · ' + matTxt(b.data.matricule) + ' ' + b.data.nom_gamer, h + '<label class="lab" for="ms-rep">Votre réponse</label><textarea id="ms-rep" rows="3"></textarea><div id="ms-err" class="err" role="alert"></div>',
+    [{ label: 'Fermer', cls: 'ghost', onClick: async () => { await afficherConversations(); await chargerCompteursAdmin(); redessinerOnglets(); return true; } },
+     { label: 'Envoyer', onClick: async () => {
+       if (!v('ms-rep')) { $('#ms-err').textContent = 'Écrivez votre réponse.'; return false; }
+       const { error } = await SB.rpc('repondre_membre', { p_membre: membreId, p_texte: v('ms-rep') });
+       if (error) { $('#ms-err').textContent = erreurRpc(error); return false; }
+       toast('Message envoyé. Le membre est averti.'); ouvrirConversation(membreId); return false;
+     } }]);
+}
+ACTIONS['ms-ouvrir'] = b => ouvrirConversation(Number(b.dataset.id));
+ACTIONS['ms-nouveau'] = () => { const id = Number(v('ms-mb')); if (!id) { toast('Choisissez le membre.', true); return; } ouvrirConversation(id); };
+
+/* Mon compte : messages avec Katana */
+async function afficherMesMessages() {
+  const z = $('#mes-messages'); if (!z || !SB || !DOS || !DOS.m) return;
+  const { data, error } = await SB.from('messages').select('*').order('cree_le');
+  if (error) { z.innerHTML = ''; return; }
+  const R = reglesSite(), lim = R ? R.reclamation_h * 3600000 : 0;
+  const recl = PUBS.filter(p => Date.now() - new Date(p.publie_le_iso || 0).getTime() < lim);
+  const pubs = {}; PUBS.forEach(p => { pubs[p.id] = p; });
+  z.innerHTML = '<h3 style="margin-top:12px">Messages avec Katana</h3>' + ((data || []).length ? '<ul class="taches">' + data.map(x => '<li><span><b>' + (x.de_katana ? 'Katana' : 'Vous') + '</b>' + (x.publication_id ? ' ' + badge('Réclamation · ' + (pubs[x.publication_id] ? libPub(pubs[x.publication_id]) : 'classement'), 'a') : '') + ' : <span style="white-space:pre-line">' + esc(x.texte) + '</span></span><span class="dim small nowrap">' + dateLoc(x.cree_le) + '</span></li>').join('') + '</ul>' : '<p class="mute small">Aucun message. Écrivez à Katana pour toute question, précision ou contestation.</p>')
+    + (recl.length ? '<label class="lab" for="mm-pub">Concerne</label><select id="mm-pub"><option value="">Message simple</option>' + recl.map(p => '<option value="' + p.id + '">Réclamation : ' + esc(libPub(p)) + '</option>').join('') + '</select>' : '')
+    + '<label class="lab" for="mm-txt">Votre message à Katana</label><textarea id="mm-txt" rows="3"></textarea><div class="row-btns"><button class="btn sm" type="button" data-act="mm-envoyer">Envoyer</button></div>';
+  if ((data || []).some(x => x.de_katana && !x.lu_le)) { await SB.rpc('marquer_messages_lus', {}); majPastilleCompte(); }
+}
+ACTIONS['mm-envoyer'] = async () => {
+  const t = v('mm-txt'); if (!t) { toast('Écrivez votre message.', true); return; }
+  const pub = v('mm-pub');
+  const { error } = await SB.rpc('ecrire_a_katana', { p_texte: t, p_publication: pub ? Number(pub) : null });
+  if (error) { toast(erreurRpc(error), true); return; }
+  toast(pub ? 'Réclamation envoyée à Katana.' : 'Message envoyé à Katana.'); afficherMesMessages();
+};
 
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));

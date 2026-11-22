@@ -2,7 +2,7 @@
    Règle simple et sûre : on demande toujours d'abord au réseau ; la copie
    n'est utilisée que hors connexion. Seuls les fichiers du site sont gardés :
    jamais les échanges avec Supabase ni les données. */
-const VERSION = 'dfmm-couleurs-1';
+const VERSION = 'dfmm-actus-1';
 const FICHIERS = ['./', './index.html', './config.js', './js/regles.js', './manifest.webmanifest',
   './icons/icone-192.png', './icons/icone-512.png', './icons/apple-touch-icon.png'];
 

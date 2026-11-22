@@ -16,7 +16,7 @@ for (const f of fs.readdirSync(dm).sort()) {
 }
 PARAMS.inscriptions_ouvertes.valeur = true;
 const base = { parametres: Object.values(PARAMS), membres: [], periodes: [], comptes_jeu: [], comptes_periodes: [], pseudos_historique: [],
-  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], lots: [], publications: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
+  saisons: [], sanctions: [], dossiers: [], convocations: [], messages_litige: [], lots: [], actualites: [], messages: [{ id: 900, membre_id: 2, de_katana: false, texte: 'Bonjour Katana, une question', publication_id: null, cree_le: '2026-11-21T10:00:00Z', lu_le: null }], publications: [], matchs: [], match_lignes: [], captures: [], registre: [], journal: [], demandes: [], notifications: [], volsever_appels: [], parametres_historique: [], membres_prives: [] };
 for (let i = 1; i <= 8; i++) {
   base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', date_approbation: '2026-11-18T00:00:00+03:00' });
   base.periodes.push({ id: 100 + i, membre_id: i, debut: '2026-11-17T21:00:00Z', fin: null });
@@ -196,6 +196,33 @@ srv.listen(8765, async () => {
       if (!/Prévision/.test(t) || !/Lot test : 10 000 Ar/.test(t) || !/Faux 8/.test(t)) throw new Error(t.slice(0, 400));
       if (!/au plus un lot \(1 lot\(s\) attribué/.test(t)) throw new Error('contrôle : ' + t.slice(-300));
       if (await p.$('[data-act="lo-attribuer"]')) throw new Error('bouton d’enregistrement visible sans classement final');
+      await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
+    });
+    await etape('actualités : publier, visible sur l’accueil, retirer', async () => {
+      await p.goto('http://localhost:8765/#admin-actualites'); await p.waitForTimeout(600);
+      await p.click('[data-act="ac-publier"]'); await p.waitForTimeout(200);
+      if (await p.evaluate(() => window.FAUSSE_BASE.actualites.length)) throw new Error('publiée sans titre');
+      await p.fill('#ac-titre', 'Bienvenue dans Aurora'); await p.fill('#ac-texte', 'Premier classement provisoire le 29/11.');
+      await p.click('[data-act="ac-publier"]'); await p.waitForTimeout(600);
+      if (!/En ligne/.test(await p.textContent('#ac-liste'))) throw new Error(await p.textContent('#ac-liste'));
+      await p.goto('http://localhost:8765/#accueil'); await p.waitForTimeout(700);
+      if (await p.isHidden('#home-actus-band') || !/Bienvenue dans Aurora/.test(await p.textContent('#home-actus'))) throw new Error('pas sur l’accueil');
+      await p.goto('http://localhost:8765/#admin-actualites'); await p.waitForTimeout(600);
+      await p.click('[data-act="ac-retirer"]'); await p.waitForTimeout(600);
+      if (!/Retirée/.test(await p.textContent('#ac-liste'))) throw new Error('non retirée');
+      await p.goto('http://localhost:8765/#accueil'); await p.waitForTimeout(700);
+      if (!(await p.isHidden('#home-actus-band'))) throw new Error('actualité retirée encore visible');
+    });
+    await etape('messages : compteur, lecture, réponse de Katana', async () => {
+      await p.goto('http://localhost:8765/#admin-messages'); await p.waitForTimeout(800);
+      if (!/Messages1/.test((await p.textContent('#adm-tabs')).replace(/\s+/g, ''))) throw new Error('compteur ' + await p.textContent('#adm-tabs'));
+      if (!/DFMM-2 Faux 2/.test(await p.textContent('#ms-liste'))) throw new Error(await p.textContent('#ms-liste'));
+      await p.click('[data-act="ms-ouvrir"]'); await p.waitForTimeout(600);
+      if (!/Bonjour Katana, une question/.test(await p.textContent('#modal-b'))) throw new Error(await p.textContent('#modal-b'));
+      await p.fill('#ms-rep', 'Bonjour, je regarde.'); await p.click('#modal-f button:has-text("Envoyer")'); await p.waitForTimeout(700);
+      if (!/Bonjour, je regarde/.test(await p.textContent('#modal-b'))) throw new Error('réponse absente');
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(600);
+      if (/Messages1/.test((await p.textContent('#adm-tabs')).replace(/\s+/g, ''))) throw new Error('compteur non remis à zéro');
       await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
     });
     await etape('repasser en brouillon (motif obligatoire)', async () => {
