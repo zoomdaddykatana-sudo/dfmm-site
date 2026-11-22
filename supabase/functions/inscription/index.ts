@@ -6,6 +6,7 @@
 // Vérifications automatiques (choix de Katana du 22/11/2026) : UID et pseudo lus chez volsever
 // (UID inconnu = refus si « refus_uid_introuvable » est à « oui ») ; domaine de l'e-mail existant,
 // qui reçoit des e-mails, et pas jetable ; code Messenger donné au joueur.
+// Limites (migration 0015) : inscriptions par heure (« inscriptions_max_heure ») et longueur des textes.
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 
 // DEBUT-AIDES (JavaScript simple, testé automatiquement par tests/inscription.test.js)
@@ -26,10 +27,17 @@ function dateReelle(t) {
   const x = new Date(t + 'T00:00:00Z');
   return !isNaN(x.getTime()) && x.toISOString().slice(0, 10) === t && t >= '1900-01-01' && t < new Date().toISOString().slice(0, 10);
 }
-function verifierDonnees(d) {
+// Longueurs maximales (décision 3 du 22/11/2026, réglables : longueur_max_court et longueur_max_long).
+const CHAMPS_COURTS = { nom_reel: 'nom réel', nom_gamer: 'nom de gamer', email: 'e-mail', pseudo: 'pseudo', clan: 'clan', pays: 'pays' };
+const CHAMPS_LONGS = { facebook: 'lien Facebook' };
+function verifierDonnees(d, lim) {
   const err = [];
   const txt = k => String(d[k] == null ? '' : d[k]).trim();
+  const max = { court: Number(lim && lim.court) || 100, long: Number(lim && lim.long) || 2000 };
   ['nom_reel', 'nom_gamer', 'email', 'date_naissance', 'genre', 'facebook', 'pseudo', 'uid', 'residence', 'comprend_mg', 'parle_mg'].forEach(k => { if (!txt(k)) err.push('Champ manquant : ' + k + '.'); });
+  [[CHAMPS_COURTS, max.court], [CHAMPS_LONGS, max.long]].forEach(([champs, n]) => Object.keys(champs).forEach(k => {
+    if (txt(k).length > n) err.push('Texte trop long (' + champs[k] + ') : ' + n + ' caractères au plus.');
+  }));
   if (txt('email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(txt('email'))) err.push('Adresse e-mail invalide.');
   if (txt('facebook') && !/^facebook\.com\/[^\s]+$/.test(normFacebook(txt('facebook')))) err.push('Lien Facebook invalide.');
   if (txt('date_naissance') && !dateReelle(txt('date_naissance'))) err.push('Date de naissance invalide.');
@@ -90,6 +98,7 @@ const MESSAGES_EMAIL = {
   jetable: 'Les adresses e-mail temporaires (jetables) ne sont pas acceptées. Utilisez votre adresse habituelle.',
 };
 const MESSAGE_UID_INCONNU = 'Cet UID n’existe pas dans Delta Force. Vérifiez-le sur votre profil de jeu (chiffres seulement), puis réessayez.';
+const MESSAGE_TROP_D_INSCRIPTIONS = 'Trop d’inscriptions en ce moment. Réessayez dans une heure. Si le problème continue, écrivez à Katana sur Messenger.';
 
 // ----- Code Messenger : « UV- » + 6 signes faciles à lire (sans 0, O, 1, I, L) -----
 const SIGNES_CODE = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -182,7 +191,8 @@ Deno.serve(async (req) => {
   try {
     // 1. Inscriptions ouvertes ? (et réglages des vérifications)
     const { data: ps, error: ep } = await sb.from('parametres').select('cle, valeur')
-      .in('cle', ['inscriptions_ouvertes', 'refus_uid_introuvable', 'volsever_max_jour', 'volsever_max_minute', 'volsever_delai_s']);
+      .in('cle', ['inscriptions_ouvertes', 'refus_uid_introuvable', 'volsever_max_jour', 'volsever_max_minute', 'volsever_delai_s',
+        'longueur_max_court', 'longueur_max_long']);
     const P: Record<string, unknown> = {};
     (ps ?? []).forEach((x: { cle: string; valeur: unknown }) => { P[x.cle] = x.valeur; });
     if (ep || !('inscriptions_ouvertes' in P)) return reponse({ erreur: 'Lecture des réglages impossible (' + (ep ? ep.message : 'réglage introuvable') + '). Prévenez Katana.' }, 500);
@@ -192,7 +202,7 @@ Deno.serve(async (req) => {
     const form = await req.formData();
     const d = JSON.parse(String(form.get('donnees') || '{}'));
     const capture = form.get('capture');
-    const err = verifierDonnees(d);
+    const err = verifierDonnees(d, { court: P.longueur_max_court, long: P.longueur_max_long });
     if (!(capture instanceof File) || !capture.size) err.push('La capture du profil est obligatoire.');
     else if (capture.size > 5 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/.test(capture.type)) err.push('Capture invalide (image JPEG, PNG ou WebP de 5 Mo au plus).');
     if (err.length) return reponse({ erreur: err.join(' ') }, 400);
@@ -210,7 +220,13 @@ Deno.serve(async (req) => {
     const verifEmail = await verifierEmail(email);
     if (verifEmail in MESSAGES_EMAIL) return reponse({ erreur: MESSAGES_EMAIL[verifEmail as keyof typeof MESSAGES_EMAIL] }, 400);
 
-    // 3 ter. UID et pseudo chez volsever (en dernier : chaque appel compte dans la limite de 24 heures)
+    // 3 ter. Limite d'inscriptions par heure (réglage « inscriptions_max_heure », migration 0015) : protège le quota
+    // de volsever et l'espace de stockage contre les envois en masse.
+    const { data: place, error: el } = await sb.rpc('reserver_essai_inscription');
+    if (el) return reponse({ erreur: 'Inscription impossible pour le moment. Réessayez plus tard.' }, 500);
+    if (place !== true) return reponse({ erreur: MESSAGE_TROP_D_INSCRIPTIONS }, 429);
+
+    // 3 quater. UID et pseudo chez volsever (en dernier : chaque appel compte dans la limite de 24 heures)
     const pseudoTape = String(d.pseudo).trim();
     const vs = await appelerVolsever(sb, uid, P);
     if (vs.resultat === 'introuvable' && P.refus_uid_introuvable !== false) return reponse({ erreur: MESSAGE_UID_INCONNU }, 400);

@@ -93,3 +93,13 @@ test('code Messenger : « UV- » + 6 signes lisibles', () => {
   assert.match(c, /^UV-[2-9A-HJKMNP-Z]{6}$/);
   for (let i = 0; i < 200; i++) assert.match(V.codeMessenger(require('node:crypto').randomBytes(6)), /^UV-[2-9A-HJKMNP-Z]{6}$/);
 });
+test('longueurs maximales (décision 3) : 100 caractères pour les champs courts, 2 000 pour le lien Facebook', () => {
+  assert.deepEqual(verifierDonnees(Object.assign({}, BON, { nom_gamer: 'n'.repeat(100), nom_reel: 'r'.repeat(100), clan: 'c'.repeat(100) })), []);
+  assert.match(verifierDonnees(Object.assign({}, BON, { nom_gamer: 'n'.repeat(101) })).join(), /Texte trop long \(nom de gamer\) : 100 caractères/);
+  assert.match(verifierDonnees(Object.assign({}, BON, { pseudo: 'p'.repeat(101) })).join(), /Texte trop long \(pseudo\)/);
+  assert.match(verifierDonnees(Object.assign({}, BON, { facebook: 'https://facebook.com/' + 'f'.repeat(2000) })).join(), /Texte trop long \(lien Facebook\) : 2000 caractères/);
+});
+test('longueurs maximales réglables (longueur_max_court, longueur_max_long)', () => {
+  assert.match(verifierDonnees(Object.assign({}, BON, { nom_gamer: 'n'.repeat(21) }), { court: 20, long: 2000 }).join(), /20 caractères au plus/);
+  assert.deepEqual(verifierDonnees(Object.assign({}, BON, { nom_gamer: 'n'.repeat(21) }), { court: '150', long: '3000' }), []);
+});

@@ -2,6 +2,8 @@
 // Un membre connecté déclare un nouveau pseudo pour l'un de ses comptes.
 // La fonction lit le pseudo officiel chez volsever à partir de l'UID enregistré
 // (clé dans le secret VOLSEVER_API_KEY, jamais dans le code), puis enregistre le résultat.
+// Avant l'appel : 1 déclaration par compte et par 24 h (réglable), refus pendant une suspension, 100 caractères
+// au plus (réglable) — fonction reserver_declaration_pseudo (migration 0015).
 // Limites d'appels réglables ; sans réponse utilisable, la déclaration reste en attente
 // et Katana la valide à la main.
 // Deuxième usage (Katana seulement) : { reverifier_inscription: <n° de candidature> } relit chez volsever
@@ -102,9 +104,10 @@ Deno.serve(async (req) => {
     if (!m || m.statut !== 'actif') return reponse({ erreur: 'Cette démarche est réservée aux membres actifs.' }, 403);
     const { data: c } = await sb.from('comptes_jeu').select('id, uid, statut').eq('id', Number(compte_id)).eq('membre_id', m.id).maybeSingle();
     if (!c || c.statut === 'remplace') return reponse({ erreur: 'Choisissez l’un de vos comptes.' }, 400);
-    const { data: enCours } = await sb.from('demandes').select('id').eq('membre_id', m.id).eq('type', 'pseudo')
-      .in('statut', ['en_attente', 'precisions']).filter('details->>compte_id', 'eq', String(c.id)).limit(1);
-    if (enCours && enCours.length) return reponse({ erreur: 'Une déclaration de pseudo est déjà en attente pour ce compte.' }, 409);
+    // 1 ter. Contrôles avant tout appel à volsever (migration 0015) : pas de suspension, pseudo pas trop long,
+    // aucune déclaration en attente, 1 déclaration par compte et par « pseudo_delai_h » heures. La déclaration est notée.
+    const { error: er } = await sb.rpc('reserver_declaration_pseudo', { p_user: qui.user.id, p_compte: c.id, p_tape: tape });
+    if (er) return reponse({ erreur: er.message }, 409);
 
     // 2 et 3. Limites d'appels, puis appel à volsever
     const r = await appelerVolsever(sb, c.uid, c.id);
