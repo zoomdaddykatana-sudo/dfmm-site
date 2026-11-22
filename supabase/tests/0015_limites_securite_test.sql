@@ -53,7 +53,7 @@ begin
   insert into resultats (test, ok, detail) values ('4 réglages dans la section Limites (10 par heure, 24 h, 100, 2000)',
     n = 4 and v = 'inscriptions_max_heure=10, pseudo_delai_h=24, longueur_max_court=100, longueur_max_long=2000', coalesce(v, 'aucun'));
   select count(*) into n from pg_trigger where tgname = 'longueurs_textes' and not tgisinternal;
-  insert into resultats (test, ok, detail) values ('Contrôle de longueur sur 7 tables', n = 7, n || ' table(s)');
+  insert into resultats (test, ok, detail) values ('Contrôle de longueur sur 7 tables au moins (8 après la migration 0016)', n >= 7, n || ' table(s)');
 end $$;
 
 -- ---------- 2. Accès : ni un membre ni un visiteur n'appellent les fonctions serveur ni ne lisent les compteurs ----------
