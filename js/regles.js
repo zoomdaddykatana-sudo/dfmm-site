@@ -183,8 +183,10 @@ var L = (function () {
   // ---------- Contrôles d'un match ----------
   // bloquants : le match ne peut pas être validé ; attente : le match passe « en attente » (Katana tranche) ;
   // alertes : information pour Katana, jamais de sanction automatique.
+  // criteres : liste complète des critères, chacun { nom, etat: 'ok' | 'non' | 'attente' | 'sans_objet', detail }.
   function controlesMatch(match, ctx, saison, R) {
-    var B = [], A = [], W = [];
+    var B = [], A = [], W = [], C = [];
+    var crit = function (nom, etat, detail) { C.push({ nom: nom, etat: etat, detail: detail || '' }); };
     var lignes = match.lignes || [];
     var total = lignes.length;
     var h = lignes.filter(function (l) { return l.faction === 'HAAVK'; }).length;
@@ -250,7 +252,39 @@ var L = (function () {
     });
     alertesPerformance(match, ctx, R).forEach(function (a) { W.push(a); });
     if (!(match.captures && match.captures.length)) W.push('Aucune capture archivée pour ce match (preuve à conserver).');
-    return { bloquants: B, attente: A, alertes: W, total: total, h: h, g: g, membres: membres, requis: requis };
+    // Liste complète des critères (mêmes contrôles que ci-dessus, présentés un par un).
+    var dansSaison = saison && validDT(match.fin) && !(validD(saison.debut) && match.fin.slice(0, 10) < saison.debut) && !(validD(saison.fin) && match.fin.slice(0, 10) > saison.fin);
+    crit('Saison choisie et match terminé pendant la saison', !saison || !validDT(match.fin) ? (saison ? 'sans_objet' : 'non') : (dansSaison ? 'ok' : 'non'),
+      !saison ? 'aucune saison' : !validDT(match.fin) ? 'heure de fin manquante' : (saison.debut || '?') + ' → ' + (saison.fin || 'en cours'));
+    crit('Date et heure de fin du match', validDT(match.fin) ? 'ok' : 'non', validDT(match.fin) ? match.fin.replace('T', ' ') : 'manquantes');
+    crit('Au moins ' + R.participants_min + ' participants', total >= R.participants_min ? 'ok' : 'non', total + ' participant(s)');
+    crit('Chaque ligne a une faction', sansF ? 'non' : 'ok', sansF ? sansF + ' ligne(s) sans faction' : '');
+    crit('Écart entre les factions de ' + R.ecart_factions_max + ' joueur au plus', ecart > R.ecart_factions_max ? 'non' : 'ok', 'HAAVK ' + h + ', GTI ' + g + ', écart ' + ecart);
+    crit('Statistiques complètes (8 valeurs par ligne)', manq.length ? 'non' : 'ok', manq.length ? 'ligne(s) ' + uniq(manq).join(', ') : '');
+    crit('Aucune valeur négative', neg.length ? 'non' : 'ok', neg.length ? 'ligne(s) ' + uniq(neg).join(', ') : '');
+    crit('Aucun pseudo en double', dupP.length ? 'non' : 'ok', uniq(dupP).join(', '));
+    crit('Un seul passage par joueur', dupM.length ? 'non' : 'ok', uniq(dupM).join(', '));
+    crit('Au moins ' + R.seuil_membres_pct + ' % de membres confirmés', total && membres < requis ? 'non' : 'ok', membres + ' sur ' + total + ', minimum ' + requis);
+    if (match.demarrage) crit('Capture envoyée au plus ' + R.delai_capture_min + ' min après la fin', 'sans_objet', 'saisie de démarrage');
+    else if (match.delai_exception) crit('Capture envoyée au plus ' + R.delai_capture_min + ' min après la fin', 'ok', 'retard accepté');
+    else if (!validDT(match.envoi)) crit('Capture envoyée au plus ' + R.delai_capture_min + ' min après la fin', 'non', 'heure d’envoi manquante');
+    else if (!validDT(match.fin)) crit('Capture envoyée au plus ' + R.delai_capture_min + ' min après la fin', 'sans_objet', 'heure de fin manquante');
+    else { var dd = diffMinutes(match.fin, match.envoi); crit('Capture envoyée au plus ' + R.delai_capture_min + ' min après la fin', dd > R.delai_capture_min ? 'non' : 'ok', dd + ' min'); }
+    if (match.type === 'Libre') {
+      var crL = match.creneau_id ? ctx.creneaux[match.creneau_id] : null;
+      crit('Créneau déclaré et non annulé', crL && crL.statut !== 'Annulé' ? 'ok' : 'non', crL ? 'créneau ' + crL.id : 'aucun créneau');
+      if (crL && validDT(match.fin)) { var bL = bornesCreneau(crL, R); crit('Fin dans la plage du créneau', match.fin < bL.deb || match.fin > bL.fin ? 'attente' : 'ok', bL.deb.replace('T', ' ') + ' → ' + bL.fin.replace('T', ' ')); }
+      else crit('Fin dans la plage du créneau', 'sans_objet', crL ? 'heure de fin manquante' : 'aucun créneau');
+      var dejaL = crL ? autres.filter(function (m) { return m.creneau_id === crL.id && m.statut === 'Validé'; }) : [];
+      crit('Un seul match validé par créneau', dejaL.length ? 'non' : 'ok', dejaL.length ? 'déjà validé : ' + dejaL[0].id : '');
+    }
+    return { bloquants: B, attente: A, alertes: W, criteres: C, total: total, h: h, g: g, membres: membres, requis: requis };
+  }
+
+  // Motif proposé à partir des contrôles : les critères non remplis (bloquants puis attente), une phrase par ligne.
+  function motifDepuisControles(c) {
+    var l = (c.bloquants || []).concat(c.attente || []);
+    return l.length ? 'Critère(s) non rempli(s) : ' + l.join(' ') : '';
   }
 
   // ---------- Concordance des captures d'un match libre (section 4) ----------
@@ -537,7 +571,7 @@ var L = (function () {
     addDays: addDays, addMinutes: addMinutes, diffMinutes: diffMinutes, dow: dow,
     inPeriods: inPeriods, suspendedAt: suspendedAt, statutAffiche: statutAffiche,
     normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte, membresRequis: membresRequis,
-    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, comparerLectures: comparerLectures, alertesPerformance: alertesPerformance,
+    bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, motifDepuisControles: motifDepuisControles, comparerLectures: comparerLectures, alertesPerformance: alertesPerformance,
     matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,
     agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots, classementDepuisPublication: classementDepuisPublication,
     coupurePour: coupurePour, coupureFinale: coupureFinale, finVerificationFinale: finVerificationFinale, publicationFinale: publicationFinale,
