@@ -103,4 +103,5 @@ Points en suspens :
 
 1. Titres et lots (PR n° 11) : migration 0011 et test 0011 faits ; fusion sur l'accord écrit de Katana.
 2. Matchs saisis en brouillon : M-2 et M-3 (valider quand les réinscriptions sont approuvées). Premier provisoire d'Aurora le dimanche 29/11/2026 (coupure samedi 28/11 à 16 h) : guider Katana (Administration > Classements).
-3. Lot 3B (matchs libres) ; lot 5 (textes : « 7 derniers jours d'audit » / « gel » ; message rouge du lien de réinitialisation proposé le 21/11, non validé ; règlement ; processus).
+3. Lot 5, suite (proposer chaque texte à Katana avant de l'appliquer) : règlement réécrit en entier à partir du cahier (ajouter matchs en attente et litiges, tableau-guide des sanctions, confidentialité des litiges, phase de démarrage, lisibilité des captures) ; page Processus (litiges, sanctions) ; couleurs (rouge #E53935 au lieu de l'ambre) ; actualités (Katana publie) ; messagerie avec Katana.
+4. Lot 3B (matchs libres), puis nettoyage de l'ancien code du prototype (onglets « Créneaux », « Tableau de bord », « Décisions »).
