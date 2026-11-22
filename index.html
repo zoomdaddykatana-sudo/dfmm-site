@@ -201,13 +201,6 @@ input:focus,select:focus,textarea:focus{outline:none;border-color:var(--green);b
 input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 .grid-f{display:grid;gap:0 14px;grid-template-columns:repeat(auto-fit,minmax(min(100%,240px),1fr))}
 .err{color:#FF8A86;font-size:14px;margin-top:4px}
-.types{display:grid;gap:8px;grid-template-columns:repeat(auto-fit,minmax(min(100%,160px),1fr));border:0;padding:0;margin:0 0 10px}
-.types label{display:block;border:1px solid var(--line2);padding:10px 12px;cursor:pointer;background:var(--panel);line-height:1.3}
-.types label b{display:block}
-.types label span{font-size:13px;color:var(--mute)}
-.types input{position:absolute;opacity:0;pointer-events:none}
-.types label:has(input:checked){border-color:var(--green);background:var(--greenbg)}
-.types label:has(input:focus-visible){outline:2px solid var(--ink)}
 .msg-out{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:14px;min-height:220px}
 
 /* Administration */
@@ -807,35 +800,6 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   </div>
 </section>
 
-<!-- ============ PARTICIPER ============ -->
-<section class="view" data-view="participer" hidden>
-  <div class="band">
-    <div class="wrap">
-      <div class="sec-head">
-        <h1>Participer</h1>
-        <p>En attendant l’espace membre, chaque demande se fait en deux temps : remplissez le formulaire, puis envoyez le message préparé en privé à l’organisation.</p>
-        <p class="note">Où envoyer votre message : <b id="canal-txt">en message privé à Katana</b></p>
-      </div>
-      <form id="dem-form" novalidate>
-        <fieldset class="types" id="dem-types"></fieldset>
-        <div class="panel" id="dem-panel">
-          <p id="dem-intro" class="mute"></p>
-          <div id="dem-champs"></div>
-          <div id="dem-err" class="err" role="alert"></div>
-          <div class="row-btns"><button class="btn" type="submit">Préparer mon message</button></div>
-        </div>
-      </form>
-      <div id="dem-sortie" class="panel" hidden>
-        <h3>Votre message est prêt</h3>
-        <p>Copiez-le et envoyez-le <b>en message privé</b> à l’organisation. Il contient vos informations personnelles : ne le publiez pas dans un groupe.</p>
-        <p id="dem-rappel" class="note a" hidden></p>
-        <textarea id="dem-msg" class="msg-out" readonly></textarea>
-        <div class="row-btns"><button class="btn" type="button" data-act="copier-msg">Copier le message</button><button class="btn ghost" type="button" data-act="nouvelle-demande">Faire une autre demande</button></div>
-      </div>
-    </div>
-  </div>
-</section>
-
 <!-- ============ INSCRIPTION ============ -->
 <section class="view" data-view="inscription" hidden>
   <div class="band">
@@ -866,61 +830,6 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
         <nav class="adm-tabs" id="adm-tabs" aria-label="Sections de l’administration"></nav>
         <div id="adm-shell"></div>
         <div id="adm-body"></div>
-        <div id="adm-decisions" hidden>
-          <div class="panel">
-            <h3>Décisions validées intégrées au site</h3>
-            <div class="scroll"><table>
-              <thead><tr><th>Domaine</th><th>Décision</th></tr></thead>
-              <tbody>
-                <tr><td>Système</td><td>Ce site sert d’outil intermédiaire. Le système cible reste un site et une application (public, membres, administration) sur Supabase, avec sauvegardes, version de test et journal des décisions. En attendant : sauvegarde manuelle chaque semaine.</td></tr>
-                <tr><td>Administration</td><td>Katana est le seul administrateur. Chaque inscription et chaque match sont confirmés manuellement.</td></tr>
-                <tr><td>Matricule</td><td>DFMM-n attribué à l’approbation, jamais réutilisé. Les anciens matricules ne sont pas repris : les personnes déjà approuvées se réinscrivent et gardent leur date d’approbation d’origine comme début de période.</td></tr>
-                <tr><td>Inscription</td><td>Champs de l’ancien formulaire, plus date de naissance, genre, compréhension (essentielle) et pratique (informative) du malgache, résidence (province et ville principale ou périphérie, ou pays). E-mail obligatoire. Nationalité ou origine malgache par case à cocher, vérifiée à l’approbation.</td></tr>
-                <tr><td>Comptes</td><td>2 comptes au maximum, un seul actif, 7 jours entre deux changements, compte remplacé inactif définitivement. Ajout et changement de compte actif sur approbation. Changement de pseudo par déclaration, historique conservé.</td></tr>
-                <tr><td>Statuts</td><td>Candidature : en attente, refusée. Membre : actif, suspendu, retiré, exclu. Comptabilisation par périodes actives. Retiré : hors classements et lots, données conservées, réintégration possible.</td></tr>
-                <tr><td>Données</td><td>Effacement des informations personnelles sur demande ; matricule, statistiques et pseudo conservés.</td></tr>
-                <tr><td>Matchs</td><td>Au moins 16 participants, écart de factions de 1 au plus sur tous les participants, au moins 30 % de membres inscrits arrondi au supérieur (paramètre). Pseudos inconnus non bloquants. Pseudo ambigu : « à identifier », décision de Katana.</td></tr>
-                <tr><td>Matchs libres</td><td>Déclaration préalable obligatoire, un match par créneau accepté, capture sous 30 minutes.</td></tr>
-                <tr><td>Contrôles</td><td>Contrôles automatiques limités aux valeurs manquantes, négatives ou en double. Pas de comparaison éliminations/morts entre factions. Alertes de performance, jamais de sanction automatique.</td></tr>
-                <tr><td>Classements</td><td>11 distinctions, départages du guide, un lot par joueur et redistribution. Provisoire le dimanche tous les 14 jours, coupure samedi 17 h (paramètre). Public : classements seulement ; lots non annoncés avant confirmation.</td></tr>
-                <tr><td>Sanctions</td><td>Suspension temporaire avec date de fin, ou exclusion définitive. Motif communiqué, droit de réponse, recours sous 48 h.</td></tr>
-              </tbody>
-            </table></div>
-          </div>
-          <div class="panel">
-            <h3>Choix techniques du site, à confirmer</h3>
-            <ul class="chk">
-              <li class="w">Une distinction MOST ou BEST exige un total supérieur à 0 (pas de titre pour un total nul).</li>
-              <li class="w">Le premier quartile (Q1) est calculé comme QUARTILE.INC d’Excel (interpolation linéaire).</li>
-              <li class="w">Les membres retirés ou exclus ne comptent ni dans la médiane, ni dans Q1.</li>
-              <li class="w">Pour le seuil de 30 %, un « membre inscrit » est une ligne rattachée à un matricule.</li>
-              <li class="w">L’activation immédiate d’un 2e compte déclenche le délai de 7 jours avant le changement suivant.</li>
-              <li class="w">Après un effacement des données, l’UID est conservé (privé) pour empêcher les doublons.</li>
-              <li class="w">Une suspension se termine à la fin du jour indiqué.</li>
-            </ul>
-          </div>
-          <div class="panel">
-            <h3>Points encore ouverts</h3>
-            <ul class="chk">
-              <li class="w">Durée d’une session de match libre : créneau déclaré ou fenêtre de 6 heures. Le site applique la fin déclarée, sinon 6 heures.</li>
-              <li class="w">La règle des 30 minutes reste-t-elle applicable aux matchs libres déclarés à l’avance ? Le site l’applique.</li>
-              <li class="w">Accès pendant une suspension ou une exclusion : proposé, lecture seule et messagerie vers Katana.</li>
-              <li class="w">Écart entre pseudo déclaré et pseudo vérifié : proposé, e-mail préparé et validé d’un clic.</li>
-              <li class="w">Nombre de personnes déjà approuvées à réinscrire : 19 ou 6, selon la liste à jour.</li>
-              <li class="w">Lancement à 16 h 05 et annonce du lundi (Saison Aurora) : toujours appliqués ?</li>
-              <li class="w">Guide PDF : nouvelle version à produire avec les règles mises à jour.</li>
-            </ul>
-          </div>
-          <div class="panel">
-            <h3>Contradictions tranchées</h3>
-            <ul class="chk">
-              <li class="o">Égalité parfaite : distinction non attribuée (guide), et non co-lauréats (dossier de transfert).</li>
-              <li class="o">Publication : tous les 14 jours (décision du 20 novembre), et non 15.</li>
-              <li class="o">Comptes : 2 comptes avec un seul actif (20 novembre), à la place de 3 comptes sans compte actif (19 novembre).</li>
-              <li class="o">Taille de match : 16 participants minimum, à la place de « 20 participants maximum ».</li>
-            </ul>
-          </div>
-        </div>
       </div>
     </div>
   </div>
@@ -965,12 +874,12 @@ const nid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).
 const note = (t, c) => '<div class="note' + (c ? ' ' + c : '') + '">' + t + '</div>';
 
 /* ---------------- Données ---------------- */
-const COLS = ['saisons', 'membres', 'comptes', 'inscriptions', 'demandes', 'creneaux', 'matchs', 'publications', 'journal', 'parametres'];
+const COLS = ['saisons', 'membres', 'comptes', 'inscriptions', 'demandes', 'matchs', 'publications', 'journal', 'parametres'];
 const S = {}; COLS.forEach(c => { S[c] = []; });
 const ETAT = { charge: {}, erreur: {} };
 const CAP = { db: null, user: null };
 let ADMIN = false, PRET = false, PUB = null, ED = null, MODE = '';
-const UI = { vue: 'accueil', tab: 'parametres', tabRendu: '', grp: 'tous', archive: '', membre: '', rech: '', filtreMb: 'tous', filtreInsc: 'attente', clSaison: '', clType: 'Provisoire', clCoupure: '', lotSaison: '', matchSaison: '', jRech: '', jMax: 100, demType: 'creneau', msg: null };
+const UI = { vue: 'accueil', tab: 'parametres', tabRendu: '', grp: 'tous', archive: '', membre: '', rech: '', filtreMb: 'tous', filtreInsc: 'attente', clSaison: '', clType: 'Provisoire', clCoupure: '', lotSaison: '', matchSaison: '', jRech: '', jMax: 100 };
 
 const capCache = {};
 function cap(nom) {
@@ -1024,11 +933,10 @@ const compteActif = mat => S.comptes.find(c => c.matricule === mat && c.statut =
 const saisonPar = id => S.saisons.find(s => s.id === id);
 function saisonActive() { return saisonPar(sys().saison_active) || S.saisons.slice().sort((a, b) => String(b.debut).localeCompare(String(a.debut)))[0] || null; }
 function ctx() {
-  const membres = {}, comptes = {}, creneaux = {};
+  const membres = {}, comptes = {};
   S.membres.forEach(m => { membres[m.id] = Object.assign({}, m, { matricule: m.id }); });
   S.comptes.forEach(c => { comptes[c.id] = c; });
-  S.creneaux.forEach(c => { creneaux[c.id] = c; });
-  return { membres, comptes, creneaux, matchsList: S.matchs };
+  return { membres, comptes, creneaux: {}, matchsList: S.matchs };
 }
 function nomJoueur(mat) { const m = membre(mat); if (!m) return mat; const c = compteActif(mat); return m.nom_gamer || (c && c.pseudo) || mat; }
 function pseudosJoueur(mat) { return comptesDe(mat).filter(c => c.statut !== 'Remplacé').map(c => c.pseudo).filter(Boolean); }
@@ -1157,8 +1065,7 @@ function rendreClassementsPublic() {
   $('#cl-body').innerHTML = (p.categories || []).filter(c => UI.grp === 'tous' || c.kind === UI.grp).map(c => carteCl(c, p, false)).join('');
 }
 
-/* ---------------- Participer : formulaires et message ---------------- */
-const MAT = { k: 'matricule', lab: 'Votre matricule', t: 'text', req: 1, ph: 'DFMM-12', court: 'Matricule' };
+/* ---------------- Formulaire d’inscription ---------------- */
 const DEM = {
   inscription: { lab: 'Inscription', sous: 'Rejoindre DFMM et la LEAGUE UV', intro: 'Toutes les informations sont obligatoires, sauf le clan. Préparez aussi une capture de votre profil de jeu montrant votre pseudo et votre UID. Votre UID et votre adresse e-mail sont vérifiés automatiquement ; après l’envoi, vous recevrez un code à envoyer à la page DFMM sur Messenger depuis le compte Facebook indiqué.', rappel: 'Joignez à votre message une capture de votre profil de jeu montrant clairement votre pseudo et votre UID.', champs: [
     { k: 'nom_reel', lab: 'Nom et prénom (réels)', t: 'text', req: 1, court: 'Nom et prénom' },
@@ -1181,39 +1088,7 @@ const DEM = {
     { k: 'acc_uv', lab: 'J’ai lu et j’accepte le règlement de la LEAGUE UV.', t: 'check', req: 1, court: 'Règlement LEAGUE UV accepté' },
     { k: 'acc_donnees', lab: 'J’accepte que mes informations servent à gérer la communauté et la ligue.', t: 'check', req: 1, court: 'Traitement des données accepté' },
     { k: 'acc_approbation', lab: 'Je comprends que mon inscription doit être approuvée par l’organisation.', t: 'check', req: 1, court: 'Approbation comprise' }
-  ], verif: x => x.comprend_mg === 'Non' ? 'Comprendre le malgache est un critère essentiel : cette inscription ne pourrait pas être acceptée.' : (x.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email) ? 'Adresse e-mail invalide.' : (x.uid && !/^\d{5,20}$/.test(String(x.uid).trim()) ? 'UID invalide : il ne contient que des chiffres (de 5 à 20).' : '')) },
-  creneau: { lab: 'Match libre', sous: 'Déclarer un créneau à l’avance', intro: 'Un match libre doit être déclaré avant d’être joué. Un seul match est comptabilisé par créneau accepté.', rappel: 'Après le match, chaque responsable de faction envoie la capture du résultat au plus 30 minutes après la fin.', champs: [
-    Object.assign({}, MAT, { lab: 'Votre matricule (organisateur)' }),
-    { k: 'nom_gamer', lab: 'Votre nom de gamer', t: 'text', req: 1, court: 'Nom de gamer' },
-    { k: 'date', lab: 'Date du match', t: 'date', req: 1, court: 'Date' },
-    { k: 'debut', lab: 'Heure de début', t: 'time', req: 1, court: 'Début' },
-    { k: 'fin', lab: 'Heure de fin prévue', t: 'time', req: 1, court: 'Fin prévue' },
-    { k: 'resp_haavk', lab: 'Responsable HAAVK', t: 'text', req: 1, court: 'Responsable HAAVK' },
-    { k: 'resp_gti', lab: 'Responsable GTI', t: 'text', req: 1, court: 'Responsable GTI' },
-    { k: 'motif', lab: 'Motif ou précisions', t: 'textarea', req: 1, court: 'Motif' }
-  ], verif: x => (x.date && x.debut && x.date + 'T' + x.debut < now()) ? 'Le créneau doit être déclaré à l’avance : choisissez une date et une heure à venir.' : '' },
-  pseudo: { lab: 'Changement de pseudo', sous: 'Simple déclaration', intro: 'Sans approbation. Déclarez-le avant votre participation suivante.', champs: [
-    MAT, { k: 'uid', lab: 'UID du compte concerné', t: 'text', req: 1, mode: 'numeric', court: 'UID' },
-    { k: 'ancien', lab: 'Ancien pseudo', t: 'text', req: 1, court: 'Ancien pseudo' },
-    { k: 'nouveau', lab: 'Nouveau pseudo exact', t: 'text', req: 1, court: 'Nouveau pseudo' }] },
-  compte2: { lab: 'Ajouter un 2e compte', sous: '2 comptes au maximum', intro: 'Deux comptes au maximum par matricule, un seul actif à la fois. La demande est examinée par l’organisation.', rappel: 'Joignez une capture du profil du nouveau compte montrant le pseudo et l’UID.', champs: [
-    MAT, { k: 'pseudo', lab: 'Pseudo du nouveau compte', t: 'text', req: 1, court: 'Pseudo' },
-    { k: 'uid', lab: 'UID du nouveau compte', t: 'text', req: 1, mode: 'numeric', court: 'UID' },
-    { k: 'activer', lab: 'Je souhaite jouer avec ce compte dès son approbation.', t: 'check', court: 'Activer dès l’approbation' },
-    { k: 'motif', lab: 'Motif', t: 'textarea', req: 1, court: 'Motif' }] },
-  actif: { lab: 'Changer de compte actif', sous: '7 jours entre deux changements', intro: 'Seul le compte actif est comptabilisé. Il faut au moins 7 jours entre deux changements.', champs: [
-    MAT, { k: 'compte', lab: 'Compte à activer (pseudo ou UID)', t: 'text', req: 1, court: 'Compte à activer' },
-    { k: 'motif', lab: 'Motif court', t: 'text', req: 1, court: 'Motif' }] },
-  retrait: { lab: 'Demander mon retrait', sous: 'Quitter la ligue', intro: 'Si votre retrait est accepté, votre période active se ferme, vos comptes deviennent inactifs et vos autres demandes sont annulées. Vous n’apparaissez plus dans les classements ni pour les lots. Votre matricule, vos statistiques et votre pseudo sont conservés, et vous pouvez demander votre réintégration à tout moment.', champs: [
-    MAT, { k: 'motif', lab: 'Motif (facultatif)', t: 'textarea', court: 'Motif' },
-    { k: 'compris', lab: 'J’ai compris les conséquences de mon retrait.', t: 'check', req: 1, court: 'Conséquences comprises' }] },
-  reclamation: { lab: 'Réclamation', sous: 'Sous 48 heures', intro: 'À envoyer dans les 48 heures suivant la publication ou la notification concernée.', rappel: 'Joignez vos preuves (captures) au message.', champs: [
-    MAT, { k: 'objet', lab: 'Objet', t: 'radio', opts: ['Résultat d’un match', 'Classement publié', 'Décision de l’organisation'], req: 1, court: 'Objet' },
-    { k: 'reference', lab: 'Match ou publication concernés (date, heure ou numéro)', t: 'text', req: 1, court: 'Référence' },
-    { k: 'motif', lab: 'Motif', t: 'textarea', req: 1, court: 'Motif' },
-    { k: 'preuves', lab: 'Preuves jointes (description)', t: 'text', court: 'Preuves' }] },
-  effacement: { lab: 'Effacer mes données', sous: 'Données personnelles', intro: 'Vos informations personnelles (e-mail, date de naissance, nom réel, lien Facebook, etc.) seront effacées. Votre matricule, vos statistiques et votre pseudo sont conservés, et vos apparitions passées dans les classements restent publiques avec votre pseudo.', champs: [
-    MAT, { k: 'compris', lab: 'J’ai compris ce qui est effacé et ce qui est conservé.', t: 'check', req: 1, court: 'Conséquences comprises' }] }
+  ], verif: x => x.comprend_mg === 'Non' ? 'Comprendre le malgache est un critère essentiel : cette inscription ne pourrait pas être acceptée.' : (x.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email) ? 'Adresse e-mail invalide.' : (x.uid && !/^\d{5,20}$/.test(String(x.uid).trim()) ? 'UID invalide : il ne contient que des chiffres (de 5 à 20).' : '')) }
 };
 function champHtml(f, val, px) {
   px = px || 'f-'; const id = px + f.k, x = val[f.k], etoile = f.req ? ' <span class="dim">*</span>' : '';
@@ -1248,50 +1123,10 @@ function verifierChamps(champs, o) {
   const manq = champs.filter(f => f.req && !(f.si && !f.si(o)) && (f.t === 'check' ? !o[f.k] : !String(o[f.k] || '').trim())).map(f => f.court || f.lab);
   return manq.length ? 'À compléter : ' + manq.join(', ') + '.' : '';
 }
-function initParticiper() {
-  $('#dem-types').innerHTML = Object.keys(DEM).filter(k => k !== 'inscription').map(k => '<label><input type="radio" name="dem-type" value="' + k + '"' + (k === UI.demType ? ' checked' : '') + '><b>' + esc(DEM[k].lab) + '</b><span>' + esc(DEM[k].sous) + '</span></label>').join('');
-  afficherDemande();
-}
-function afficherDemande() {
-  const D = DEM[UI.demType];
-  $('#dem-intro').textContent = D.intro;
-  $('#dem-champs').innerHTML = '<div class="grid-f">' + D.champs.map(f => champHtml(f, {})).join('') + '</div>';
-  $('#dem-err').textContent = '';
-  majVisibilite(D.champs, 'f-', $('#dem-champs'));
-  const s = PUB && PUB.saison; if (s && s.canal) $('#canal-txt').textContent = s.canal;
-}
-function composer(type, o) {
-  const D = DEM[type], t = now();
-  const lignes = ['LEAGUE UV · ' + D.lab.toUpperCase(), 'Préparé le ' + fDT(t), ''];
-  const data = { t: type, v: 1, d: t };
-  D.champs.forEach(f => {
-    if (f.si && !f.si(o)) return;
-    data[f.k] = o[f.k];
-    const val = f.t === 'check' ? (o[f.k] ? 'Oui' : 'Non') : o[f.k];
-    if (val !== '' && val != null) lignes.push((f.court || f.lab) + ' : ' + val);
-  });
-  lignes.push('', 'Code de traitement (à laisser tel quel) :', L.encodeMsg(data));
-  return lignes.join('\n');
-}
-function soumettreDemande(e) {
-  e.preventDefault();
-  const D = DEM[UI.demType];
-  const o = lireChamps(D.champs);
-  if (o.matricule !== undefined) o.matricule = o.matricule.toUpperCase().replace(/\s+/g, '');
-  let err = verifierChamps(D.champs, o);
-  if (!err && o.matricule !== undefined && !/^DFMM-\d+$/.test(o.matricule)) err = 'Matricule au format DFMM-12.';
-  if (!err && D.verif) err = D.verif(o);
-  $('#dem-err').textContent = err;
-  if (err) return;
-  $('#dem-msg').value = composer(UI.demType, o);
-  $('#dem-rappel').hidden = !D.rappel; $('#dem-rappel').textContent = D.rappel || '';
-  $('#dem-form').hidden = true; $('#dem-sortie').hidden = false;
-  $('#dem-sortie').scrollIntoView({ block: 'start' });
-}
 
 /* ---------------- Administration ---------------- */
 const TABS_ACTIFS = ['parametres', 'inscriptions', 'demandes', 'membres', 'creneaux', 'matchs', 'classements', 'lots', 'messages', 'actualites', 'litiges', 'sanctions', 'saison', 'acces', 'sauvegarde'];
-const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['bord', 'Tableau de bord'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde'], ['decisions', 'Décisions']];
+const TABS = [['parametres', 'Paramètres'], ['acces', 'Accès des joueurs'], ['inscriptions', 'Inscriptions'], ['demandes', 'Demandes'], ['membres', 'Membres'], ['creneaux', 'Créneaux'], ['matchs', 'Matchs'], ['classements', 'Classements'], ['lots', 'Titres et lots'], ['journal', 'Journal'], ['messages', 'Messages'], ['actualites', 'Actualités'], ['litiges', 'Litiges'], ['sanctions', 'Sanctions'], ['saison', 'Saison'], ['sauvegarde', 'Sauvegarde']];
 const enCours = i => i.statut === 'En attente' || i.statut === 'Précisions demandées';
 function compteurTab(k) {
   if (k === 'inscriptions') return ADM.nbInsc;
@@ -1311,78 +1146,15 @@ function rendreAdmin() {
   if (TABS_ACTIFS.indexOf(UI.tab) < 0) { UI.tab = TABS_ACTIFS[0]; UI.tabRendu = ''; }
   att.hidden = true; $('#adm').hidden = false;
   $('#adm-tabs').innerHTML = TABS.filter(([k]) => TABS_ACTIFS.indexOf(k) >= 0).map(([k, l]) => { const n = compteurTab(k); return '<a href="#admin-' + k + '"' + (UI.tab === k ? ' class="on" aria-current="page"' : '') + '>' + esc(l) + (n ? '<span class="cpt">' + n + '</span>' : '') + '</a>'; }).join('');
-  const T = TAB[UI.tab] || TAB.bord;
+  const T = TAB[UI.tab];
   if (UI.tabRendu !== UI.tab) { $('#adm-shell').innerHTML = T.shell ? T.shell() : ''; UI.tabRendu = UI.tab; if (T.apres) T.apres(); if (T.charger) T.charger(); }
   const errs = Object.keys(ETAT.erreur);
   $('#adm-body').innerHTML = (errs.length ? note('Lecture impossible : ' + esc(errs.map(k => k + ' (' + ETAT.erreur[k] + ')').join(', ')), 'r') : '') + (T.body ? T.body() : '');
-  $('#adm-decisions').hidden = UI.tab !== 'decisions';
   if (UI.tab === 'parametres') chargerHistorique();
 }
 function optSaisons(sel) { return S.saisons.slice().sort((a, b) => String(b.debut).localeCompare(String(a.debut))).map(s => '<option value="' + esc(s.id) + '"' + (s.id === sel ? ' selected' : '') + '>' + esc(s.nom) + '</option>').join(''); }
 
-/* ----- Tableau de bord ----- */
 const TAB = {};
-TAB.bord = {
-  shell: () => '<div class="panel"><h3>Coller un message reçu</h3><p class="mute small">Collez le message qu’un joueur a préparé sur la page Participer. Le code DFMM1 est lu automatiquement : aucune ressaisie.</p><textarea id="msg-in" rows="4" placeholder="Collez ici le message complet…"></textarea><div class="row-btns"><button class="btn" type="button" data-act="msg-lire">Lire le message</button></div><div id="msg-out"></div></div>',
-  body: () => {
-    const s = saisonActive(), t = now(), j = t.slice(0, 10);
-    const kp = [[S.membres.filter(m => m.statut === 'Actif').length, 'membres actifs'], [S.matchs.filter(m => m.statut === 'Validé' && s && m.saison_id === s.id).length, 'matchs validés cette saison'], [S.inscriptions.filter(enCours).length, 'candidatures à traiter'], [S.publications.filter(p => s && p.saison && p.saison.id === s.id).length, 'classements publiés']];
-    let h = '<div class="kpis">' + kp.map(([n, l]) => '<div class="kpi"><b>' + n + '</b><span>' + l + '</span></div>').join('') + '</div>';
-    const ta = [];
-    if (!s) ta.push(['Aucune saison : commencez par créer la saison et ses dates.', '<a class="btn sm" href="#admin-saison">Créer la saison</a>']);
-    const ni = S.inscriptions.filter(enCours).length; if (ni) ta.push([ni + ' candidature(s) à examiner.', '<a class="btn sm" href="#admin-inscriptions">Examiner</a>']);
-    const nd = S.demandes.filter(d => d.statut === 'En attente').length; if (nd) ta.push([nd + ' demande(s) de membres en attente.', '<a class="btn sm" href="#admin-demandes">Traiter</a>']);
-    const nc = S.creneaux.filter(c => c.statut === 'En attente').length; if (nc) ta.push([nc + ' créneau(x) de match libre à décider.', '<a class="btn sm" href="#admin-creneaux">Décider</a>']);
-    const br = S.matchs.filter(m => m.statut === 'Brouillon'); if (br.length) ta.push([br.length + ' match(s) en brouillon, dont ' + br.filter(m => (m.lignes || []).some(l => l.res === 'à identifier')).length + ' avec des lignes à identifier.', '<a class="btn sm" href="#admin-matchs">Vérifier</a>']);
-    if (s) { const pr = L.publicationsPrevues(s, j, 1)[0]; ta.push(['Prochain classement provisoire : ' + (pr ? fD(pr) + ', coupure la veille à ' + L.regles(s).coupure_heure.replace(':', ' h ') : 'date du premier provisoire à renseigner dans la saison') + '.', '<a class="btn sm ghost" href="#admin-classements">Préparer</a>']); }
-    const sv = sys().derniere_sauvegarde, jr = sv ? Math.floor(L.diffMinutes(sv, t) / 1440) : null;
-    ta.push([sv ? 'Dernière sauvegarde : ' + fDT(sv) + (jr >= 7 ? ', il y a ' + jr + ' jours. À refaire.' : '.') : 'Aucune sauvegarde faite. À faire chaque semaine.', '<a class="btn sm' + (sv && jr < 7 ? ' ghost' : '') + '" href="#admin-sauvegarde">Sauvegarder</a>']);
-    h += '<div class="panel"><h3>À faire</h3><ul class="taches">' + ta.map(([a, b]) => '<li><span>' + esc(a) + '</span>' + b + '</li>').join('') + '</ul></div>';
-    return h;
-  }
-};
-function lireMessage() {
-  const out = $('#msg-out'); let o;
-  try { o = L.decodeMsg($('#msg-in').value); } catch (e) { out.innerHTML = '<p class="err">' + esc(e.message) + '</p>'; return; }
-  const D = DEM[o.t]; if (!D) { out.innerHTML = '<p class="err">Type de demande inconnu.</p>'; return; }
-  UI.msg = o;
-  let h = '<div class="card-l"><div class="t"><b>' + esc(D.lab) + '</b><span class="dim small">préparé le ' + fDT(o.d) + '</span></div><dl class="kv">';
-  D.champs.forEach(f => { if (o[f.k] === undefined || o[f.k] === '') return; h += '<dt>' + esc(f.court || f.lab) + '</dt><dd>' + esc(f.t === 'check' ? (o[f.k] ? 'Oui' : 'Non') : o[f.k]) + '</dd>'; });
-  h += '</dl><div class="row-btns"><button class="btn" type="button" data-act="msg-enregistrer">' + (o.t === 'inscription' ? 'Créer la candidature' : o.t === 'creneau' ? 'Enregistrer la demande de créneau' : 'Enregistrer la demande') + '</button></div></div>';
-  out.innerHTML = h;
-}
-function sansMeta(o) { const x = Object.assign({}, o); delete x.t; delete x.v; delete x.d; return x; }
-async function enregistrerMessage() {
-  const o = UI.msg; if (!o) return;
-  const t = now();
-  const ok = await agir(async () => {
-    if (o.t === 'inscription') {
-      const dup = S.inscriptions.find(i => i.msg_d === o.d && i.uid === o.uid);
-      if (dup) throw new Error('Cette candidature est déjà enregistrée (' + (dup.nom_gamer || dup.id) + ').');
-      const id = nid('I');
-      await ecrire('inscriptions', id, Object.assign(sansMeta(o), { statut: 'En attente', recu_le: t, source: 'Message', msg_d: o.d }));
-      await noter('Inscription', id, 'Candidature reçue : ' + (o.nom_gamer || ''), '');
-      location.hash = '#admin-inscriptions';
-    } else if (o.t === 'creneau') {
-      const dup = S.creneaux.find(c => c.msg_d === o.d && c.demandeur === o.matricule);
-      if (dup) throw new Error('Ce créneau est déjà enregistré (' + dup.id + ').');
-      const n = Math.max(0, ...S.creneaux.map(c => numero(c.id))) + 1, id = 'L-' + String(n).padStart(3, '0');
-      const s = saisonActive();
-      await ecrire('creneaux', id, { saison_id: s ? s.id : '', date: o.date, debut: o.debut, fin: o.fin, demandeur: o.matricule, nom_gamer: o.nom_gamer, resp_haavk: o.resp_haavk, resp_gti: o.resp_gti, motif: o.motif, statut: 'En attente', recu_le: t, msg_d: o.d });
-      await noter('Créneau', id, 'Demande de créneau reçue de ' + o.matricule, '');
-      location.hash = '#admin-creneaux';
-    } else {
-      const dup = S.demandes.find(d => d.msg_d === o.d && d.matricule === o.matricule && d.type === o.t);
-      if (dup) throw new Error('Cette demande est déjà enregistrée.');
-      if (!membre(o.matricule)) toast('Attention : matricule ' + o.matricule + ' introuvable parmi les membres.', true);
-      const id = nid('D');
-      await ecrire('demandes', id, { type: o.t, matricule: o.matricule, details: sansMeta(o), statut: 'En attente', recu_le: t, msg_d: o.d });
-      await noter('Demande', o.matricule, 'Demande reçue : ' + DEM[o.t].lab, '');
-      location.hash = '#admin-demandes';
-    }
-  }, 'Enregistré.');
-  if (ok) { UI.msg = null; const i = $('#msg-in'); if (i) i.value = ''; const out = $('#msg-out'); if (out) out.innerHTML = ''; }
-}
 
 /* ----- Inscriptions ----- */
 const PERSO = ['nom_reel', 'nom_gamer', 'email', 'date_naissance', 'genre', 'facebook', 'clan', 'residence', 'province', 'zone', 'pays', 'comprend_mg', 'parle_mg', 'origine_mg'];
@@ -1711,7 +1483,6 @@ function sortie(mat, statut, dem) {
       await ecrire('membres', mat, Object.assign({}, m, { statut, periodes: fermerPeriode(m.periodes, t) }));
       for (const c of comptesDe(mat).filter(c => c.statut === 'Actif')) await ecrire('comptes', c.id, Object.assign({}, c, { statut: 'En pause', periodes: fermerPeriode(c.periodes, t) }));
       for (const d of S.demandes.filter(d => d.matricule === mat && d.statut === 'En attente' && (!dem || d.id !== dem.id))) await ecrire('demandes', d.id, Object.assign({}, d, { statut: 'Annulée', decide_le: t, motif_decision: 'Annulée par ' + (ex ? 'l’exclusion' : 'le retrait') }));
-      for (const c of S.creneaux.filter(c => c.demandeur === mat && c.statut === 'En attente')) await ecrire('creneaux', c.id, Object.assign({}, c, { statut: 'Annulé', decide_le: t, decision_motif: 'Annulé par ' + (ex ? 'l’exclusion' : 'le retrait') }));
       await finDemande(dem, 'Acceptée', motif);
       await noter(ex ? 'Sanction' : 'Membre', mat, ex ? 'Exclusion définitive' : 'Retrait accepté', motif);
     }, ex ? 'Membre exclu.' : 'Retrait enregistré.');
@@ -1755,50 +1526,6 @@ function refuserDemande(d) {
     return agir(async () => { await finDemande(d, 'Refusée', motif); await noter('Demande', d.matricule, 'Demande refusée : ' + ((DEM[d.type] || {}).lab || d.type), motif); }, 'Demande refusée.');
   } }]);
   return false;
-}
-
-/* ----- Créneaux de matchs libres ----- */
-TAB.creneaux = {
-  shell: () => '<div class="row-btns" style="margin:0 0 12px"><button class="btn sm ghost" type="button" data-act="cr-saisir">Saisir un créneau</button></div>',
-  body: () => {
-    const l = S.creneaux.slice().sort((a, b) => String(b.date + b.debut).localeCompare(String(a.date + a.debut)));
-    if (!l.length) return note('Aucune demande de créneau. Les joueurs déclarent leurs matchs libres depuis la page Participer.');
-    return '<div class="scroll"><table><thead><tr><th>Créneau</th><th>Date</th><th>Heures</th><th>Demandeur</th><th>Responsables</th><th>Statut</th><th>Match</th><th></th></tr></thead><tbody>' + l.map(c => {
-      const m = S.matchs.find(x => x.creneau_id === c.id && x.statut === 'Validé');
-      return '<tr><td>' + esc(c.id) + '</td><td class="nowrap">' + fDc(c.date) + '</td><td class="nowrap">' + esc(c.debut + ' – ' + (c.fin || '')) + '</td><td>' + esc(c.demandeur) + '<div class="dim small">' + esc(c.nom_gamer || '') + '</div></td><td class="small">HAAVK : ' + esc(c.resp_haavk || '—') + '<br>GTI : ' + esc(c.resp_gti || '—') + '</td><td>' + badgeStatut(c.statut) + (c.statut === 'Accepté' ? '<div class="dim small">' + (c.temoin ? 'avec témoin' : 'confié aux joueurs') + '</div>' : '') + '</td><td>' + (m ? esc(m.id) : '—') + '</td><td>' + (c.statut === 'En attente' ? '<button class="btn sm" type="button" data-act="cr-decider" data-id="' + esc(c.id) + '">Décider</button>' : '<button class="btn sm ghost" type="button" data-act="cr-decider" data-id="' + esc(c.id) + '">Voir</button>') + '</td></tr>';
-    }).join('') + '</tbody></table></div>';
-  }
-};
-function deciderCreneau(id) {
-  const c = S.creneaux.find(x => x.id === id); if (!c) return;
-  const infos = '<dl class="kv"><dt>Date</dt><dd>' + fD(c.date) + ', ' + esc(c.debut) + ' – ' + esc(c.fin || '') + '</dd><dt>Demandeur</dt><dd>' + esc(c.demandeur + ' · ' + (c.nom_gamer || '')) + '</dd><dt>Responsables</dt><dd>HAAVK : ' + esc(c.resp_haavk) + ' · GTI : ' + esc(c.resp_gti) + '</dd><dt>Motif</dt><dd>' + esc(c.motif || '') + '</dd><dt>Reçue le</dt><dd>' + fDT(c.recu_le) + '</dd></dl>';
-  if (c.statut !== 'En attente') { modal('Créneau ' + c.id, infos + '<p>' + badgeStatut(c.statut) + ' ' + esc(c.decision_motif || '') + '</p>', [{ label: 'Fermer', cls: 'ghost' }, { label: 'Message pour le joueur', onClick: () => { messageCreneau(c); return false; } }]); return; }
-  const m = membre(c.demandeur);
-  modal('Décider du créneau ' + c.id, infos + (!m ? note('Matricule du demandeur introuvable.', 'r') : statutM(m) !== 'Actif' ? note('Demandeur non actif (' + statutM(m) + ').', 'a') : '') + '<div class="choix"><label><input type="radio" name="crd" value="temoin"> Accepter, Katana participe comme témoin</label><label><input type="radio" name="crd" value="joueurs"> Accepter, match confié aux joueurs</label><label><input type="radio" name="crd" value="refus"> Refuser</label></div>' + formMotif(false, 'Motif ou consignes'), [{ label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', onClick: async () => {
-    const d = radio('crd'), motif = v('a-motif'), t = now();
-    if (!d) return erreurA('Choisissez une décision.');
-    if (d === 'refus' && !motif) return erreurA('Le motif est obligatoire pour un refus.');
-    const ok = await agir(async () => {
-      await ecrire('creneaux', c.id, Object.assign({}, c, { statut: d === 'refus' ? 'Refusé' : 'Accepté', temoin: d === 'temoin', decide_le: t, decision_motif: motif }));
-      await noter('Créneau', c.id, d === 'refus' ? 'Créneau refusé' : 'Créneau accepté (' + (d === 'temoin' ? 'avec témoin' : 'confié aux joueurs') + ')', motif);
-    }, 'Décision enregistrée.');
-    if (ok) messageCreneau(S.creneaux.find(x => x.id === c.id));
-    return false;
-  } }]);
-}
-function messageCreneau(c) {
-  const ok = c.statut === 'Accepté';
-  const txt = 'Bonjour ' + (c.nom_gamer || '') + ',\n\n' + (ok ? 'Votre créneau de match libre ' + c.id + ' est accepté : ' + fD(c.date) + ', de ' + c.debut + ' à ' + (c.fin || '') + '.\n' + (c.temoin ? 'Katana participera comme témoin.' : 'Le match vous est confié.') + '\n\nRappels : au moins 16 joueurs, factions équilibrées à un joueur près, au moins 30 % de membres inscrits. Chaque responsable de faction envoie la capture du résultat au plus 30 minutes après la fin du match, en indiquant le créneau ' + c.id + '. Un seul match est comptabilisé pour ce créneau.' : 'Votre demande de créneau ' + c.id + ' n’est pas acceptée.') + (c.decision_motif ? '\n\n' + (ok ? 'Consignes : ' : 'Motif : ') + c.decision_motif : '') + '\n\nKatana, organisation DFMM';
-  modalTexte('Message à envoyer', 'Envoyez ce message au demandeur et aux responsables de faction.', txt);
-}
-function saisirCreneau() {
-  const D = DEM.creneau;
-  modal('Saisir un créneau', '<div class="grid-f" id="sc-champs">' + D.champs.map(f => champHtml(f, {}, 'c-')).join('') + '</div><div id="sc-err" class="err"></div>', [{ label: 'Annuler', cls: 'ghost' }, { label: 'Enregistrer', onClick: async () => {
-    const o = lireChamps(D.champs, 'c-'); o.matricule = o.matricule.toUpperCase().replace(/\s+/g, '');
-    const e = verifierChamps(D.champs, o); if (e) { $('#sc-err').textContent = e; return false; }
-    const n = Math.max(0, ...S.creneaux.map(c => numero(c.id))) + 1, id = 'L-' + String(n).padStart(3, '0'), s = saisonActive();
-    return agir(async () => { await ecrire('creneaux', id, { saison_id: s ? s.id : '', date: o.date, debut: o.debut, fin: o.fin, demandeur: o.matricule, nom_gamer: o.nom_gamer, resp_haavk: o.resp_haavk, resp_gti: o.resp_gti, motif: o.motif, statut: 'En attente', recu_le: now() }); await noter('Créneau', id, 'Demande de créneau saisie pour ' + o.matricule, ''); }, 'Créneau enregistré.');
-  } }]);
 }
 
 /* ----- Matchs ----- */
@@ -1861,10 +1588,6 @@ async function telecharger(nom, contenu, type) {
 /* ---------------- Actions ---------------- */
 const ACTIONS = {
   'fermer-modal': () => fermerModal(),
-  'copier-msg': () => copier($('#dem-msg')),
-  'nouvelle-demande': () => { $('#dem-form').hidden = false; $('#dem-sortie').hidden = true; afficherDemande(); },
-  'msg-lire': () => lireMessage(),
-  'msg-enregistrer': () => enregistrerMessage(),
   'insc-filtre': b => { UI.filtreInsc = b.dataset.f; rendreAdmin(); },
   'insc-examiner': b => examinerInscription(b.dataset.id),
   'insc-saisir': () => saisirInscription(),
@@ -1872,8 +1595,6 @@ const ACTIONS = {
   'dem-refuser': b => { const d = S.demandes.find(x => x.id === b.dataset.id); if (d) refuserDemande(d); },
   'mb-ouvrir': b => { UI.membre = b.dataset.id; rendreAdmin(); window.scrollTo(0, 0); },
   'mb-retour': () => { UI.membre = ''; rendreAdmin(); },
-  'cr-saisir': () => saisirCreneau(),
-  'cr-decider': b => deciderCreneau(b.dataset.id),
   'j-plus': () => { UI.jMax += 100; rendreAdmin(); },
   'deconnexion': () => seDeconnecter(),
   'param-enregistrer': b => enregistrerParam(b.dataset.k),
@@ -1886,12 +1607,12 @@ const ACTIONS = {
 Object.keys(ACT_MB).forEach(k => { ACTIONS['mb-' + k] = b => ACT_MB[k](b.dataset.id); });
 
 /* ---------------- Navigation et démarrage ---------------- */
-const VUES = ['accueil', 'classements', 'reglement', 'processus', 'participer', 'inscription', 'compte', 'admin'];
+const VUES = ['accueil', 'classements', 'reglement', 'processus', 'inscription', 'compte', 'admin'];
 function router() {
   const h = (location.hash || '').slice(1);
   let vue = h, t = '';
   if (h.indexOf('admin-') === 0) { vue = 'admin'; t = h.slice(6); }
-  if (vue === 'participer') vue = 'inscription';   // ancienne page retirée : tout se fait dans le site
+  if (vue === 'participer') vue = 'inscription';   // ancienne adresse de la page retirée : on garde la redirection
   if (VUES.indexOf(vue) < 0) vue = 'accueil';
   const chg = UI.vue !== vue;
   UI.vue = vue;
@@ -1919,8 +1640,6 @@ function lierEvenements() {
     if (MODE === 'insc-decision' && t.name === 'dec') { const z = $('#dec-app'); if (z) z.hidden = t.value !== 'Approuver'; return; }
     if (MODE === 'saisie-insc' && t.closest('#si-champs')) { majVisibilite(DEM.inscription.champs, 'm-', $('#si-champs')); return; }
     if (MODE === 'modif-membre' && t.closest('#mo-champs')) { majVisibilite(DEM.inscription.champs.filter(f => PERSO.indexOf(f.k) >= 0), 'e-', $('#mo-champs')); return; }
-    if (t.name === 'dem-type' && e.type === 'change') { UI.demType = t.value; afficherDemande(); return; }
-    if (t.closest('#dem-champs')) { majVisibilite(DEM[UI.demType].champs, 'f-', $('#dem-champs')); return; }
     if (t.id === 'cl-arch' && e.type === 'change') { UI.archive = t.value; rendreClassementsPublic(); return; }
     if (t.id === 'mb-rech') { UI.rech = t.value; $('#adm-body').innerHTML = TAB.membres.body(); return; }
     if (t.id === 'mb-filtre') { UI.filtreMb = t.value; $('#adm-body').innerHTML = TAB.membres.body(); return; }
@@ -1930,7 +1649,6 @@ function lierEvenements() {
   };
   document.addEventListener('input', saisie);
   document.addEventListener('change', saisie);
-  $('#dem-form').addEventListener('submit', soumettreDemande);
   document.addEventListener('submit', e => { if (e.target.id === 'f-connexion') seConnecter(e); else if (e.target.id === 'f-inscription') soumettreInscription(e); else if (e.target.id === 'f-mdp') changerMdp(e); });
   document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('#modal').hidden) fermerModal(); });
 }
@@ -3807,7 +3525,6 @@ ACTIONS['ml-annuler-cap'] = async b => {
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
   try { PUB = JSON.parse($('#pub-data').textContent || 'null'); } catch (e) { PUB = null; }
-  initParticiper();
   lierEvenements();
   router();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
