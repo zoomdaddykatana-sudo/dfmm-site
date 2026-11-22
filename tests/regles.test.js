@@ -246,3 +246,32 @@ test('Match libre : retard accepté par Katana (échec technique) = pas de bloca
   assert.ok(L.controlesMatch(m, ctx, SAISON, R).bloquants.some(b => /min après la fin/.test(b)));
   assert.ok(!L.controlesMatch({ ...m, delai_exception: true }, ctx, SAISON, R).bloquants.some(b => /min après la fin/.test(b)));
 });
+
+// ---------- Liste complète des critères et motif proposé (PR du contrôle, 22/11/2026) ----------
+test('critères du match : tous remplis pour un match valide', () => {
+  const c = L.controlesMatch(match(16, 8), ctxAvec(16), SAISON, R);
+  assert.ok(c.criteres.length >= 11);
+  assert.deepEqual(c.criteres.filter(x => x.etat === 'non' || x.etat === 'attente'), []);
+  assert.equal(L.motifDepuisControles(c), '');
+});
+test('critères du match : 10 contre 8 → écart non rempli, motif proposé avec la phrase de la règle', () => {
+  const m = match(18, 18);
+  let n = 0; m.lignes.forEach(l => { if (l.faction === 'GTI' && n < 1) { l.faction = 'HAAVK'; n++; } });
+  const c = L.controlesMatch(m, ctxAvec(18), SAISON, R);
+  assert.equal(c.h, 10); assert.equal(c.g, 8);
+  const e = c.criteres.find(x => /Écart/.test(x.nom));
+  assert.equal(e.etat, 'non'); assert.match(e.detail, /HAAVK 10, GTI 8, écart 2/);
+  assert.equal(c.criteres.filter(x => x.etat === 'non').length, 1);
+  assert.match(L.motifDepuisControles(c), /^Critère\(s\) non rempli\(s\) : Écart d’effectif de 2 \(HAAVK 10, GTI 8\) : maximum 1\.$/);
+});
+test('critères du match : délai non exigé en saisie de démarrage ; critères des matchs libres présents', () => {
+  const d = L.controlesMatch(match(16, 8, { demarrage: true, envoi: '' }), ctxAvec(16), SAISON, R);
+  assert.equal(d.criteres.find(x => /min après la fin/.test(x.nom)).etat, 'sans_objet');
+  assert.ok(!d.criteres.some(x => /créneau/i.test(x.nom)));
+  const ctx = ctxAvec(16); ctx.creneaux = { L1: { id: 'L1', date: '2026-11-21', debut: '15:00', statut: 'Annoncé' } };
+  const lib = L.controlesMatch(match(16, 8, { type: 'Libre', creneau_id: 'L1', fin: '2026-11-21T16:00', envoi: '2026-11-21T16:05' }), ctx, SAISON, R);
+  assert.equal(lib.criteres.find(x => /plage du créneau/.test(x.nom)).etat, 'ok');
+  const tard = L.controlesMatch(match(16, 8, { type: 'Libre', creneau_id: 'L1', fin: '2026-11-21T16:01', envoi: '2026-11-21T16:05' }), ctx, SAISON, R);
+  assert.equal(tard.criteres.find(x => /plage du créneau/.test(x.nom)).etat, 'attente');
+  assert.match(L.motifDepuisControles(tard), /plage du créneau/);
+});

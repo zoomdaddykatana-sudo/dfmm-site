@@ -223,6 +223,8 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 .chk li.b{color:#FF8A86}.chk li.b::before{content:"✕";color:var(--red)}
 .chk li.w{color:var(--ink)}.chk li.w::before{content:"!";color:var(--amber);left:6px}
 .chk li.o{color:var(--mute)}.chk li.o::before{content:"✓";color:var(--green)}
+.chk li.s{color:var(--mute)}.chk li.s::before{content:"–";color:var(--mute);left:4px}
+.chk.crit li.o{color:var(--ink)}
 .kv{display:grid;grid-template-columns:minmax(0,11em) minmax(0,1fr);gap:4px 12px;font-size:15px;margin:6px 0}
 .kv dt{color:var(--mute)}
 .kv dd{margin:0;overflow-wrap:anywhere}
@@ -2473,10 +2475,23 @@ function majControles() {
   const box = $('#ed-ctrl'); if (!box || !ED) return;
   const R = reglesSite(); if (!R) { box.innerHTML = note('Réglages de la ligue non chargés.', 'r'); return; }
   const c = L.controlesMatch(matchCourant(), CX, saisonJS(saisonSB(ED.saison_id)), R);
+  const ETAT_C = { ok: 'o', non: 'b', attente: 'w', sans_objet: 's' };
+  const crit = '<ul class="chk crit" id="ed-criteres">' + c.criteres.map(x => '<li class="' + ETAT_C[x.etat] + '">' + esc(x.nom) + (x.detail ? ' <span class="dim">(' + esc(x.detail) + ')</span>' : '')
+    + (x.etat === 'attente' ? ' <span class="dim">— match en attente</span>' : x.etat === 'sans_objet' ? ' <span class="dim">— non exigé</span>' : '') + '</li>').join('') + '</ul>';
+  const echec = c.bloquants.length || c.attente.length;
   box.innerHTML = '<b>' + c.total + ' participant(s)</b> · HAAVK ' + c.h + ' · GTI ' + c.g + ' · membres confirmés ' + c.membres + ' (minimum ' + c.requis + ')'
-    + (c.bloquants.length || c.alertes.length || c.attente.length ? chk({ B: c.bloquants.concat(c.attente), W: c.alertes }) : '<ul class="chk"><li class="o">Tous les contrôles automatiques sont passés. Vérifiez la capture, puis validez.</li></ul>');
-  const b = $('#ed-valider'); if (b) b.disabled = !!(c.bloquants.length || c.attente.length);
+    + '<h4 style="margin:10px 0 0">Critères du match</h4>' + crit
+    + (echec ? chk({ B: c.bloquants.concat(c.attente) }) + (ED.lock ? '' : '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="ed-motif-auto">Mettre les critères non remplis dans le motif</button></div>')
+      : '<ul class="chk"><li class="o">Tous les critères automatiques sont remplis. Vérifiez la capture, puis validez.</li></ul>')
+    + (c.alertes.length ? '<h4 style="margin:10px 0 0">Alertes</h4>' + chk({ W: c.alertes }) : '');
+  const b = $('#ed-valider'); if (b) b.disabled = !!echec;
 }
+ACTIONS['ed-motif-auto'] = () => {
+  const R = reglesSite(), z = $('#e-motif'); if (!R || !z || !ED) return;
+  const m = L.motifDepuisControles(L.controlesMatch(matchCourant(), CX, saisonJS(saisonSB(ED.saison_id)), R));
+  if (!m) { toast('Tous les critères sont remplis : aucun motif à proposer.'); return; }
+  z.value = m; z.focus(); toast('Motif proposé : relisez-le, puis choisissez Refuser, Mettre en attente ou Annuler.');
+};
 function redessinerLignes() { const t = $('#ed-table'); if (t) t.innerHTML = tableLignes(ED.lock); majControles(); }
 function surSaisieEditeur(e) {
   const el = e.target, tr = el.closest('tr[data-i]');
