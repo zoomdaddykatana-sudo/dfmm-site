@@ -320,7 +320,7 @@ srv.listen(8765, async () => {
         DB.membres.push({ id: 50, matricule: null, nom_gamer: 'Faux Candidat', statut: 'en_attente', cree_le: '2026-11-22T05:00:00Z' },
                         { id: 51, matricule: null, nom_gamer: 'Faux Muet', statut: 'en_attente', cree_le: '2026-11-22T05:30:00Z' });
         DB.comptes_jeu.push({ id: 60, membre_id: 50, uid: '9914050', pseudo: 'PKL¬Officiel', statut: 'en_pause' }, { id: 61, membre_id: 51, uid: '9914051', pseudo: 'Muet', statut: 'en_pause' });
-        DB.membres_prives.push({ membre_id: 50, nom_reel: 'Faux', email: 'c50@test.invalid', facebook: 'facebook.com/faux50', residence: 'Madagascar', province: 'Antananarivo', zone: 'Périphérie', comprend_mg: true, code_messenger: 'UV-ABC234',
+        DB.membres_prives.push({ membre_id: 50, nom_reel: 'Faux', email: 'c50@test.invalid', facebook: 'facebook.com/faux50', residence: 'Madagascar', province: 'Antananarivo', zone: 'Périphérie', comprend_mg: true, code_messenger: 'UV-ABC234', code_signale_le: '2026-11-22T09:30:00Z',
           verifications: { volsever: { resultat: 'trouve', pseudo_declare: 'PKL Officiel', pseudo_officiel: 'PKL¬Officiel', le: '2026-11-22T05:00:00Z' }, email: { resultat: 'ok', le: '2026-11-22T05:00:00Z' } } },
           { membre_id: 51, nom_reel: 'Faux', email: 'c51@test.invalid', facebook: 'facebook.com/faux51', residence: 'Madagascar', province: 'Antananarivo', zone: 'Périphérie', comprend_mg: true, code_messenger: 'UV-XYZ789',
           verifications: { volsever: { resultat: 'delai', pseudo_declare: 'Muet', le: '2026-11-22T05:30:00Z' }, email: { resultat: 'non_verifie', le: '2026-11-22T05:30:00Z' } } });
@@ -335,9 +335,10 @@ srv.listen(8765, async () => {
       await p.goto('http://localhost:8765/#admin-inscriptions'); await p.waitForTimeout(900);
       const carte = n => p.locator('#ins-liste .card-l', { hasText: n });
       let t = await carte('Faux Candidat').textContent();
-      if (!/Pseudo différent/.test(t) || !/officiel « PKL¬Officiel »/.test(t) || !/reçoit des e-mails/.test(t) || !/UV-ABC234/.test(t)) throw new Error(t.slice(0, 400));
+      if (!/Pseudo différent/.test(t) || !/officiel « PKL¬Officiel »/.test(t) || !/reçoit des e-mails/.test(t) || !/UV-ABC234/.test(t) || !/envoi signalé par le joueur/.test(t)) throw new Error(t.slice(0, 400));
       if (await carte('Faux Candidat').locator('[data-act="ins-reverifier"]').count()) throw new Error('Revérifier affiché pour un UID trouvé');
       t = await carte('Faux Muet').textContent();
+      if (!/envoi pas encore signalé par le joueur/.test(t)) throw new Error('signalement : ' + t.slice(0, 300));
       if (!/n’a pas répondu à temps/.test(t) || !/domaine non vérifié/.test(t)) throw new Error(t.slice(0, 400));
       // Approbation sans le code Messenger : refusée
       await p.evaluate(() => { document.querySelector('input[name="dec-50"][value="approuver"]').checked = true; ['vc-50', 'vo-50'].forEach(i => { document.getElementById(i).checked = true; }); });
@@ -424,7 +425,7 @@ srv.listen(8765, async () => {
     await p.setViewportSize({ width: 390, height: 844 }); await p.waitForTimeout(300);
     await p.screenshot({ path: path.join(ICI, 'editeur-telephone.png'), fullPage: false });
     await p.setViewportSize({ width: 1280, height: 900 });
-    await etape('inscription : réponses gardées sur l’appareil (sauf mot de passe), lien cliquable vers la page DFMM', async () => {
+    await etape('inscription : réponses gardées sur l’appareil (sauf mot de passe), lien cliquable vers la page DFMM, bouton Messenger, code gardé après retour sur la page', async () => {
       await p.evaluate(() => localStorage.setItem('faux-visiteur', '1'));
       await p.goto('http://localhost:8765/#inscription'); await p.reload(); await p.waitForTimeout(800);
       const lien = await p.getAttribute('#f-inscription a[href*="facebook.com"]', 'href');
@@ -453,10 +454,20 @@ srv.listen(8765, async () => {
       await p.evaluate(() => { window.FAUX_INVOKE = n => n === 'inscription' ? { data: { ok: true, code_messenger: 'UV-ABC123' }, error: null } : { data: null, error: null }; });
       await p.click('#f-inscription button[type="submit"]'); await p.waitForTimeout(800);
       const fin = await p.evaluate(() => ({ t: document.getElementById('ins-zone').textContent, liens: Array.from(document.querySelectorAll('#ins-zone a[href*="facebook.com"]')).map(a => a.href + '|' + a.target),
+        messenger: Array.from(document.querySelectorAll('#ins-zone a[href^="https://m.me/"]')).map(a => a.href + '|' + a.target),
         reste: Object.keys(localStorage).filter(k => k.indexOf('dfmm-brouillon|') === 0) }));
       if (!/UV-ABC123/.test(fin.t) || !/Ouvrir la page DFMM/.test(fin.t) || fin.liens.length < 2 || fin.liens.some(l => l !== 'https://www.facebook.com/profile.php?id=61596920126729|_blank')) throw new Error(JSON.stringify(fin).slice(0, 300));
       if (fin.reste.length) throw new Error('brouillon gardé après l’envoi : ' + fin.reste);
+      if (fin.messenger.length !== 1 || fin.messenger[0] !== 'https://m.me/61596920126729|_blank' || !/Écrire à DFMM sur Messenger/.test(fin.t) || !/J’ai envoyé le code/.test(fin.t)) throw new Error('bouton Messenger : ' + JSON.stringify(fin.messenger));
+      // Le joueur part sur Facebook et revient (page rechargée) : le code est toujours affiché, pas un formulaire vide.
+      await p.reload(); await p.waitForTimeout(900);
+      const retour = await p.evaluate(() => ({ code: /UV-ABC123/.test(document.getElementById('ins-zone').textContent), form: !!document.getElementById('f-inscription') }));
+      if (!retour.code || retour.form) throw new Error('code perdu après le retour sur la page : ' + JSON.stringify(retour));
+      await p.evaluate(() => { location.hash = '#regles'; }); await p.waitForTimeout(300); await p.evaluate(() => { location.hash = '#inscription'; }); await p.waitForTimeout(700);
+      if (!(await p.evaluate(() => /UV-ABC123/.test(document.getElementById('ins-zone').textContent)))) throw new Error('code perdu après un changement de page');
       await p.screenshot({ path: path.join(ICI, 'inscription-code-messenger.png'), fullPage: false });
+      await p.click('[data-act="ins-autre"]'); await p.waitForTimeout(300);
+      if (!(await p.isVisible('#f-inscription')) || await p.evaluate(() => !!localStorage.getItem('dfmm-inscription-envoyee'))) throw new Error('« Faire une autre inscription » ne rend pas le formulaire');
       await p.evaluate(() => { localStorage.clear(); });
     });
   } catch (e) { process.exitCode = 1; }

@@ -129,7 +129,8 @@ begin
   insert into resultats (test, ok, detail) values ('Un créneau = un match libre en brouillon', n = 1, n || '');
   select count(*) into n from public.notifications where membre_id = (select id from ids where nom = 'B') and texte like 'Vous êtes responsable GTI du match libre%';
   insert into resultats (test, ok, detail) values ('Responsable GTI averti', n = 1, n || ' notification(s)');
-  select count(*) into n from public.notifications where membre_id = (select id from ids where nom = 'D');
+  -- (depuis 0018, l'approbation de l'inscription envoie aussi « Votre inscription est approuvée » : non comptée ici)
+  select count(*) into n from public.notifications where membre_id = (select id from ids where nom = 'D') and texte not like 'Votre inscription est approuvée%';
   insert into resultats (test, ok, detail) values ('Responsable suspendu non averti (demande retenue)', n = 1, n || ' notification(s) (la sanction seulement)');
   select count(*) into n from public.journal where type = 'Match libre' and decision like 'Demande retenue%';
   insert into resultats (test, ok, detail) values ('Demandes retenues dans la liste de Katana (journal)', n = 2, n || '');

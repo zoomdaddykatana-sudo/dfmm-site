@@ -908,6 +908,9 @@ const nid = p => p + '-' + Date.now().toString(36) + Math.random().toString(36).
 const note = (t, c) => '<div class="note' + (c ? ' ' + c : '') + '">' + t + '</div>';
 // Page Facebook DFMM : c'est elle qui reçoit le code Messenger de l'inscription.
 const PAGE_DFMM = 'https://www.facebook.com/profile.php?id=61596920126729';
+// Lien direct vers la conversation Messenger de la page DFMM (choix de Katana du 23/11/2026).
+const MESSENGER_DFMM = 'https://m.me/61596920126729';
+const lienMessengerDfmm = (txt, cls) => '<a href="' + MESSENGER_DFMM + '" target="_blank" rel="noopener"' + (cls ? ' class="' + cls + '"' : '') + '>' + (txt || 'Écrire à DFMM sur Messenger') + '</a>';
 const lienPageDfmm = (txt, cls) => '<a href="' + PAGE_DFMM + '" target="_blank" rel="noopener"' + (cls ? ' class="' + cls + '"' : '') + '>' + (txt || 'page Facebook DFMM') + '</a>';
 
 /* ---------------- Données ---------------- */
@@ -1958,8 +1961,10 @@ function rendreInscription() {
   if (!PRET) { z.innerHTML = '<p class="mute">Chargement…</p>'; return; }
   if (!SB) { z.innerHTML = note('Inscription impossible pour le moment : connexion à la base indisponible.', 'r'); return; }
   if (PARAM.inscriptions_ouvertes !== true) { z.innerHTML = note('Les inscriptions ouvriront au lancement officiel de la LEAGUE UV. Les membres déjà approuvés (DFMM-1 à DFMM-25) se réinscriront à ce moment-là et garderont leur matricule.'); return; }
-  if (SESSION) { z.innerHTML = note('Vous êtes connecté : votre inscription est déjà enregistrée. Suivez-la dans « Mon compte ».') + '<a class="btn" href="#compte">Mon compte</a>'; return; }
-  if ($('#f-inscription')) return;
+  if (SESSION) { oublierInsEnvoyee(); z.innerHTML = note('Vous êtes connecté : votre inscription est déjà enregistrée. Suivez-la dans « Mon compte ».') + '<a class="btn" href="#compte">Mon compte</a>'; return; }
+  if ($('#f-inscription') || $('#bloc-code')) return;
+  const fin = lireInsEnvoyee();
+  if (fin) { z.innerHTML = ecranInsEnvoyee(fin); return; }
   const D = DEM.inscription;
   z.innerHTML = '<form id="f-inscription" class="panel" novalidate data-brouillon="inscription"><p class="mute">' + esc(D.intro) + '</p><p class="small">Page DFMM à qui envoyer le code : ' + lienPageDfmm('ouvrir la page Facebook DFMM') + '. Vos réponses sont gardées sur cet appareil jusqu’à l’envoi (' + BROUILLON_JOURS + ' jours au plus), sauf le mot de passe et la capture : vous pouvez quitter la page pour chercher une information.</p><div class="grid-f" id="ins-champs">' + D.champs.map(f => champHtml(f, {}, 'i-')).join('') + '</div><div class="grid-f"><div><label class="lab" for="i-mdp">Mot de passe (8 caractères au moins) <span class="dim">*</span></label><input type="password" id="i-mdp" autocomplete="new-password"></div><div><label class="lab" for="i-mdp2">Le même, une seconde fois <span class="dim">*</span></label><input type="password" id="i-mdp2" autocomplete="new-password"></div></div><label class="lab" for="i-capture">Capture de votre profil de jeu, avec le pseudo et l’UID bien visibles <span class="dim">*</span></label><input type="file" id="i-capture" accept="image/*"><div id="i-err" class="err" role="alert"></div><div class="row-btns"><button class="btn" type="submit">Envoyer mon inscription</button></div></form>';
   majVisibilite(D.champs, 'i-', $('#ins-champs'));
@@ -1972,8 +1977,31 @@ async function erreurFonction(data, error, defaut) {
   return t || defaut;
 }
 // Code que le joueur envoie à la page DFMM sur Messenger, depuis le compte Facebook indiqué (preuve que le profil est le sien).
-function blocCodeMessenger(code) {
-  return '<div class="panel" style="margin:12px 0"><h3>Dernière étape : votre code Messenger</h3><p>Envoyez ce code en message privé à la ' + lienPageDfmm() + ', <b>depuis le compte Facebook que vous avez indiqué</b> :</p><p style="font-size:1.6em;letter-spacing:.12em"><b>' + esc(code) + '</b></p><p class="small">1. Touchez le bouton ci-dessous : la page DFMM s’ouvre (dans l’application Facebook si elle est installée).<br>2. Touchez « Message » (ou « Envoyer un message »).<br>3. Collez ou tapez le code, puis envoyez.</p><div class="row-btns">' + lienPageDfmm('Ouvrir la page DFMM', 'btn') + '</div><p class="mute small">Katana vérifie que le code vient bien de ce compte avant d’approuver votre inscription. Vous retrouverez ce code dans « Mon compte ».</p></div>';
+// o.connecte : bouton « J'ai envoyé le code » (Mon compte) ; o.signale : date du signalement déjà fait.
+function blocCodeMessenger(code, o) {
+  o = o || {};
+  const fin = o.signale ? note('Vous avez signalé l’envoi du code le ' + esc(dateLoc(o.signale)) + '. Katana va vérifier, puis décider.')
+    : o.connecte ? '<div class="row-btns"><button class="btn" type="button" data-act="moi-code-envoye">J’ai envoyé le code</button></div>'
+    : '';
+  const etape3 = o.signale ? '' : o.connecte ? '<br>3. Revenez ici et touchez « J’ai envoyé le code ».'
+    : '<br>3. Revenez sur le site, touchez « Me connecter » (e-mail et mot de passe de l’inscription), puis « J’ai envoyé le code » dans « Mon compte ».';
+  return '<div class="panel" id="bloc-code" style="margin:12px 0"><h3>Dernière étape : votre code Messenger</h3><p>Envoyez ce code en message privé à la ' + lienPageDfmm() + ', <b>depuis le compte Facebook que vous avez indiqué</b> :</p><p style="font-size:1.6em;letter-spacing:.12em"><b>' + esc(code) + '</b></p>'
+    + '<div class="row-btns">' + lienMessengerDfmm('Écrire à DFMM sur Messenger', 'btn') + lienPageDfmm('Ouvrir la page DFMM', 'btn ghost') + '</div>'
+    + '<p class="small">1. Touchez « Écrire à DFMM sur Messenger » : la conversation avec la page DFMM s’ouvre (si Messenger ne s’ouvre pas, touchez « Ouvrir la page DFMM », puis « Message »).<br>2. Tapez le code, puis envoyez.' + etape3 + '</p>'
+    + fin + '<p class="mute small">Katana vérifie que le code vient bien de ce compte avant d’approuver votre inscription. Ce code reste aussi dans vos notifications (« Mon compte »).</p></div>';
+}
+// Écran de fin d'inscription gardé sur l'appareil (7 jours au plus) : le joueur part sur Facebook et revient sans perdre son code.
+const CLE_INS_ENVOYEE = 'dfmm-inscription-envoyee';
+function lireInsEnvoyee() {
+  try { const d = JSON.parse(localStorage.getItem(CLE_INS_ENVOYEE) || 'null'); if (d && d.code && Date.now() - d.le < BROUILLON_JOURS * 86400000) return d; localStorage.removeItem(CLE_INS_ENVOYEE); } catch (e) { /* stockage indisponible */ }
+  return null;
+}
+function oublierInsEnvoyee() { try { localStorage.removeItem(CLE_INS_ENVOYEE); } catch (e) { /* rien */ } }
+function ecranInsEnvoyee(d) {
+  return note('Inscription envoyée. Katana va la vérifier. Vous pouvez déjà vous connecter avec votre e-mail et votre mot de passe pour suivre son état.')
+    + (d.code ? blocCodeMessenger(d.code) : '')
+    + (d.ecart ? note('Le pseudo lu sur votre profil de jeu est « ' + esc(d.pseudo || '') + ' » : c’est celui-ci qui est enregistré. Katana va vérifier.', 'a') : '')
+    + '<div class="row-btns"><a class="btn" href="#compte">Me connecter</a><button class="btn ghost sm" type="button" data-act="ins-autre">Faire une autre inscription</button></div>';
 }
 async function soumettreInscription(e) {
   e.preventDefault();
@@ -1995,10 +2023,9 @@ async function soumettreInscription(e) {
     const { data, error } = await SB.functions.invoke('inscription', { body: fd });
     if (error || !data || !data.ok) throw new Error(await erreurFonction(data, error, 'Inscription impossible pour le moment. Réessayez plus tard.'));
     oublierBrouillon('inscription');
-    $('#ins-zone').innerHTML = note('Inscription envoyée. Katana va la vérifier. Vous pouvez déjà vous connecter avec votre e-mail et votre mot de passe pour suivre son état.')
-      + (data.code_messenger ? blocCodeMessenger(data.code_messenger) : '')
-      + (data.ecart_pseudo ? note('Le pseudo lu sur votre profil de jeu est « ' + esc(data.pseudo_retenu) + ' » : c’est celui-ci qui est enregistré. Katana va vérifier.', 'a') : '')
-      + '<a class="btn" href="#compte">Me connecter</a>';
+    const fin = { code: data.code_messenger || '', ecart: !!data.ecart_pseudo, pseudo: data.pseudo_retenu || '', le: Date.now() };
+    try { if (fin.code) localStorage.setItem(CLE_INS_ENVOYEE, JSON.stringify(fin)); } catch (x) { /* stockage indisponible : l'écran reste affiché */ }
+    $('#ins-zone').innerHTML = ecranInsEnvoyee(fin);
     window.scrollTo(0, 0);
   } catch (x) { err.textContent = x.message; }
   finally { if (btn) btn.disabled = false; }
@@ -2029,9 +2056,9 @@ function historiquePseudos(c) {
 async function chargerMonDossier() {
   const z = $('#mon-dossier'); if (!z || !SB) return;
   const [a, b, c] = await Promise.all([
-    SB.from('membres').select('id, matricule, nom_gamer, statut, decision, dernier_changement_compte, donnees_effacees, membres_prives(code_messenger), comptes_jeu(id, uid, pseudo, statut, pseudos_historique(pseudo, debut, fin))').maybeSingle(),
+    SB.from('membres').select('id, matricule, nom_gamer, statut, decision, dernier_changement_compte, donnees_effacees, membres_prives(code_messenger, code_signale_le), comptes_jeu(id, uid, pseudo, statut, pseudos_historique(pseudo, debut, fin))').maybeSingle(),
     SB.from('demandes').select('id, type, statut, motif_decision, cree_le, decide_le').order('cree_le', { ascending: false }).limit(20),
-    SB.from('notifications').select('id, texte, lu, cree_le').order('cree_le', { ascending: false }).limit(20)
+    SB.from('notifications').select('id, texte, lu, cree_le, sujet').order('cree_le', { ascending: false }).limit(20)
   ]);
   if (!z.isConnected) return;
   if (a.error) { z.innerHTML = note('Lecture impossible : ' + esc(a.error.message), 'r'); return; }
@@ -2042,8 +2069,8 @@ async function chargerMonDossier() {
   const etat = { en_attente: ['Votre inscription est en attente de vérification par Katana.', ''], precisions: ['Katana demande des précisions : ' + motif + '. Répondez-lui sur Messenger.', 'a'], refuse: ['Votre inscription n’a pas été acceptée. Motif : ' + motif + '.', 'r'], actif: ['', ''], retire: ['Vous avez quitté la ligue. Pour revenir, demandez votre réintégration à Katana sur Messenger : vous garderez votre matricule.', ''], exclu: ['Votre accès à la ligue est fermé.', 'r'] }[m.statut] || ['', ''];
   const cpts = m.comptes_jeu || [];
   let h = '<h3>Mon dossier</h3><dl class="kv"><dt>Nom de gamer</dt><dd>' + esc(m.nom_gamer) + '</dd><dt>Matricule</dt><dd>' + matTxt(m.matricule) + '</dd></dl>' + (etat[0] ? note(etat[0], etat[1]) : '');
-  const codeM = (un(m.membres_prives) || {}).code_messenger;
-  if (codeM && (m.statut === 'en_attente' || m.statut === 'precisions')) h += blocCodeMessenger(codeM);
+  const priv = un(m.membres_prives) || {}, codeM = priv.code_messenger, attenteIns = m.statut === 'en_attente' || m.statut === 'precisions';
+  if (codeM && attenteIns) h += blocCodeMessenger(codeM, { connecte: true, signale: priv.code_signale_le });
   if (cpts.length) h += '<h3 style="margin-top:12px">Mes comptes de jeu</h3><div class="scroll"><table><thead><tr><th>Pseudo</th><th>UID</th><th>Statut</th><th>Anciens pseudos</th></tr></thead><tbody>' + cpts.map(x => '<tr><td><b>' + esc(x.pseudo) + '</b></td><td>' + esc(x.uid) + '</td><td>' + (STATUTS_CPT[x.statut] || x.statut) + '</td><td class="small">' + historiquePseudos(x) + '</td></tr>').join('') + '</tbody></table></div>';
   if (m.statut === 'actif') {
     const encours = t => DOS.dem.some(d => d.type === t && (d.statut === 'en_attente' || d.statut === 'precisions'));
@@ -2060,7 +2087,7 @@ async function chargerMonDossier() {
   }
   if (!m.donnees_effacees && !DOS.dem.some(d => d.type === 'effacement' && (d.statut === 'en_attente' || d.statut === 'precisions'))) h += '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="moi-effacement">Demander l’effacement de mes données</button></div>';
   const nonLues = DOS.notif.filter(n => !n.lu).length;
-  h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
+  h += '<h3 style="margin-top:12px">Notifications</h3>' + (DOS.notif.length ? '<ul class="taches">' + DOS.notif.map(n => '<li class="' + (n.lu ? '' : 'notif-nouv') + '"><span>' + esc(n.texte) + (n.sujet === 'code_messenger' && !n.lu && attenteIns ? '<span class="row-btns">' + lienMessengerDfmm('Écrire à DFMM sur Messenger', 'btn sm') + lienPageDfmm('Ouvrir la page DFMM', 'btn sm ghost') + '</span>' : '') + '</span><span class="dim small nowrap">' + dateLoc(n.cree_le) + '</span></li>').join('') + '</ul>' + (nonLues ? '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="notif-lues">Tout marquer comme lu</button></div>' : '') : '<p class="mute small">Aucune notification.</p>');
   h += '<div id="mes-matchs-libres"></div><div id="mes-messages"></div><div id="mes-sanctions"></div><div id="mes-convocations"></div>';
   if (DOS.dem.length) h += '<h3 style="margin-top:12px">Mes demandes</h3><div class="scroll"><table><thead><tr><th>Demande</th><th>Déposée le</th><th>État</th><th>Réponse</th></tr></thead><tbody>' + DOS.dem.map(d => '<tr><td>' + esc(TYPES_DEM[d.type] || d.type) + '</td><td class="nowrap small">' + dateLoc(d.cree_le) + '</td><td>' + badgeStatut(STATUTS_DEM[d.statut]) + '</td><td class="small">' + esc(d.motif_decision || '') + '</td></tr>').join('') + '</tbody></table></div>';
   z.innerHTML = h;
@@ -2187,6 +2214,13 @@ ACTIONS['moi-compte2'] = () => moiCompte2();
 ACTIONS['moi-actif'] = () => moiActif();
 ACTIONS['moi-retrait'] = () => moiRetrait();
 ACTIONS['notif-lues'] = () => notifLues();
+ACTIONS['moi-code-envoye'] = async b => {
+  b.disabled = true;
+  const { error } = await SB.rpc('signaler_code_envoye');
+  if (error) { b.disabled = false; toast(erreurRpc(error), true); return; }
+  toast('Merci : Katana sait que vous avez envoyé le code.'); chargerMonDossier();
+};
+ACTIONS['ins-autre'] = () => { oublierInsEnvoyee(); $('#ins-zone').innerHTML = ''; rendreInscription(); };
 ACTIONS['dem-decider'] = b => deciderDemandeSB(b);
 ACTIONS['fiche-ouvrir'] = b => ouvrirFiche(Number(b.dataset.id));
 
@@ -2296,7 +2330,8 @@ function verifsInscription(c) {
   const nomE = { ok: 'domaine existant, qui reçoit des e-mails', non_verifie: '<span class="err">domaine non vérifié</span> (services DNS muets au moment de l’inscription)' };
   const mail = !em ? '<span class="mute">non vérifié</span>' : (nomE[em.resultat] || esc(em.resultat));
   return '<h3 style="margin-top:12px">Vérifications automatiques</h3><dl class="kv"><dt>UID (volsever)</dt><dd>' + uid + (reverif ? ' ' + reverif : '') + '<div id="rv-' + id + '" class="err" role="alert"></div></dd><dt>E-mail</dt><dd>' + mail + '</dd>'
-    + (p.code_messenger ? '<dt>Code Messenger attendu</dt><dd><b style="letter-spacing:.08em">' + esc(p.code_messenger) + '</b></dd>' : '') + '</dl>';
+    + (p.code_messenger ? '<dt>Code Messenger attendu</dt><dd><b style="letter-spacing:.08em">' + esc(p.code_messenger) + '</b> · '
+      + (p.code_signale_le ? '<b>envoi signalé par le joueur</b> le ' + esc(dateLoc(p.code_signale_le)) : '<span class="mute">envoi pas encore signalé par le joueur</span>') + '</dd>' : '') + '</dl>';
 }
 async function reverifierInscription(b) {
   const id = b.dataset.id, err = $('#rv-' + id);
