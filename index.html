@@ -1989,6 +1989,8 @@ async function erreurFonction(data, error, defaut) {
 function blocCodeMessenger(code) {
   return '<div class="panel" style="margin:12px 0"><h3>Dernière étape : votre code Messenger</h3><p>Envoyez ce code en message privé à la ' + lienPageDfmm() + ', <b>depuis le compte Facebook que vous avez indiqué</b> :</p><p style="font-size:1.6em;letter-spacing:.12em"><b>' + esc(code) + '</b></p><p class="small">1. Touchez le bouton ci-dessous : la page DFMM s’ouvre (dans l’application Facebook si elle est installée).<br>2. Touchez « Message » (ou « Envoyer un message »).<br>3. Collez ou tapez le code, puis envoyez.</p><div class="row-btns">' + lienPageDfmm('Ouvrir la page DFMM', 'btn') + '</div><p class="mute small">Katana vérifie que le code vient bien de ce compte avant d’approuver votre inscription. Vous retrouverez ce code dans « Mon compte ».</p></div>';
 }
+// Délai de traitement annoncé aux joueurs (réglage « delai_traitement_h », migration 0019 ; 0 ou absent = rien).
+function delaiTraitement() { const h = Number(PARAM.delai_traitement_h); return Number.isFinite(h) && h > 0 ? 'jusqu’à ' + h + ' h' : ''; }
 async function soumettreInscription(e) {
   e.preventDefault();
   const D = DEM.inscription, err = $('#i-err'), btn = e.submitter;
@@ -2009,7 +2011,7 @@ async function soumettreInscription(e) {
     const { data, error } = await SB.functions.invoke('inscription', { body: fd });
     if (error || !data || !data.ok) throw new Error(await erreurFonction(data, error, 'Inscription impossible pour le moment. Réessayez plus tard.'));
     oublierBrouillon('inscription');
-    $('#ins-zone').innerHTML = note('Inscription envoyée. Katana va la vérifier. Vous pouvez déjà vous connecter avec votre e-mail et votre mot de passe pour suivre son état.')
+    $('#ins-zone').innerHTML = note('Inscription envoyée. Katana vérifie chaque inscription à la main' + (delaiTraitement() ? ' : comptez ' + delaiTraitement() + ' après l’envoi de votre code Messenger' : '') + '. Vous pouvez déjà vous connecter avec votre e-mail et votre mot de passe pour suivre son état.')
       + (data.code_messenger ? blocCodeMessenger(data.code_messenger) : '')
       + (data.ecart_pseudo ? note('Le pseudo lu sur votre profil de jeu est « ' + esc(data.pseudo_retenu) + ' » : c’est celui-ci qui est enregistré. Katana va vérifier.', 'a') : '')
       + '<a class="btn" href="#compte">Me connecter</a>';
@@ -2053,7 +2055,7 @@ async function chargerMonDossier() {
   if (!m) { z.innerHTML = '<p class="mute">Aucune inscription n’est liée à ce compte.</p>'; return; }
   DOS = { m, dem: b.data || [], notif: c.data || [] };
   const motif = esc((m.decision || {}).motif || '');
-  const etat = { en_attente: ['Votre inscription est en attente de vérification par Katana.', ''], precisions: ['Katana demande des précisions : ' + motif + '. Répondez-lui sur Messenger.', 'a'], refuse: ['Votre inscription n’a pas été acceptée. Motif : ' + motif + '.', 'r'], actif: ['', ''], retire: ['Vous avez quitté la ligue. Pour revenir, demandez votre réintégration à Katana sur Messenger : vous garderez votre matricule.', ''], exclu: ['Votre accès à la ligue est fermé.', 'r'] }[m.statut] || ['', ''];
+  const etat = { en_attente: ['Votre inscription est en attente de vérification par Katana' + (delaiTraitement() ? ' (délai : ' + delaiTraitement() + ' après l’envoi de votre code Messenger)' : '') + '.', ''], precisions: ['Katana demande des précisions : ' + motif + '. Répondez-lui sur Messenger.', 'a'], refuse: ['Votre inscription n’a pas été acceptée. Motif : ' + motif + '.', 'r'], actif: ['', ''], retire: ['Vous avez quitté la ligue. Pour revenir, demandez votre réintégration à Katana sur Messenger : vous garderez votre matricule.', ''], exclu: ['Votre accès à la ligue est fermé.', 'r'] }[m.statut] || ['', ''];
   const cpts = m.comptes_jeu || [];
   let h = '<h3>Mon dossier</h3><dl class="kv"><dt>Nom de gamer</dt><dd>' + esc(m.nom_gamer) + '</dd><dt>Matricule</dt><dd>' + matTxt(m.matricule) + '</dd></dl>' + (etat[0] ? note(etat[0], etat[1]) : '');
   const codeM = (un(m.membres_prives) || {}).code_messenger;
