@@ -7,7 +7,7 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'inscription', 'index.ts'), 'utf8');
 const aides = src.slice(src.indexOf('// DEBUT-AIDES'), src.indexOf('// FIN-AIDES'));
-const { normEmail, normFacebook, verifierDonnees } = new Function(aides + '; return { normEmail, normFacebook, verifierDonnees };')();
+const { normEmail, normFacebook, verifierDonnees, adresseClient } = new Function(aides + '; return { normEmail, normFacebook, verifierDonnees, adresseClient };')();
 
 const BON = { nom_reel: 'Rakoto Jean', nom_gamer: 'Jeannot', email: 'Jean@Exemple.mg', date_naissance: '2001-05-04', genre: 'Homme',
   facebook: 'https://www.facebook.com/jeannot.rakoto/', pseudo: 'PKL¬Pzone', uid: '123456789', residence: 'Madagascar',
@@ -102,4 +102,22 @@ test('longueurs maximales (décision 3) : 100 caractères pour les champs courts
 test('longueurs maximales réglables (longueur_max_court, longueur_max_long)', () => {
   assert.match(verifierDonnees(Object.assign({}, BON, { nom_gamer: 'n'.repeat(21) }), { court: 20, long: 2000 }).join(), /20 caractères au plus/);
   assert.deepEqual(verifierDonnees(Object.assign({}, BON, { nom_gamer: 'n'.repeat(21) }), { court: '150', long: '3000' }), []);
+});
+
+// Limite par connexion (migration 0018) : adresse IP lue dans les en-têtes de l'hébergeur.
+const entetes = (o) => (nom) => (nom in o ? o[nom] : null);
+test('adresse IP : cf-connecting-ip d’abord, puis x-real-ip, puis la 1re adresse de x-forwarded-for', () => {
+  assert.equal(adresseClient(entetes({ 'cf-connecting-ip': '41.188.10.5', 'x-forwarded-for': '1.2.3.4, 5.6.7.8' })), '41.188.10.5');
+  assert.equal(adresseClient(entetes({ 'x-real-ip': '154.126.3.9', 'x-forwarded-for': '1.2.3.4' })), '154.126.3.9');
+  assert.equal(adresseClient(entetes({ 'x-forwarded-for': ' 197.149.20.1 , 10.0.0.1' })), '197.149.20.1');
+  assert.equal(adresseClient(entetes({ 'cf-connecting-ip': '2C0F:FC88:1::A' })), '2c0f:fc88:1::a');
+  assert.equal(adresseClient(entetes({ 'cf-connecting-ip': '::ffff:41.188.10.5' })), '41.188.10.5');
+});
+test('adresse IP absente, illisible ou interne : rien (seule la limite commune s’applique)', () => {
+  assert.equal(adresseClient(entetes({})), '');
+  assert.equal(adresseClient(entetes({ 'x-forwarded-for': 'inconnu' })), '');
+  assert.equal(adresseClient(entetes({ 'x-forwarded-for': '999.1.1.1' })), '');
+  for (const interne of ['10.1.2.3', '127.0.0.1', '172.20.0.4', '192.168.1.10', '169.254.1.1', '100.64.3.2', '::1', 'fd00::5', 'fe80::1']) {
+    assert.equal(adresseClient(entetes({ 'cf-connecting-ip': interne })), '', interne);
+  }
 });

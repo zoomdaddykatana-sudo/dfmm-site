@@ -7,6 +7,8 @@
 // (UID inconnu = refus si « refus_uid_introuvable » est à « oui ») ; domaine de l'e-mail existant,
 // qui reçoit des e-mails, et pas jetable ; code Messenger donné au joueur.
 // Limites (migration 0015) : inscriptions par heure (« inscriptions_max_heure ») et longueur des textes.
+// Limite par connexion (migration 0018, choix de Katana du 23/11/2026) : « inscriptions_max_heure_ip » par adresse IP ;
+// seule une empreinte (SHA-256) de l'adresse part dans la base, jamais l'adresse elle-même.
 import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 
 // DEBUT-AIDES (JavaScript simple, testé automatiquement par tests/inscription.test.js)
@@ -99,6 +101,30 @@ const MESSAGES_EMAIL = {
 };
 const MESSAGE_UID_INCONNU = 'Cet UID n’existe pas dans Delta Force. Vérifiez-le sur votre profil de jeu (chiffres seulement), puis réessayez.';
 const MESSAGE_TROP_D_INSCRIPTIONS = 'Trop d’inscriptions en ce moment. Réessayez dans une heure. Si le problème continue, écrivez à Katana sur Messenger.';
+const MESSAGE_TROP_MEME_CONNEXION = 'Trop d’inscriptions depuis cette connexion internet en une heure. Réessayez dans une heure, ou depuis une autre connexion (Wi-Fi ou données mobiles). Si le problème continue, écrivez à Katana sur Messenger.';
+
+// ----- Adresse IP du joueur, lue dans les en-têtes posés par l'hébergeur -----
+// lire(nom) renvoie la valeur d'un en-tête. Ordre : cf-connecting-ip, x-real-ip, puis la 1re adresse de x-forwarded-for.
+// Adresse absente, illisible ou interne (réseau privé, machine locale) : '' (seule la limite commune s'applique alors,
+// pour ne jamais mettre tous les joueurs dans le même compteur).
+function adresseClient(lire) {
+  const brut = [lire('cf-connecting-ip'), lire('x-real-ip'), String(lire('x-forwarded-for') || '').split(',')[0]]
+    .map(v => String(v || '').trim()).find(v => v !== '') || '';
+  const ip = brut.toLowerCase().replace(/^::ffff:(?=\d+\.\d+\.\d+\.\d+$)/, '');
+  const v4 = ip.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/);
+  if (v4) {
+    const n = v4.slice(1).map(Number);
+    if (n.some(x => x > 255)) return '';
+    if (n[0] === 10 || n[0] === 127 || n[0] === 0 || (n[0] === 172 && n[1] >= 16 && n[1] <= 31) || (n[0] === 192 && n[1] === 168)
+        || (n[0] === 169 && n[1] === 254) || (n[0] === 100 && n[1] >= 64 && n[1] <= 127)) return '';
+    return n.join('.');
+  }
+  if (/^[0-9a-f:]+$/.test(ip) && ip.includes(':') && ip.length <= 39) {
+    if (ip === '::1' || ip === '::' || /^f[cd]/.test(ip) || /^fe[89ab]/.test(ip)) return '';
+    return ip;
+  }
+  return '';
+}
 
 // ----- Code Messenger : « UV- » + 6 signes faciles à lire (sans 0, O, 1, I, L) -----
 const SIGNES_CODE = '23456789ABCDEFGHJKMNPQRSTUVWXYZ';
@@ -220,11 +246,14 @@ Deno.serve(async (req) => {
     const verifEmail = await verifierEmail(email);
     if (verifEmail in MESSAGES_EMAIL) return reponse({ erreur: MESSAGES_EMAIL[verifEmail as keyof typeof MESSAGES_EMAIL] }, 400);
 
-    // 3 ter. Limite d'inscriptions par heure (réglage « inscriptions_max_heure », migration 0015) : protège le quota
-    // de volsever et l'espace de stockage contre les envois en masse.
-    const { data: place, error: el } = await sb.rpc('reserver_essai_inscription');
+    // 3 ter. Limites d'inscriptions par heure : commune (« inscriptions_max_heure », migration 0015) et par connexion
+    // (« inscriptions_max_heure_ip », migration 0018). Protègent le quota de volsever et l'espace de stockage.
+    const ip = adresseClient((nom: string) => req.headers.get(nom));
+    const empIp = ip ? await empreinte('ip:' + ip) : null;
+    const { data: place, error: el } = await sb.rpc('reserver_essai_inscription', { p_empreinte_ip: empIp });
     if (el) return reponse({ erreur: 'Inscription impossible pour le moment. Réessayez plus tard.' }, 500);
-    if (place !== true) return reponse({ erreur: MESSAGE_TROP_D_INSCRIPTIONS }, 429);
+    if (place === 'limite_ip') return reponse({ erreur: MESSAGE_TROP_MEME_CONNEXION }, 429);
+    if (place !== 'ok') return reponse({ erreur: MESSAGE_TROP_D_INSCRIPTIONS }, 429);
 
     // 3 quater. UID et pseudo chez volsever (en dernier : chaque appel compte dans la limite de 24 heures)
     const pseudoTape = String(d.pseudo).trim();

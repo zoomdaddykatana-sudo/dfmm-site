@@ -49,8 +49,8 @@ insert into ids select 'sA', id from s;
 do $$
 declare n int; v text;
 begin
-  select count(*), string_agg(cle || '=' || valeur::text, ', ' order by ordre) into n, v from public.parametres where section = 'Limites';
-  insert into resultats (test, ok, detail) values ('4 réglages dans la section Limites (10 par heure, 24 h, 100, 2000)',
+  select count(*), string_agg(cle || '=' || valeur::text, ', ' order by ordre) into n, v from public.parametres where section = 'Limites' and ordre <= 4;
+  insert into resultats (test, ok, detail) values ('4 réglages dans la section Limites (10 par heure, 24 h, 100, 2000 ; un 5e à partir de la migration 0018)',
     n = 4 and v = 'inscriptions_max_heure=10, pseudo_delai_h=24, longueur_max_court=100, longueur_max_long=2000', coalesce(v, 'aucun'));
   select count(*) into n from pg_trigger where tgname = 'longueurs_textes' and not tgisinternal;
   insert into resultats (test, ok, detail) values ('Contrôle de longueur sur 7 tables au moins (8 après la migration 0016)', n >= 7, n || ' table(s)');
