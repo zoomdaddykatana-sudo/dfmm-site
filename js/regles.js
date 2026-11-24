@@ -102,6 +102,19 @@ var L = (function () {
     return m.statut || '';
   }
 
+  // ---------- UID ----------
+  // UID collé depuis le jeu ou une messagerie : on enlève les caractères invisibles, les espaces
+  // et le mot « UID », et on change les chiffres « larges » en chiffres normaux (NFKC).
+  // Une vraie faute (lettre, tiret…) reste : le contrôle 5 à 25 chiffres la refuse.
+  // Même nettoyage que la fonction serveur « inscription » (tests/inscription.test.js).
+  var UID_RE = /^\d{5,25}$/;
+  function normUid(u) {
+    var s = String(u == null ? '' : u).normalize('NFKC');
+    s = s.replace(/[\s\u00AD\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '');
+    return s.replace(/^uid:?/i, '');
+  }
+  function uidValide(u) { return UID_RE.test(normUid(u)); }
+
   // ---------- Pseudos ----------
   function normPseudo(s) {
     var x = String(s || '').normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
@@ -603,6 +616,7 @@ var L = (function () {
     regles: regles, nowStr: nowStr, versLocal: versLocal, validDT: validDT, validD: validD, normDT: normDT,
     addDays: addDays, addMinutes: addMinutes, diffMinutes: diffMinutes, dow: dow,
     inPeriods: inPeriods, suspendedAt: suspendedAt, statutAffiche: statutAffiche,
+    normUid: normUid, uidValide: uidValide,
     normPseudo: normPseudo, lev: lev, resoudre: resoudre, ligneCompte: ligneCompte, membresRequis: membresRequis,
     bornesCreneau: bornesCreneau, controlesMatch: controlesMatch, motifDepuisControles: motifDepuisControles, verifierLecture: verifierLecture, comparerLectures: comparerLectures, alertesPerformance: alertesPerformance,
     matchDansClassement: matchDansClassement, ligneDansClassement: ligneDansClassement,

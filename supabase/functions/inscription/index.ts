@@ -13,6 +13,14 @@ import { createClient } from 'npm:@supabase/supabase-js@2.117.3';
 
 // DEBUT-AIDES (JavaScript simple, testé automatiquement par tests/inscription.test.js)
 const PROVINCES = ['Antananarivo', 'Antsiranana', 'Fianarantsoa', 'Mahajanga', 'Toamasina', 'Toliara'];
+// UID collé depuis le jeu ou une messagerie : on enlève les caractères invisibles, les espaces
+// et le mot « UID », et on change les chiffres « larges » en chiffres normaux (NFKC).
+// Une vraie faute (lettre, tiret…) reste : le contrôle 5 à 25 chiffres la refuse.
+// Même nettoyage que L.normUid (js/regles.js).
+function normUid(u) {
+  const s = String(u == null ? '' : u).normalize('NFKC').replace(/[\s\u00AD\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2069\uFEFF]/g, '');
+  return s.replace(/^uid:?/i, '');
+}
 function normEmail(e) { return String(e || '').trim().toLowerCase(); }
 // Un même profil Facebook peut s'écrire de plusieurs façons : on garde une forme unique.
 function normFacebook(lien) {
@@ -43,7 +51,7 @@ function verifierDonnees(d, lim) {
   if (txt('email') && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(txt('email'))) err.push('Adresse e-mail invalide.');
   if (txt('facebook') && !/^facebook\.com\/[^\s]+$/.test(normFacebook(txt('facebook')))) err.push('Lien Facebook invalide.');
   if (txt('date_naissance') && !dateReelle(txt('date_naissance'))) err.push('Date de naissance invalide.');
-  if (txt('uid') && !/^\d{5,20}$/.test(txt('uid'))) err.push('UID invalide : il ne contient que des chiffres (de 5 à 20).');
+  if (txt('uid') && !/^\d{5,25}$/.test(normUid(d.uid))) err.push('UID invalide : il ne contient que des chiffres (de 5 à 25).');
   if (txt('genre') && ['Homme', 'Femme', 'Préfère ne pas le dire'].indexOf(txt('genre')) < 0) err.push('Genre invalide.');
   if (txt('residence') === 'Madagascar') {
     if (PROVINCES.indexOf(txt('province')) < 0) err.push('Province invalide.');
@@ -233,7 +241,7 @@ Deno.serve(async (req) => {
     else if (capture.size > 5 * 1024 * 1024 || !/^image\/(jpeg|png|webp)$/.test(capture.type)) err.push('Capture invalide (image JPEG, PNG ou WebP de 5 Mo au plus).');
     if (err.length) return reponse({ erreur: err.join(' ') }, 400);
 
-    const email = normEmail(d.email), fb = normFacebook(d.facebook), uid = String(d.uid).trim();
+    const email = normEmail(d.email), fb = normFacebook(d.facebook), uid = normUid(d.uid);
     const empEmail = await empreinte(email), empFb = await empreinte(fb);
 
     // 3. Doublons (avant de créer quoi que ce soit)

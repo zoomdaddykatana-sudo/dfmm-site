@@ -1140,7 +1140,7 @@ const DEM = {
     { k: 'acc_uv', lab: 'J’ai lu et j’accepte le règlement de la LEAGUE UV.', t: 'check', req: 1, court: 'Règlement LEAGUE UV accepté' },
     { k: 'acc_donnees', lab: 'J’accepte que mes informations servent à gérer la communauté et la ligue.', t: 'check', req: 1, court: 'Traitement des données accepté' },
     { k: 'acc_approbation', lab: 'Je comprends que mon inscription doit être approuvée par l’organisation.', t: 'check', req: 1, court: 'Approbation comprise' }
-  ], verif: x => x.comprend_mg === 'Non' ? 'Comprendre le malgache est un critère essentiel : cette inscription ne pourrait pas être acceptée.' : (x.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email) ? 'Adresse e-mail invalide.' : (x.uid && !/^\d{5,20}$/.test(String(x.uid).trim()) ? 'UID invalide : il ne contient que des chiffres (de 5 à 20).' : '')) }
+  ], verif: x => x.comprend_mg === 'Non' ? 'Comprendre le malgache est un critère essentiel : cette inscription ne pourrait pas être acceptée.' : (x.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(x.email) ? 'Adresse e-mail invalide.' : (x.uid && !L.uidValide(x.uid) ? 'UID invalide : il ne contient que des chiffres (de 5 à 25).' : '')) }
 };
 function champHtml(f, val, px) {
   px = px || 'f-'; const id = px + f.k, x = val[f.k], etoile = f.req ? ' <span class="dim">*</span>' : '';
@@ -1303,8 +1303,8 @@ function controlesInscription(i) {
   if (i.parle_mg === 'Non') W.push('Ne parle pas le malgache (information seulement, non bloquante).');
   if (!i.origine_mg) B.push('Nationalité ou origine malgache non déclarée.'); else OK.push('Nationalité ou origine malgache déclarée, à vérifier.');
   if (i.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(i.email)) W.push('Format d’e-mail inhabituel.');
-  const u = String(i.uid || '').trim();
-  if (u && !/^\d{5,20}$/.test(u)) W.push('Format d’UID inhabituel (chiffres attendus).');
+  const u = L.normUid(i.uid);
+  if (u && !L.uidValide(u)) W.push('Format d’UID inhabituel (chiffres attendus).');
   const uidC = u ? S.comptes.filter(c => String(c.uid).trim() === u) : [];
   if (uidC.length) W.push('UID déjà enregistré pour ' + uidC.map(c => c.matricule).join(', ') + ' : impossible d’attribuer un nouveau matricule, seule une réintégration de ce membre est possible.');
   else if (u) OK.push('UID inconnu des autres membres.');
@@ -1995,6 +1995,7 @@ async function soumettreInscription(e) {
   e.preventDefault();
   const D = DEM.inscription, err = $('#i-err'), btn = e.submitter;
   const o = lireChamps(D.champs, 'i-');
+  if (o.uid) o.uid = L.normUid(o.uid);
   const mdp = $('#i-mdp').value, f = $('#i-capture').files[0];
   let m = verifierChamps(D.champs, o) || (D.verif ? D.verif(o) : '');
   if (!m && mdp.length < 8) m = 'Le mot de passe doit faire 8 caractères au moins.';
@@ -2087,7 +2088,7 @@ function moiCompte2() {
   const R = reglesSite();
   modal('Ajouter un 2e compte', '<div data-brouillon="compte2"><p class="mute small">' + (R ? R.comptes_max : 2) + ' comptes au maximum par matricule, un seul actif à la fois. Katana examine la demande.</p><label class="lab" for="d-pseudo">Pseudo exact du nouveau compte</label><input id="d-pseudo" type="text"><label class="lab" for="d-uid">UID du nouveau compte</label><input id="d-uid" type="text" inputmode="numeric"><label class="lab" for="d-capture">Capture du profil du nouveau compte (pseudo et UID visibles)</label><input id="d-capture" type="file" accept="image/*"><label class="lab" for="d-motif">Motif</label><textarea id="d-motif" rows="2"></textarea><label class="coche"><input type="checkbox" id="d-activer"><span>Je veux jouer avec ce compte dès son approbation. Le délai de ' + (R ? R.delai_changement_compte_jours : 7) + ' jours avant le changement suivant commence alors.</span></label><div id="d-err" class="err" role="alert"></div></div>',
     [{ label: 'Annuler', cls: 'ghost' }, { label: 'Envoyer la demande', onClick: async () => {
-      const err = $('#d-err'), f = $('#d-capture').files[0], pseudo = $('#d-pseudo').value.trim(), uid = v('d-uid'), motif = v('d-motif');
+      const err = $('#d-err'), f = $('#d-capture').files[0], pseudo = $('#d-pseudo').value.trim(), uid = L.normUid(v('d-uid')), motif = v('d-motif');
       err.textContent = '';
       if (!pseudo || !uid || !motif || !f) { err.textContent = 'Pseudo, UID, capture et motif sont obligatoires.'; return false; }
       const img = await reduireImage(f, 1600, 0.85);
@@ -2152,7 +2153,7 @@ function carteDemande(d) {
   const m = d.membres || {}, x = d.details || {}, id = d.id, cpts = m.comptes_jeu || [];
   const actif = cpts.find(c => c.statut === 'actif');
   let det = [];
-  if (d.type === 'compte2') det = [['Pseudo du nouveau compte', esc(x.pseudo)], ['UID', esc(x.uid) + (/^\d{5,20}$/.test(x.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Actif dès l’approbation', x.activer ? 'Oui' : 'Non'], ['Motif', esc(x.motif)], ['Comptes actuels', cpts.map(c => esc(c.pseudo) + ' (' + (STATUTS_CPT[c.statut] || c.statut) + ')').join(', ') || '—']];
+  if (d.type === 'compte2') det = [['Pseudo du nouveau compte', esc(x.pseudo)], ['UID', esc(x.uid) + (L.uidValide(x.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Actif dès l’approbation', x.activer ? 'Oui' : 'Non'], ['Motif', esc(x.motif)], ['Comptes actuels', cpts.map(c => esc(c.pseudo) + ' (' + (STATUTS_CPT[c.statut] || c.statut) + ')').join(', ') || '—']];
   else if (d.type === 'compte_actif') det = [['Compte à activer', esc(x.pseudo) + ' · UID ' + esc(x.uid)], ['Compte actif actuel', actif ? esc(actif.pseudo) + ' · UID ' + esc(actif.uid) : '—'], ['Dernier changement', dateLoc(m.dernier_changement_compte)], ['Motif', esc(x.motif)]];
   else if (d.type === 'pseudo') det = [['Compte', 'UID ' + esc(x.uid)], ['Pseudo déclaré', esc(x.pseudo_declare)], ['Pseudo lu par volsever', x.pseudo_volsever ? esc(x.pseudo_volsever) + ' (déjà appliqué)' : '—'], ['Raison', esc(x.raison || '')], ['Pseudo actuel', esc((cpts.find(c => String(c.id) === String(x.compte_id)) || {}).pseudo || '—')]];
   else if (d.type === 'effacement') return carteEffacement(d);
@@ -2327,7 +2328,7 @@ function lienFb(u) { u = String(u || '').trim(); if (!u) return '—'; const h =
 function carteInscription(c) {
   const p = un(c.membres_prives) || {}, cpt = (c.comptes_jeu || [])[0] || {}, id = c.id;
   const age = p.date_naissance ? Math.floor((Date.now() - new Date(p.date_naissance).getTime()) / 31557600000) + ' ans' : '';
-  const kv = [['Nom réel', esc(p.nom_reel)], ['E-mail', esc(p.email)], ['Naissance', p.date_naissance ? fDc(p.date_naissance) + ' (' + age + ')' : '—'], ['Genre', esc(p.genre)], ['Facebook', lienFb(p.facebook)], ['Clan', esc(p.clan || '—')], ['Pseudo en jeu', esc(cpt.pseudo)], ['UID', esc(cpt.uid) + (/^\d{5,20}$/.test(cpt.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Résidence', p.residence === 'Étranger' ? 'Étranger, ' + esc(p.pays) : 'Madagascar, ' + esc(p.province) + ', ' + esc(p.zone)], ['Comprend le malgache', p.comprend_mg ? 'Oui' : 'Non'], ['Parle le malgache', p.parle_mg ? 'Oui' : 'Non (information seulement)'], ['Origine malgache déclarée', p.origine_mg ? 'Oui' : 'Non'], ['Reçue le', fDT(L.versLocal(c.cree_le))]];
+  const kv = [['Nom réel', esc(p.nom_reel)], ['E-mail', esc(p.email)], ['Naissance', p.date_naissance ? fDc(p.date_naissance) + ' (' + age + ')' : '—'], ['Genre', esc(p.genre)], ['Facebook', lienFb(p.facebook)], ['Clan', esc(p.clan || '—')], ['Pseudo en jeu', esc(cpt.pseudo)], ['UID', esc(cpt.uid) + (L.uidValide(cpt.uid || '') ? '' : ' <span class="err">format inhabituel</span>')], ['Résidence', p.residence === 'Étranger' ? 'Étranger, ' + esc(p.pays) : 'Madagascar, ' + esc(p.province) + ', ' + esc(p.zone)], ['Comprend le malgache', p.comprend_mg ? 'Oui' : 'Non'], ['Parle le malgache', p.parle_mg ? 'Oui' : 'Non (information seulement)'], ['Origine malgache déclarée', p.origine_mg ? 'Oui' : 'Non'], ['Reçue le', fDT(L.versLocal(c.cree_le))]];
   const sugg = INS.anciens.filter(x => x.nom_gamer && L.normPseudo(x.nom_gamer) === L.normPseudo(c.nom_gamer));
   const autres = INS.anciens.filter(x => sugg.indexOf(x) < 0);
   const opt = x => '<option value="' + x.matricule + '">DFMM-' + x.matricule + ' · ' + esc(x.nom_gamer || '') + ' · approuvé le ' + fDc(x.date_approbation) + '</option>';
