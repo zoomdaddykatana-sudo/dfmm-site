@@ -87,7 +87,8 @@ p{margin:.5em 0}
 
 /* Accueil */
 .hero{background:radial-gradient(1200px 500px at 15% 0%,rgba(53,214,111,.08),transparent 60%),var(--bg)}
-.hero-grid{display:grid;gap:22px;max-width:1240px;margin:0 auto;grid-template-areas:"id" "board" "more"}
+.hero-grid{display:grid;gap:22px;max-width:1240px;margin:0 auto;grid-template-areas:"id" "cta" "board" "more"}
+.hero-cta{grid-area:cta}
 .hero-id{grid-area:id;display:flex;align-items:center;gap:16px}
 .hero-more{grid-area:more;display:grid;gap:18px;align-content:start}
 .board{grid-area:board}
@@ -101,7 +102,7 @@ p{margin:.5em 0}
 .facts span{font-size:14px;color:var(--mute)}
 .hero .cta{display:flex;flex-wrap:wrap;gap:10px}
 @media(min-width:900px){
-  .hero-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr);grid-template-areas:"id board" "more board";grid-template-rows:auto 1fr;gap:26px 44px;align-items:start}
+  .hero-grid{grid-template-columns:minmax(0,5fr) minmax(0,6fr);grid-template-areas:"id board" "cta board" "more board";grid-template-rows:auto auto 1fr;gap:26px 44px;align-items:start}
   .hero-id{display:grid;gap:18px}
   .logo-full{width:250px}
   .hero-id .sous{font-size:20px}
@@ -314,6 +315,10 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <p class="sous">Victory Unite, saison après saison</p>
         </div>
       </div>
+      <div class="cta hero-cta">
+        <a class="btn" href="#inscription">S’inscrire</a>
+        <a class="btn ghost" href="#reglement">Lire le règlement</a>
+      </div>
       <div class="hero-more">
         <p class="lead">La ligue communautaire et individuelle des joueurs malgaches de Delta Force Mobile. Chaque match validé compte, et chaque contribution peut être reconnue sur la saison.</p>
         <ul class="facts">
@@ -322,10 +327,6 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
           <li><b>11</b><span>distinctions par saison</span></li>
           <li><b>8</b><span>statistiques suivies par match</span></li>
         </ul>
-        <div class="cta">
-          <a class="btn" href="#inscription">S’inscrire</a>
-          <a class="btn ghost" href="#reglement">Lire le règlement</a>
-        </div>
       </div>
       <div class="board" id="home-board"></div>
     </div>
