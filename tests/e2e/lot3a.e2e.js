@@ -428,7 +428,7 @@ srv.listen(8765, async () => {
       await p.evaluate(() => localStorage.setItem('faux-visiteur', '1'));
       await p.goto('http://localhost:8765/#inscription'); await p.reload(); await p.waitForTimeout(800);
       const lien = await p.getAttribute('#f-inscription a[href*="facebook.com"]', 'href');
-      if (lien !== 'https://www.facebook.com/profile.php?id=61596920126729') throw new Error('lien : ' + lien);
+      if (lien !== 'https://www.facebook.com/share/1HwLd6ddVX/') throw new Error('lien : ' + lien);
       await p.fill('#i-nom_reel', 'Faux Nom'); await p.fill('#i-email', 'faux@test.invalid'); await p.check('#i-genre');
       await p.check('input[name="i-residence"][value="Madagascar"]'); await p.check('#i-acc_dfmm'); await p.fill('#i-mdp', 'secret123');
       await p.reload(); await p.waitForTimeout(800);
@@ -454,7 +454,7 @@ srv.listen(8765, async () => {
       await p.click('#f-inscription button[type="submit"]'); await p.waitForTimeout(800);
       const fin = await p.evaluate(() => ({ t: document.getElementById('ins-zone').textContent, liens: Array.from(document.querySelectorAll('#ins-zone a[href*="facebook.com"]')).map(a => a.href + '|' + a.target),
         reste: Object.keys(localStorage).filter(k => k.indexOf('dfmm-brouillon|') === 0) }));
-      if (!/UV-ABC123/.test(fin.t) || !/Ouvrir la page DFMM/.test(fin.t) || !/comptez jusqu’à 48 h après l’envoi de votre code Messenger/.test(fin.t) || fin.liens.length < 2 || fin.liens.some(l => l !== 'https://www.facebook.com/profile.php?id=61596920126729|_blank')) throw new Error(JSON.stringify(fin).slice(0, 300));
+      if (!/UV-ABC123/.test(fin.t) || !/Ouvrir la page DFMM/.test(fin.t) || !/comptez jusqu’à 48 h après l’envoi de votre code Messenger/.test(fin.t) || fin.liens.length < 2 || fin.liens.some(l => l !== 'https://www.facebook.com/share/1HwLd6ddVX/|_blank')) throw new Error(JSON.stringify(fin).slice(0, 300));
       if (fin.reste.length) throw new Error('brouillon gardé après l’envoi : ' + fin.reste);
       await p.screenshot({ path: path.join(ICI, 'inscription-code-messenger.png'), fullPage: false });
       await p.evaluate(() => { localStorage.clear(); });
