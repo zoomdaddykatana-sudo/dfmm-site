@@ -7,7 +7,8 @@ const path = require('node:path');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'supabase', 'functions', 'inscription', 'index.ts'), 'utf8');
 const aides = src.slice(src.indexOf('// DEBUT-AIDES'), src.indexOf('// FIN-AIDES'));
-const { normEmail, normFacebook, verifierDonnees, adresseClient } = new Function(aides + '; return { normEmail, normFacebook, verifierDonnees, adresseClient };')();
+const { normEmail, normFacebook, normUid, verifierDonnees, adresseClient } = new Function(aides + '; return { normEmail, normFacebook, normUid, verifierDonnees, adresseClient };')();
+const L = require('../js/regles.js');
 
 const BON = { nom_reel: 'Rakoto Jean', nom_gamer: 'Jeannot', email: 'Jean@Exemple.mg', date_naissance: '2001-05-04', genre: 'Homme',
   facebook: 'https://www.facebook.com/jeannot.rakoto/', pseudo: 'PKL¬Pzone', uid: '123456789', residence: 'Madagascar',
@@ -41,11 +42,30 @@ test('un lien qui n’est pas Facebook est refusé', () => {
 // ----- Vérifications automatiques (migration 0014, choix de Katana du 22/11/2026) -----
 const V = new Function(aides + '; return { dateReelle, interpreterVolsever, interpreterMx, lireListeJetables, estJetable, domaineEmail, codeMessenger, MESSAGES_EMAIL, MESSAGE_UID_INCONNU };')();
 
-test('UID : chiffres seulement, de 5 à 20', () => {
+test('UID : chiffres seulement, de 5 à 25 (UID réels de 21 chiffres, constat du 24/11/2026)', () => {
   assert.match(verifierDonnees(Object.assign({}, BON, { uid: '12a456' })).join(), /UID invalide/);
   assert.match(verifierDonnees(Object.assign({}, BON, { uid: '1234' })).join(), /UID invalide/);
-  assert.match(verifierDonnees(Object.assign({}, BON, { uid: '1'.repeat(21) })).join(), /UID invalide/);
+  assert.match(verifierDonnees(Object.assign({}, BON, { uid: '812-345-678' })).join(), /UID invalide/);
+  assert.match(verifierDonnees(Object.assign({}, BON, { uid: '1'.repeat(26) })).join(), /UID invalide/);
+  assert.deepEqual(verifierDonnees(Object.assign({}, BON, { uid: '1'.repeat(21) })), []);
+  assert.deepEqual(verifierDonnees(Object.assign({}, BON, { uid: '1'.repeat(25) })), []);
   assert.deepEqual(verifierDonnees(Object.assign({}, BON, { uid: ' 12345 ' })), []);
+});
+test('UID collé : caractères invisibles, espaces, « UID: » et chiffres larges nettoyés, même résultat sur le site et le serveur', () => {
+  const u = '100000000000000000001';
+  const colles = [u, ' ' + u + '\n', '\u202a' + u + '\u202c', '\u200e' + u, '\u200b' + u + '\u200b', '\ufeff' + u,
+    '1000 0000 0000 0000 00001', '1000\u00a00000\u00a00000000000001', 'UID: ' + u, 'uid:' + u, 'UID：' + u, u.replace(/\d/g, c => String.fromCharCode(0xFF10 + Number(c)))];
+  colles.forEach(c => {
+    assert.equal(normUid(c), u, JSON.stringify(c));
+    assert.equal(L.normUid(c), u, JSON.stringify(c));
+    assert.equal(L.uidValide(c), true, JSON.stringify(c));
+    assert.deepEqual(verifierDonnees(Object.assign({}, BON, { uid: c })), [], JSON.stringify(c));
+  });
+  ['12a456', '812-345-678', 'ID 12345678', '1234', '1'.repeat(26)].forEach(c => {
+    assert.equal(L.uidValide(c), false, c);
+    assert.match(verifierDonnees(Object.assign({}, BON, { uid: c })).join(), /UID invalide/, c);
+  });
+  assert.match(src, /uid = normUid\(d\.uid\)/);
 });
 test('date de naissance : réelle (pas de 31 février), après 1900, passée', () => {
   assert.equal(V.dateReelle('2001-05-04'), true);
