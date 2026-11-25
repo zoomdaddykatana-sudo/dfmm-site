@@ -164,6 +164,13 @@
       });
       return null;
     },
+    // Rappels (migration 0020) : rien n'est envoyé ; l'état imite une clé prête et 2 téléphones.
+    rappels_moi: () => ({ peut: true, actifs: true, cle_publique: 'B' + 'A'.repeat(86), telephones: (DB.abonnements_push || []).length }),
+    abonner_rappels: p => { (DB.abonnements_push = DB.abonnements_push || []).push(p.p); return null; },
+    desabonner_rappels: p => { DB.abonnements_push = (DB.abonnements_push || []).filter(x => x.endpoint !== p.p_endpoint); return null; },
+    essai_rappel: () => null,
+    rappels_admin: () => ({ actifs: true, tache: true, cle_prete: true, telephones: 2, personnes: 2, en_echec: 0, dernier_reveil: '2026-11-21T07:00:00Z',
+      dernier_envoi: '2026-11-21T07:00:05Z', dernier_bilan: { envoyes: 2, echecs: 0, oublies: 0, messages: 1 }, envoyes_7j: 3 }),
     identifier_ligne: p => { const l = DB.match_lignes.find(x => x.id === p.p_ligne); l.resolution = p.p_compte ? 'manuel' : 'non_inscrit_confirme'; l.identifie_le = iso(); return null; }
   };
   const client = {

@@ -39,7 +39,7 @@ fs.writeFileSync(path.join(ICI, 'capture.png'), png);
 
 const srv = http.createServer((q, r) => { let f = path.join(WWW, decodeURIComponent(q.url.split('?')[0].split('#')[0])); if (f.endsWith('/')) f += 'index.html'; fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : f.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream' }); r.end(d); }); });
 srv.listen(8765, async () => {
-  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   await p.clock.setFixedTime(new Date('2026-11-22T07:00:00Z'));   // dimanche 22/11/2026, 10 h à Madagascar
   const erreurs = []; p.on('pageerror', e => erreurs.push('page : ' + e.message)); p.on('console', m => { if (m.type() === 'error') erreurs.push('console : ' + m.text()); });
   p.on('dialog', d => d.accept(d.type() === 'prompt' ? (global.REPONSE_PROMPT || '') : undefined));
@@ -394,6 +394,21 @@ srv.listen(8765, async () => {
       for (const x of ['Prochain match de Katana', 'mercredi 25 novembre 2026 à 16 h 05', 'Ascension', 'vers 15 h 50', '4242', 'DFMM-3 Faux 3', 'Craqué → Ascension', 'Tournoi de Noël', 'Matchs libres annoncés'])
         if (t.indexOf(x) < 0) throw new Error('absent : ' + x + ' — ' + t.slice(0, 300));
       if (await p.$('[data-act="ev-participer"]')) throw new Error('« Je participe » affiché à Katana (pas membre)');
+    });
+    await etape('rappels : bloc du téléphone, agenda (.ics) et liens Google Agenda, état pour Katana', async () => {
+      const t = await p.textContent('#ev-rappels');
+      for (const x of ['Rappels sur ce téléphone', 'Agenda du téléphone', 'même sans Internet', 'mer. 25/11 (Ascension)'])
+        if (t.indexOf(x) < 0) throw new Error('absent : ' + x + ' — ' + t.slice(0, 300));
+      if (/4242/.test(t)) throw new Error('code de la salle dans le bloc des rappels');
+      const g = await p.getAttribute('#ev-rappels a[href*="calendar.google.com"]', 'href');
+      if (!/dates=20261125T130500Z\/20261125T140500Z/.test(g)) throw new Error(g);
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-act="rap-agenda"]')]);
+      const ics = fs.readFileSync(await dl.path(), 'utf8');
+      if (dl.suggestedFilename() !== 'league-uv-matchs.ics' || !/BEGIN:VEVENT[\s\S]*DTSTART:20261125T130500Z[\s\S]*TRIGGER:-PT35M/.test(ics) || /4242/.test(ics)) throw new Error(ics.slice(0, 400));
+      await p.goto('http://localhost:8765/#admin-calendrier'); await p.waitForTimeout(900);
+      const a = await p.textContent('#cal-rappels');
+      if (!/Rappels sur les téléphones/.test(a) || !/2 \(2 personne/.test(a) || !/Activés/.test(a)) throw new Error(a.slice(0, 300));
+      await p.goto('http://localhost:8765/#evenements'); await p.waitForTimeout(800);
     });
     await etape('prochains événements : membre actif (Je participe, code, organisateur d’un match libre)', async () => {
       await p.evaluate(() => { window.FAUX_ROLE = 'membre'; window.FAUX_MOI = 4; });

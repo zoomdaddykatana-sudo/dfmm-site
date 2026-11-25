@@ -611,6 +611,59 @@ var L = (function () {
     return { lignes: out, erreurs: err };
   }
 
+  // ---------- Agenda du téléphone (rappels sans Internet, demande de Katana du 25/11/2026) ----------
+  // Minutes entre l'heure du rappel du matin (« HH:MM », heure de Madagascar) et le début du match ; 0 si le matin est après.
+  function minutesMatin(debutIso, heureMatin) {
+    var loc = versLocal(debutIso), m = /^(\d{2}):(\d{2})$/.exec(String(heureMatin || ''));
+    if (!loc || !m) return 0;
+    return Math.max(0, Number(loc.slice(11, 13)) * 60 + Number(loc.slice(14, 16)) - (Number(m[1]) * 60 + Number(m[2])));
+  }
+  function icsDate(iso) { return new Date(iso).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
+  function icsTexte(t) { return String(t).replace(/\\/g, '\\\\').replace(/;/g, '\\;').replace(/,/g, '\\,').replace(/\r?\n/g, '\\n'); }
+  // Lignes de 75 octets au plus (norme de l'agenda), suite précédée d'un espace.
+  function icsPlier(ligne) {
+    var out = [], cur = '', n = 0;
+    Array.from(ligne).forEach(function (ch) {
+      var b = unescape(encodeURIComponent(ch)).length;
+      if (n + b > (out.length ? 74 : 75)) { out.push(cur); cur = ''; n = 0; }
+      cur += ch; n += b;
+    });
+    out.push(cur);
+    return out.join('\r\n ');
+  }
+  function heureTxt(iso) { var l = versLocal(iso); return l ? Number(l.slice(11, 13)) + ' h ' + l.slice(14, 16) : ''; }
+  // Description d'une date du calendrier (jamais de code de salle).
+  function agendaTexte(j, o) {
+    return 'Match LEAGUE UV de Katana · carte ' + (j.carte || '—') + ' · début à ' + heureTxt(j.debut)
+      + ' · salle ouverte à ' + heureTxt(new Date(new Date(j.debut).getTime() - (Number(o.ouvertureMin) || 0) * 60000).toISOString())
+      + '. Le code de la salle est sur le site (Prochains événements) : ' + (o.url || '') + '#evenements'
+      + ' — Date prévue : en cas de report ou d’annulation, le site et les notifications font foi.';
+  }
+  // Fichier .ics des prochaines dates prévues (o : maintenant, avantMin, heureMatin, ouvertureMin, plageMin, url).
+  function agendaIcs(jours, o) {
+    o = o || {};
+    var maint = new Date(o.maintenant || Date.now()).getTime(), lignes = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//DFMM//LEAGUE UV//FR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH', 'X-WR-CALNAME:LEAGUE UV'];
+    (jours || []).filter(function (j) { return j.statut === 'prevu' && new Date(j.debut).getTime() > maint; }).forEach(function (j) {
+      var avant = Number(o.avantMin) || 0, matin = minutesMatin(j.debut, o.heureMatin);
+      lignes.push('BEGIN:VEVENT', 'UID:jour-' + j.id + '@dfmm-league-uv', 'DTSTAMP:' + icsDate(new Date(maint).toISOString()),
+        'DTSTART:' + icsDate(j.debut), 'DTEND:' + icsDate(new Date(new Date(j.debut).getTime() + (Number(o.plageMin) || 60) * 60000).toISOString()),
+        'SUMMARY:' + icsTexte('LEAGUE UV — match (carte ' + (j.carte || '—') + ')'), 'DESCRIPTION:' + icsTexte(agendaTexte(j, o)));
+      if (o.url) lignes.push('URL:' + o.url + '#evenements');
+      if (matin > avant) lignes.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsTexte('LEAGUE UV — match aujourd’hui à ' + heureTxt(j.debut) + ' (carte ' + (j.carte || '—') + ')'), 'TRIGGER:-PT' + matin + 'M', 'END:VALARM');
+      if (avant > 0) lignes.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:' + icsTexte('LEAGUE UV — match à ' + heureTxt(j.debut) + ' (carte ' + (j.carte || '—') + ')'), 'TRIGGER:-PT' + avant + 'M', 'END:VALARM');
+      lignes.push('END:VEVENT');
+    });
+    lignes.push('END:VCALENDAR');
+    return lignes.map(icsPlier).join('\r\n') + '\r\n';
+  }
+  // Lien « Ajouter à Google Agenda » pour une date (rappel par défaut de l'agenda).
+  function lienGoogleAgenda(j, o) {
+    o = o || {};
+    var fin = new Date(new Date(j.debut).getTime() + (Number(o.plageMin) || 60) * 60000).toISOString();
+    return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' + encodeURIComponent('LEAGUE UV — match (carte ' + (j.carte || '—') + ')')
+      + '&dates=' + icsDate(j.debut) + '/' + icsDate(fin) + '&details=' + encodeURIComponent(agendaTexte(j, o));
+  }
+
   return {
     STATS: STATS, CATS: CATS, PROVINCES: PROVINCES, CARTES: CARTES, PARAMS_REQUIS: PARAMS_REQUIS,
     regles: regles, nowStr: nowStr, versLocal: versLocal, validDT: validDT, validD: validD, normDT: normDT,
@@ -623,7 +676,8 @@ var L = (function () {
     agreger: agreger, quantile: quantile, classer: classer, valeur: valeur, attribuerLots: attribuerLots, classementDepuisPublication: classementDepuisPublication,
     coupurePour: coupurePour, coupureFinale: coupureFinale, finVerificationFinale: finVerificationFinale, publicationFinale: publicationFinale,
     publicationsPrevues: publicationsPrevues,
-    encodeMsg: encodeMsg, decodeMsg: decodeMsg, parseLignes: parseLignes, nombre: nombre
+    encodeMsg: encodeMsg, decodeMsg: decodeMsg, parseLignes: parseLignes, nombre: nombre,
+    minutesMatin: minutesMatin, agendaIcs: agendaIcs, lienGoogleAgenda: lienGoogleAgenda
   };
 })();
 if (typeof module !== 'undefined') module.exports = L;
