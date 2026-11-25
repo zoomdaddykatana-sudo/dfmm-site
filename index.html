@@ -269,6 +269,14 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 @media(min-width:700px){.modal{align-items:center;padding:20px}}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:60;background:var(--panel2);border:1px solid var(--green);padding:10px 16px;max-width:min(92vw,560px);font-size:15px}
 .toast.err{border-color:var(--red)}
+/* Installer le site sur l'écran d'accueil (demande de Katana du 25/11/2026) */
+.inst{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:45;width:min(calc(100vw - 24px),520px);background:var(--panel2);border:1px solid var(--green);padding:12px 14px;display:grid;grid-template-columns:48px 1fr;gap:4px 12px;align-items:start;box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.inst img{width:48px;height:48px;grid-row:span 2}
+.inst b{font-size:16px;line-height:1.3}
+.inst p{margin:0;font-size:14px;color:var(--mute)}
+.inst .row-btns{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.inst .row-btns .btn{flex:1 1 auto}
+.foot .btn{justify-self:start;margin-top:4px}
 
 .foot{border-top:1px solid var(--line);padding:22px max(4vw,16px) 30px;color:var(--dim);font-size:14px;display:grid;gap:6px}
 .foot b{color:var(--mute)}
@@ -890,6 +898,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   <div><b>DFMM</b> — DELTA FORCE MOBILE MADAGASCAR · LEAGUE UV</div>
   <div>Équité · Transparence · Intégrité</div>
   <div>Compétition communautaire indépendante, non affiliée à l’éditeur de Delta Force.</div>
+  <button class="btn sm ghost" type="button" id="inst-pied" data-act="inst-montrer" hidden>📲 Installer l’application sur ce téléphone</button>
 </footer>
 
 <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-t">
@@ -900,6 +909,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   </div>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
+<div id="inst" class="inst" role="region" aria-label="Installer l’application" hidden></div>
 </template>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
@@ -3971,11 +3981,101 @@ ACTIONS['evc-retirer'] = async b => {
   toast('Événement retiré.'); afficherCalendrierAdmin();
 };
 
+/* ----- Installer le site sur l'écran d'accueil (demande de Katana du 25/11/2026) -----
+   Proposé dès l'ouverture sur téléphone, jamais quand le site est déjà installé :
+   ouvert depuis l'icône, installation notée sur ce téléphone, ou application trouvée par Chrome.
+   Android (Chrome, Samsung Internet…) : un seul bouton « Installer » (fenêtre du navigateur).
+   Navigateur de Facebook ou Messenger : bouton « Ouvrir dans Chrome ». Sinon : chemin dans le menu.
+   « Plus tard » : plus proposé pendant INSTALL_PLUS_TARD_JOURS ; le bouton du bas de page reste. */
+const INSTALL_PLUS_TARD_JOURS = 7, INSTALL_CLE = 'dfmm-installation';
+const INST = { evt: null, mode: null, pret: false };
+const estAndroid = () => /android/i.test(navigator.userAgent);
+const navIntegre = () => /FBAN|FBAV|FB_IAB|FB4A|FBIOS|Instagram|Messenger/i.test(navigator.userAgent);
+function lireInst() { try { return JSON.parse(localStorage.getItem(INSTALL_CLE) || '{}') || {}; } catch (e) { return {}; } }
+function noterInst(o) { try { localStorage.setItem(INSTALL_CLE, JSON.stringify(Object.assign(lireInst(), o))); } catch (e) { /* stockage indisponible : sans conséquence */ } }
+async function siteInstalle() {
+  if (estInstalle()) { noterInst({ installe: true }); return true; }
+  if (lireInst().installe) return true;
+  try {
+    if (navigator.getInstalledRelatedApps) { const l = await navigator.getInstalledRelatedApps(); if (l && l.length) { noterInst({ installe: true }); return true; } }
+  } catch (e) { /* question impossible : on continue */ }
+  return false;
+}
+const plusTardEnCours = () => { const t = lireInst().plus_tard; return !!t && Date.now() - t < INSTALL_PLUS_TARD_JOURS * 864e5; };
+function modeInstallation() {
+  if (estInstalle()) return null;
+  if (INST.evt) return 'bouton';
+  if (lireInst().installe) return null;
+  if (navIntegre()) return estAndroid() ? 'chrome' : 'safari';
+  if (estAndroid()) return 'menu';
+  if (estIOS()) return 'ios';
+  return null;
+}
+function lienChrome() {
+  const ici = location.origin + location.pathname;
+  return 'intent://' + location.host + location.pathname + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(ici) + ';end';
+}
+function htmlInstallation(mode) {
+  const tete = '<img src="icons/icone-192.png" alt=""><b>Installez LEAGUE UV sur votre téléphone</b>';
+  const tard = '<button class="btn sm ghost" type="button" data-act="inst-plus-tard">Plus tard</button>';
+  const fait = '<button class="btn sm ghost" type="button" data-act="inst-fait">C’est déjà fait</button>';
+  if (mode === 'bouton') return tete + '<p>Une icône sur l’écran d’accueil, comme une application : le site s’ouvre en un geste.</p><div class="row-btns"><button class="btn" type="button" data-act="inst-installer">Installer</button>' + tard + '</div>';
+  if (mode === 'chrome') return tete + '<p>Vous êtes dans Facebook ou Messenger, qui ne peut pas installer le site. Ouvrez-le dans Chrome, puis touchez <b>Installer</b>.</p><div class="row-btns"><a class="btn" href="' + esc(lienChrome()) + '">Ouvrir dans Chrome</a>' + fait + tard + '</div>';
+  if (mode === 'safari') return tete + '<p>Vous êtes dans Facebook ou Messenger : touchez <b>⋯</b> (en haut ou en bas), puis <b>Ouvrir dans le navigateur</b>. Ensuite : bouton <b>Partager</b>, puis <b>Sur l’écran d’accueil</b>.</p><div class="row-btns">' + fait + tard + '</div>';
+  if (mode === 'menu') return tete + '<p>Touchez <b>⋮</b> en haut à droite du navigateur, puis <b>Installer l’application</b> ou <b>Ajouter à l’écran d’accueil</b>, puis <b>Installer</b>.</p><div class="row-btns">' + fait + tard + '</div>';
+  if (mode === 'ios') return tete + '<p>Touchez le bouton <b>Partager</b> (carré avec une flèche vers le haut), puis <b>Sur l’écran d’accueil</b>, puis <b>Ajouter</b>.</p><div class="row-btns">' + fait + tard + '</div>';
+  return '';
+}
+function montrerInstallation(mode) {
+  const z = $('#inst'); if (!z) return;
+  INST.mode = mode; z.innerHTML = htmlInstallation(mode); z.hidden = !mode;
+}
+function cacherInstallation() { const z = $('#inst'); if (z) { z.hidden = true; z.innerHTML = ''; } INST.mode = null; }
+function majBoutonPied() { const b = $('#inst-pied'); if (b) b.hidden = !INST.pret || !modeInstallation(); }
+async function proposerInstallation() {
+  const deja = await siteInstalle() && !INST.evt;
+  INST.pret = true; majBoutonPied();
+  if (deja) return;
+  const telephone = estAndroid() || estIOS();
+  if (!telephone || plusTardEnCours()) return;
+  // Chrome peut annoncer l'installation un peu après l'ouverture : petite attente avant le chemin par le menu.
+  const mode = modeInstallation();
+  if (mode === 'menu' && !INST.evt) { setTimeout(() => { if (!INST.mode && !plusTardEnCours()) montrerInstallation(modeInstallation()); }, 4000); return; }
+  if (mode) montrerInstallation(mode);
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); INST.evt = e;
+  noterInst({ installe: false });   // le navigateur ne le propose que si le site n'est pas installé
+  majBoutonPied();
+  if ((estAndroid() || estIOS()) && !plusTardEnCours() && INST.pret) montrerInstallation('bouton');
+  else if (INST.mode) montrerInstallation('bouton');
+});
+window.addEventListener('appinstalled', () => {
+  noterInst({ installe: true }); INST.evt = null; cacherInstallation(); majBoutonPied();
+  toast('LEAGUE UV est installé : l’icône est sur l’écran d’accueil.');
+});
+ACTIONS['inst-installer'] = async b => {
+  const e = INST.evt;
+  if (!e) { montrerInstallation(modeInstallation()); return; }
+  b.disabled = true; INST.evt = null;
+  try {
+    await e.prompt();
+    const r = await e.userChoice;
+    if (r && r.outcome === 'accepted') { noterInst({ installe: true }); cacherInstallation(); toast('Installation en cours : l’icône LEAGUE UV arrive sur l’écran d’accueil.'); }
+    else { noterInst({ plus_tard: Date.now() }); cacherInstallation(); }
+  } catch (err) { montrerInstallation(estAndroid() ? 'menu' : null); }
+  majBoutonPied();
+};
+ACTIONS['inst-plus-tard'] = () => { noterInst({ plus_tard: Date.now() }); cacherInstallation(); };
+ACTIONS['inst-fait'] = () => { noterInst({ installe: true }); cacherInstallation(); majBoutonPied(); };
+ACTIONS['inst-montrer'] = () => { const m = modeInstallation() || (estAndroid() ? 'menu' : null); if (m) montrerInstallation(m); };
+
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
   try { PUB = JSON.parse($('#pub-data').textContent || 'null'); } catch (e) { PUB = null; }
   lierEvenements();
   router();
+  proposerInstallation();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   if (SB) {
     const { data } = await SB.auth.getSession();
