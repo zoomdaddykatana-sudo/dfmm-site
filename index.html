@@ -172,6 +172,7 @@ td.r{text-align:right}
 .cl-card table{font-size:14px}
 .rk{display:inline-grid;place-items:center;min-width:28px;height:24px;padding:0 4px;font-family:var(--display);font-style:italic;font-weight:800;font-size:14px;background:var(--line2);clip-path:var(--plate)}
 tr.lead1 .rk{background:var(--green);color:#04110A}
+tr.hc .rk,.rk.hc{background:transparent;color:var(--mute);font-size:12px;box-shadow:inset 0 0 0 1px var(--line2)}
 .vide-cl{padding:28px 16px;text-align:center;color:var(--mute)}
 
 /* Règlement */
@@ -357,7 +358,9 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
       <div class="dist">
         <div class="step"><span class="n">5 titres</span><h3>MOST, le total de la saison</h3><p>Récompense l’assiduité et la persévérance : chacun peut gagner en jouant régulièrement.</p><ul><li>MOST Eliminator</li><li>MOST Medic</li><li>MOST Engineer</li><li>MOST Objective</li><li>MOST Tactician</li></ul></div>
         <div class="step"><span class="n">5 titres</span><h3>BEST, la moyenne par match</h3><p>Récompense la qualité, à condition d’avoir joué au moins le nombre médian de matchs.</p><ul><li>BEST Eliminator</li><li>BEST Medic</li><li>BEST Engineer</li><li>BEST Objective</li><li>BEST Tactician</li></ul></div>
-        <div class="step"><span class="n">1 titre</span><h3>BEST Survivor</h3><p>La moyenne de morts par match la plus faible, avec un minimum de matchs et un score moyen au moins égal au premier quartile.</p></div>
+        <div class="step"><span class="n">1 titre</span><h3>BEST Survivor</h3><p>La moyenne de morts par match la plus faible, avec un minimum de matchs et un score moyen au moins égal au premier quartile.</p>
+          <h3>Membre hors concours</h3>
+          <p>Un membre déclaré hors concours (par exemple l’administrateur) figure au classement à titre indicatif ; il ne peut recevoir ni titre ni lot, et ses statistiques n’entrent pas dans le calcul du seuil et du Q1.<span class="chg">Nouveau</span></p></div>
       </div>
     </div>
   </div>
@@ -1104,13 +1107,16 @@ function carteCl(c, p, toutes) {
   h += (tete ? '<div style="padding:8px 14px">' + tete + '</div>' : '') + '<div class="scroll"><table><thead><tr><th>Rang</th><th>Joueur</th><th class="r">' + (c.kind === 'MOST' ? 'Total' : 'Moyenne') + '</th><th class="r">Matchs</th></tr></thead><tbody>';
   lignes.forEach(l => {
     const ps = (l.pseudos || []).filter(x => x && x !== l.nom);
-    h += '<tr class="' + (l.rang === 1 && nbL ? 'lead1' : '') + '"><td><span class="rk">' + l.rang + (l.egal ? '=' : '') + '</span></td><td><b>' + esc(l.nom) + '</b><div class="dim small">' + esc(l.mat) + (ps.length ? ' · ' + esc(ps.join(', ')) : '') + '</div></td><td class="num">' + fV(c.kind, l.val) + '</td><td class="num">' + l.n + '</td></tr>';
+    const rk = l.hc ? '<span class="rk hc" title="Hors concours : figure à titre indicatif, sans titre ni lot">HC</span>' : '<span class="rk">' + l.rang + (l.egal ? '=' : '') + '</span>';
+    h += '<tr class="' + (l.hc ? 'hc' : l.rang === 1 && nbL ? 'lead1' : '') + '"><td>' + rk + '</td><td><b>' + esc(l.nom) + '</b><div class="dim small">' + esc(l.mat) + (l.hc ? ' · hors concours' : '') + (ps.length ? ' · ' + esc(ps.join(', ')) : '') + '</div></td><td class="num">' + fV(c.kind, l.val) + '</td><td class="num">' + l.n + '</td></tr>';
   });
-  return h + '</tbody></table></div></div>';
+  return h + '</tbody></table></div>' + (lignes.some(l => l.hc) ? '<p class="dim small" style="padding:6px 14px;margin:0">HC : hors concours, à titre indicatif (ni titre ni lot).</p>' : '') + '</div>';
 }
+// « 12 joueur(s) classé(s) + 1 hors concours » (anciennes publications : pas de nb_hc).
+function nbClasses(p, mot) { return p.nb_joueurs + ' joueur(s)' + (mot ? ' ' + mot : '') + (p.nb_hc ? ' + ' + p.nb_hc + ' hors concours' : ''); }
 function rendreClassementsPublic() {
   const p = pubAffichee();
-  $('#cl-meta').innerHTML = p ? esc(libPub(p)) + '. Matchs terminés avant le ' + fDT(p.coupure) + ' : ' + p.nb_matchs + ' match(s), ' + p.nb_joueurs + ' joueur(s) classé(s).' + (p.type !== 'Final' ? ' Réclamations en privé jusqu’au ' + fDT(p.recours_jusqu) + '.' : '') : 'Aucun classement publié pour le moment. Le premier classement provisoire sera publié un dimanche, après les premiers matchs validés.';
+  $('#cl-meta').innerHTML = p ? esc(libPub(p)) + '. Matchs terminés avant le ' + fDT(p.coupure) + ' : ' + p.nb_matchs + ' match(s), ' + nbClasses(p, 'classé(s)') + '.' + (p.type !== 'Final' ? ' Réclamations en privé jusqu’au ' + fDT(p.recours_jusqu) + '.' : '') : 'Aucun classement publié pour le moment. Le premier classement provisoire sera publié un dimanche, après les premiers matchs validés.';
   const arch = PUBS.slice();
   $('#cl-archives').innerHTML = arch.length > 1 ? '<label class="lab" for="cl-arch">Afficher un autre classement</label><select id="cl-arch" style="max-width:420px;margin-bottom:14px"><option value="">Dernier classement publié</option>' + arch.map(a => '<option value="' + esc(a.id) + '"' + (UI.archive === a.id ? ' selected' : '') + '>' + esc(libPub(a)) + '</option>').join('') + '</select>' : '';
   $$('#cl-seg button').forEach(b => b.classList.toggle('on', b.dataset.grp === UI.grp));
@@ -2188,6 +2194,13 @@ async function ouvrirFiche(id) {
   const p = m.membres_prives || {}, cpts = m.comptes_jeu || [];
   let h = '<dl class="kv"><dt>Statut</dt><dd>' + badgeStatut(STATUTS_MB[m.statut]) + '</dd><dt>Nom réel</dt><dd>' + esc(p.nom_reel || '—') + '</dd><dt>E-mail</dt><dd>' + esc(p.email || '—') + '</dd><dt>Facebook</dt><dd>' + lienFb(p.facebook) + '</dd><dt>Approuvé le</dt><dd>' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</dd><dt>Dernier changement de compte</dt><dd>' + dateLoc(m.dernier_changement_compte) + '</dd><dt>Périodes actives</dt><dd>' + ((m.periodes || []).sort((a, b) => String(a.debut).localeCompare(String(b.debut))).map(x => 'du ' + dateLoc(x.debut) + (x.fin ? ' au ' + dateLoc(x.fin) : ' à aujourd’hui')).join('<br>') || '—') + '</dd></dl>';
   h += '<h3 style="margin-top:12px">Comptes de jeu</h3><div class="scroll"><table><thead><tr><th>Pseudo</th><th>UID</th><th>Statut</th><th>Anciens pseudos</th></tr></thead><tbody>' + cpts.map(x => '<tr><td><b>' + esc(x.pseudo) + '</b></td><td>' + esc(x.uid) + '</td><td>' + (STATUTS_CPT[x.statut] || x.statut) + '</td><td class="small">' + historiquePseudos(x) + '</td></tr>').join('') + '</tbody></table></div>';
+  if (typeof m.hors_concours === 'boolean' && m.statut === 'actif') {
+    h += '<h3 style="margin-top:12px">Hors concours</h3><p class="mute small">Un membre hors concours (par exemple l’administrateur) figure au classement à titre indicatif, avec « HC » à la place du rang. Il ne reçoit ni titre ni lot, et ses statistiques n’entrent pas dans le calcul du seuil BEST ni du Q1. Ses matchs comptent normalement pour les contrôles des matchs.</p>'
+      + '<p>Statut actuel : <b>' + (m.hors_concours ? 'hors concours' : 'en concours') + '</b></p>'
+      + '<label class="coche"><input type="checkbox" id="fi-hc"' + (m.hors_concours ? ' checked' : '') + '><span>Hors concours</span></label>'
+      + '<label class="lab" for="fi-hc-motif">Motif (obligatoire)</label><textarea id="fi-hc-motif" rows="2"></textarea><div id="fi-hc-err" class="err" role="alert"></div>'
+      + '<div class="row-btns"><button class="btn sm" type="button" data-act="fiche-hc" data-id="' + m.id + '" data-avant="' + (m.hors_concours ? '1' : '0') + '">Enregistrer le statut hors concours</button></div>';
+  }
   const dem = (m.demandes || []).sort((a, b) => String(b.cree_le).localeCompare(String(a.cree_le))).slice(0, 15);
   if (dem.length) h += '<h3 style="margin-top:12px">Demandes</h3><ul class="taches">' + dem.map(d => '<li><span>' + esc(TYPES_DEM[d.type] || d.type) + (d.motif_decision ? '<br><span class="mute small">' + esc(d.motif_decision) + '</span>' : '') + '</span><span class="nowrap">' + badgeStatut(STATUTS_DEM[d.statut]) + ' <span class="dim small">' + dateLoc(d.cree_le) + '</span></span></li>').join('') + '</ul>';
   const boutons = [{ label: 'Fermer', cls: 'ghost' }];
@@ -2207,6 +2220,19 @@ ACTIONS['moi-retrait'] = () => moiRetrait();
 ACTIONS['notif-lues'] = () => notifLues();
 ACTIONS['dem-decider'] = b => deciderDemandeSB(b);
 ACTIONS['fiche-ouvrir'] = b => ouvrirFiche(Number(b.dataset.id));
+ACTIONS['fiche-hc'] = async b => {
+  const err = $('#fi-hc-err'), val = coche('fi-hc'), motif = v('fi-hc-motif');
+  err.textContent = '';
+  if ((b.dataset.avant === '1') === val) { err.textContent = 'Cochez ou décochez « Hors concours » pour changer le statut.'; return; }
+  if (!motif) { err.textContent = 'Le motif est obligatoire.'; return; }
+  b.disabled = true;
+  const { error } = await SB.rpc('definir_hors_concours', { p_membre: Number(b.dataset.id), p_valeur: val, p_motif: motif });
+  b.disabled = false;
+  if (error) { err.textContent = erreurRpc(error); return; }
+  toast(val ? 'Membre déclaré hors concours : au classement sans titre ni lot.' : 'Membre remis en concours.');
+  if (typeof chargerMembres === 'function' && $('#mb2-liste')) chargerMembres();
+  ouvrirFiche(Number(b.dataset.id));
+};
 
 /* ----- Lot 2C : pseudo avec volsever, effacement des données ----- */
 function moiPseudo() {
@@ -2375,7 +2401,7 @@ TAB.membres = {
   charger: chargerMembres
 };
 async function chargerMembres() {
-  const { data, error } = await SB.from('membres').select('id, matricule, nom_gamer, statut, date_approbation, comptes_jeu(uid, pseudo, statut)').not('matricule', 'is', null).order('matricule');
+  const { data, error } = await SB.from('membres').select('*, comptes_jeu(uid, pseudo, statut)').not('matricule', 'is', null).order('matricule');
   const z = $('#mb2-liste'); if (!z) return;
   if (error) { z.innerHTML = note('Lecture impossible : ' + esc(error.message), 'r'); return; }
   MB = data || []; afficherMembres();
@@ -2386,7 +2412,7 @@ function afficherMembres() {
   const l = MB.filter(m => !q || [matTxt(m.matricule), m.nom_gamer].concat((m.comptes_jeu || []).map(c => c.pseudo), (m.comptes_jeu || []).map(c => c.uid)).some(x => x && L.normPseudo(x).indexOf(q) >= 0));
   if (!MB.length) { z.innerHTML = note('Aucun membre pour le moment. Les membres apparaissent ici une fois leur inscription approuvée.'); return; }
   if (!l.length) { z.innerHTML = note('Aucun membre ne correspond.'); return; }
-  z.innerHTML = '<p class="mute small">' + l.length + ' membre(s)</p><div class="scroll"><table><thead><tr><th>Matricule</th><th>Nom de gamer</th><th>Statut</th><th>Compte actif</th><th>Approuvé le</th><th></th></tr></thead><tbody>' + l.map(m => { const c = (m.comptes_jeu || []).find(x => x.statut === 'actif'); return '<tr><td class="nowrap">' + matTxt(m.matricule) + '</td><td>' + esc(m.nom_gamer) + '</td><td>' + badgeStatut(STATUTS_MB[m.statut]) + '</td><td>' + (c ? esc(c.pseudo) + '<div class="dim small">UID ' + esc(c.uid) + '</div>' : '—') + '</td><td class="nowrap">' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</td><td><button class="btn sm ghost" type="button" data-act="fiche-ouvrir" data-id="' + m.id + '">Ouvrir</button></td></tr>'; }).join('') + '</tbody></table></div>';
+  z.innerHTML = '<p class="mute small">' + l.length + ' membre(s)</p><div class="scroll"><table><thead><tr><th>Matricule</th><th>Nom de gamer</th><th>Statut</th><th>Compte actif</th><th>Approuvé le</th><th></th></tr></thead><tbody>' + l.map(m => { const c = (m.comptes_jeu || []).find(x => x.statut === 'actif'); return '<tr><td class="nowrap">' + matTxt(m.matricule) + '</td><td>' + esc(m.nom_gamer) + (m.hors_concours ? ' ' + badge('Hors concours', 'o') : '') + '</td><td>' + badgeStatut(STATUTS_MB[m.statut]) + '</td><td>' + (c ? esc(c.pseudo) + '<div class="dim small">UID ' + esc(c.uid) + '</div>' : '—') + '</td><td class="nowrap">' + (m.date_approbation ? fDc(L.versLocal(m.date_approbation)) : '—') + '</td><td><button class="btn sm ghost" type="button" data-act="fiche-ouvrir" data-id="' + m.id + '">Ouvrir</button></td></tr>'; }).join('') + '</tbody></table></div>';
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
@@ -2501,9 +2527,15 @@ ACTIONS['sa-modifier'] = b => modifierSaisonSB(b.dataset.id);
 ACTIONS['sa-activer'] = b => activerSaisonSB(b.dataset.id);
 
 /* Contexte des règles : membres, comptes et matchs de la saison, en heure de Madagascar */
+// Membres pour le calcul. Repli sans « hors_concours » tant que la migration 0020 n'est pas exécutée.
+async function lireMembresCalcul() {
+  const r = await SB.from('membres').select('id, matricule, nom_gamer, statut, hors_concours, periodes(debut, fin)').not('matricule', 'is', null);
+  if (!r.error || !/hors_concours/.test(r.error.message || '')) return r;
+  return SB.from('membres').select('id, matricule, nom_gamer, statut, periodes(debut, fin)').not('matricule', 'is', null);
+}
 async function chargerContexte(saisonId) {
   const [a, b, c, sx, cr] = await Promise.all([
-    SB.from('membres').select('id, matricule, nom_gamer, statut, periodes(debut, fin)').not('matricule', 'is', null),
+    lireMembresCalcul(),
     SB.from('comptes_jeu').select('id, membre_id, uid, pseudo, statut, comptes_periodes(debut, fin), pseudos_historique(pseudo, debut, fin)'),
     saisonId ? SB.from('matchs').select('id, saison_id, type, demarrage, carte, mode, fin, debut_annonce, jour_id, statut, motif, notes, valide_le, attente_decide_le, creneau_id, match_lignes(*), captures(id, envoyee_le, statut, exception)').eq('saison_id', saisonId) : Promise.resolve({ data: [] }),
     SB.from('sanctions').select('membre_id, type, debut, fin, statut, match_id').in('type', ['suspension', 'retrait_statistiques']),
@@ -2512,7 +2544,7 @@ async function chargerContexte(saisonId) {
   const err = a.error || b.error || c.error; if (err) throw new Error(err.message);
   const per = l => (l || []).map(p => ({ debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' }));
   const membres = {}, parId = {}, comptes = {};
-  (a.data || []).forEach(m => { const mat = matTxt(m.matricule); parId[m.id] = mat; membres[mat] = { matricule: mat, id: m.id, nom_gamer: m.nom_gamer, statut: STATUTS_MB[m.statut] || m.statut, periodes: per(m.periodes), suspensions: [] }; });
+  (a.data || []).forEach(m => { const mat = matTxt(m.matricule); parId[m.id] = mat; membres[mat] = { matricule: mat, id: m.id, nom_gamer: m.nom_gamer, statut: STATUTS_MB[m.statut] || m.statut, hc: m.hors_concours === true, periodes: per(m.periodes), suspensions: [] }; });
   (b.data || []).forEach(x => { if (!parId[x.membre_id]) return; comptes[String(x.id)] = { id: String(x.id), matricule: parId[x.membre_id], uid: x.uid, pseudo: x.pseudo, statut: x.statut, periodes: per(x.comptes_periodes), pseudos: (x.pseudos_historique || []).map(p => ({ pseudo: p.pseudo, debut: isoLoc(p.debut), fin: p.fin ? isoLoc(p.fin) : '' })) }; });
   CX = { membres, comptes, parId, comptesList: Object.values(comptes), creneaux: {}, matchsList: [] };
   // Sanctions (lot 4A) : suspensions (matchs de la période non comptés) et statistiques retirées dans un match.
@@ -2941,7 +2973,11 @@ function controleClassement(P, agg, cl) {
     items.push([!!P.coupure && P.coupure <= now(), P.coupure && P.coupure <= now() ? 'Coupure passée (' + fDT(P.coupure) + ').' : 'Coupure pas encore passée : attendez le ' + fDT(P.coupure) + '.']);
     if (PUBS.some(p => String(p.saison_id) === String(P.s.id) && p.type === 'Provisoire' && p.coupure === P.coupure)) items.push([false, 'Un classement provisoire avec cette coupure est déjà publié.']);
   }
-  items.push([true, 'Seuil BEST : médiane des matchs joués, arrondie au supérieur = ' + cl.seuil + '. Q1 du score moyen = ' + fN(cl.q1, 2) + '.']);
+  items.push([true, 'Seuil BEST : médiane des matchs joués, arrondie au supérieur = ' + cl.seuil + '. Q1 du score moyen = ' + fN(cl.q1, 2) + '.' + (cl.hc && cl.hc.length ? ' Calculés sans les joueurs hors concours.' : '')]);
+  if (cl.hc && cl.hc.length) {
+    const titreHC = cl.cats.some(c => c.laureats.some(j => CX.membres[j.mat] && CX.membres[j.mat].hc));
+    items.push([!titreHC, titreHC ? 'Un joueur hors concours est lauréat : anomalie, ne publiez pas.' : 'Hors concours (' + cl.hc.map(j => j.mat).join(', ') + ') : « HC » à la place du rang, lauréat d’aucun titre.']);
+  }
   const co = cl.cats.filter(c => c.statut === 'Co-lauréats').map(c => c.label);
   if (co.length) items.push([true, 'Égalité parfaite en tête (co-lauréats) : ' + co.join(', ') + '.']);
   return items;
@@ -2958,7 +2994,7 @@ async function calculerClassement() {
   const ctl = controleClassement(P, agg, cl);
   CLC = { P, agg, cl, ctl };
   const numero = PUBS.filter(p => String(p.saison_id) === String(P.s.id) && p.type === 'Provisoire').length + 1;
-  let h = '<div class="kpis">' + [[agg.nbMatchs, 'matchs comptés'], [cl.pop.length, 'joueurs classés'], [cl.seuil, 'seuil BEST (matchs)'], [fN(cl.q1, 2), 'Q1 du score moyen']].map(([a, b]) => '<div class="kpi"><b>' + a + '</b><span>' + b + '</span></div>').join('') + '</div>';
+  let h = '<div class="kpis">' + [[agg.nbMatchs, 'matchs comptés'], [cl.pop.length + (cl.hc && cl.hc.length ? ' + ' + cl.hc.length + ' HC' : ''), 'joueurs classés' + (cl.hc && cl.hc.length ? ' + hors concours' : '')], [cl.seuil, 'seuil BEST (matchs)'], [fN(cl.q1, 2), 'Q1 du score moyen']].map(([a, b]) => '<div class="kpi"><b>' + a + '</b><span>' + b + '</span></div>').join('') + '</div>';
   h += '<p class="mute">Aperçu du classement ' + (P.type === 'Final' ? 'final' : 'provisoire n° ' + numero) + ' de ' + esc(P.s.nom) + '.</p>';
   h += '<div class="panel"><h3>Contrôle avant publication</h3><ul class="chk">' + ctl.map(([ok, t]) => '<li class="' + (ok === true ? 'o' : ok === null ? 'w' : 'b') + '">' + esc(t) + '</li>').join('') + '</ul>'
     + '<h3 style="margin-top:12px">Vérifications manuelles</h3><label class="coche"><input type="checkbox" id="cl-v1"><span>Les captures des matchs comptés ont été vérifiées.</span></label><label class="coche"><input type="checkbox" id="cl-v2"><span>Les réclamations en cours ont été traitées ou n’affectent pas ce classement.</span></label><label class="coche"><input type="checkbox" id="cl-v3"><span>La publication ne contient aucune donnée personnelle (seulement noms de gamer, pseudos, matricules et statistiques).</span></label>'
@@ -2971,10 +3007,10 @@ function contenuClassement(P, agg, cl) {
   const R = P.R;
   return {
     saison: { id: P.s.id, nom: P.s.nom, debut: P.s.debut, fin: P.s.fin }, recours_jusqu: P.type === 'Final' ? null : L.addMinutes(now(), R.reclamation_h * 60),
-    nb_matchs: agg.nbMatchs, nb_joueurs: cl.pop.length, seuil: cl.seuil, q1: cl.q1,
+    nb_matchs: agg.nbMatchs, nb_joueurs: cl.pop.length, nb_hc: (cl.hc || []).length, seuil: cl.seuil, q1: cl.q1,
     categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut,
       laureats: c.laureats.map(j => ({ mat: j.mat, nom: nomMat(j.mat), val: c.lignes.find(l => l.j === j).val })),
-      lignes: c.lignes.map(l => ({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomMat(l.j.mat), pseudos: pseudosMat(l.j.mat), val: l.val, n: l.j.n })) }))
+      lignes: c.lignes.map(l => Object.assign({ rang: l.rang, egal: l.egal, mat: l.j.mat, nom: nomMat(l.j.mat), pseudos: pseudosMat(l.j.mat), val: l.val, n: l.j.n }, l.hc ? { hc: true } : {})) }))
   };
 }
 async function publierClassementSB(b) {
@@ -2994,7 +3030,7 @@ async function publierClassementSB(b) {
 function afficherPubliees() {
   const z = $('#cl-liste'); if (!z) return;
   const l = PUBS.filter(p => !UI.clSaison || String(p.saison_id) === String(UI.clSaison));
-  z.innerHTML = l.length ? '<ul class="taches">' + l.map(p => '<li><span>' + esc(libPub(p)) + ' · ' + p.nb_matchs + ' match(s), ' + p.nb_joueurs + ' joueur(s)</span><button class="btn sm ghost" type="button" data-act="cl-fb-pub" data-id="' + p.id + '">Texte pour Facebook</button></li>').join('') + '</ul>' : '<p class="mute small">Aucun classement publié pour cette saison.</p>';
+  z.innerHTML = l.length ? '<ul class="taches">' + l.map(p => '<li><span>' + esc(libPub(p)) + ' · ' + p.nb_matchs + ' match(s), ' + nbClasses(p) + '</span><button class="btn sm ghost" type="button" data-act="cl-fb-pub" data-id="' + p.id + '">Texte pour Facebook</button></li>').join('') + '</ul>' : '<p class="mute small">Aucun classement publié pour cette saison.</p>';
 }
 function texteFacebook(p) {
   const l = ['LEAGUE UV · ' + (p.type === 'Final' ? 'CLASSEMENT FINAL' : 'CLASSEMENT PROVISOIRE N° ' + p.numero), (p.saison ? p.saison.nom + ' · ' : '') + 'matchs jusqu’au ' + fDT(p.coupure), ''];

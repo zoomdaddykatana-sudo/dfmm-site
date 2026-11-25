@@ -27,3 +27,10 @@ test('la sauvegarde ne cite que des tables qui existent', () => {
   const inconnues = sauvegardees.filter(t => !creees.includes(t));
   assert.deepEqual(inconnues, [], 'Tables inconnues : ' + inconnues.join(', '));
 });
+
+test('la sauvegarde lit toutes les colonnes de chaque table (dont membres.hors_concours, migration 0020)', () => {
+  assert.ok(sauvegardees.includes('membres'));
+  assert.match(html, /SB\.from\(t\)\.select\('\*'\)/);
+  const mig = fs.readFileSync(path.join(dossier, '0020_hors_concours.sql'), 'utf8');
+  assert.match(mig, /alter table public\.membres add column hors_concours boolean not null default false/);
+});

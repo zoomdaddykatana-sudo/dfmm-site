@@ -61,6 +61,13 @@
   };
   const RPC = {
     est_admin: () => true,
+    definir_hors_concours: p => {
+      if (!String(p.p_motif || '').trim()) throw new Error('Le motif est obligatoire.');
+      const m = DB.membres.find(x => x.id === p.p_membre); if (!m) throw new Error('Membre introuvable.');
+      if (!!m.hors_concours === !!p.p_valeur) throw new Error('Statut inchangé.');
+      m.hors_concours = !!p.p_valeur; DB.journal.push({ id: ++seq, type: 'Membre', objet: 'DFMM-' + m.matricule, decision: p.p_valeur ? 'Déclaré hors concours' : 'Remis en concours', motif: p.p_motif, date: iso() });
+      return null;
+    },
     activer_saison: p => { DB.saisons.forEach(s => { s.active = s.id === p.p_saison; if (s.active && s.statut === 'preparation') s.statut = 'en_cours'; }); return null; },
     enregistrer_match: p => {
       p = p.p; let m;
