@@ -39,7 +39,7 @@ fs.writeFileSync(path.join(ICI, 'capture.png'), png);
 
 const srv = http.createServer((q, r) => { let f = path.join(WWW, decodeURIComponent(q.url.split('?')[0].split('#')[0])); if (f.endsWith('/')) f += 'index.html'; fs.readFile(f, (e, d) => { if (e) { r.writeHead(404); r.end(); return; } r.writeHead(200, { 'Content-Type': f.endsWith('.js') ? 'text/javascript' : f.endsWith('.html') ? 'text/html; charset=utf-8' : 'application/octet-stream' }); r.end(d); }); });
 srv.listen(8765, async () => {
-  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 } });
+  const b = await chromium.launch(); const p = await b.newPage({ viewport: { width: 1280, height: 900 }, acceptDownloads: true });
   await p.clock.setFixedTime(new Date('2026-11-22T07:00:00Z'));   // dimanche 22/11/2026, 10 h à Madagascar
   const erreurs = []; p.on('pageerror', e => erreurs.push('page : ' + e.message)); p.on('console', m => { if (m.type() === 'error') erreurs.push('console : ' + m.text()); });
   p.on('dialog', d => d.accept(d.type() === 'prompt' ? (global.REPONSE_PROMPT || '') : undefined));
@@ -436,6 +436,21 @@ srv.listen(8765, async () => {
         if (t.indexOf(x) < 0) throw new Error('absent : ' + x + ' — ' + t.slice(0, 300));
       if (await p.$('[data-act="ev-participer"]')) throw new Error('« Je participe » affiché à Katana (pas membre)');
     });
+    await etape('rappels : bloc du téléphone, agenda (.ics) et liens Google Agenda, état pour Katana', async () => {
+      const t = await p.textContent('#ev-rappels');
+      for (const x of ['Rappels sur ce téléphone', 'Agenda du téléphone', 'même sans Internet', 'mer. 25/11 (Ascension)'])
+        if (t.indexOf(x) < 0) throw new Error('absent : ' + x + ' — ' + t.slice(0, 300));
+      if (/4242/.test(t)) throw new Error('code de la salle dans le bloc des rappels');
+      const g = await p.getAttribute('#ev-rappels a[href*="calendar.google.com"]', 'href');
+      if (!/dates=20261125T130500Z\/20261125T140500Z/.test(g)) throw new Error(g);
+      const [dl] = await Promise.all([p.waitForEvent('download'), p.click('[data-act="rap-agenda"]')]);
+      const ics = fs.readFileSync(await dl.path(), 'utf8');
+      if (dl.suggestedFilename() !== 'league-uv-matchs.ics' || !/BEGIN:VEVENT[\s\S]*DTSTART:20261125T130500Z[\s\S]*TRIGGER:-PT35M/.test(ics) || /4242/.test(ics)) throw new Error(ics.slice(0, 400));
+      await p.goto('http://localhost:8765/#admin-calendrier'); await p.waitForTimeout(900);
+      const a = await p.textContent('#cal-rappels');
+      if (!/Rappels sur les téléphones/.test(a) || !/2 \(2 personne/.test(a) || !/Activés/.test(a)) throw new Error(a.slice(0, 300));
+      await p.goto('http://localhost:8765/#evenements'); await p.waitForTimeout(800);
+    });
     await etape('prochains événements : membre actif (Je participe, code, organisateur d’un match libre)', async () => {
       await p.evaluate(() => { window.FAUX_ROLE = 'membre'; window.FAUX_MOI = 4; });
       await p.goto('http://localhost:8765/#accueil'); await p.goto('http://localhost:8765/#evenements'); await p.waitForTimeout(800);
@@ -499,6 +514,52 @@ srv.listen(8765, async () => {
       if (fin.reste.length) throw new Error('brouillon gardé après l’envoi : ' + fin.reste);
       await p.screenshot({ path: path.join(ICI, 'inscription-code-messenger.png'), fullPage: false });
       await p.evaluate(() => { localStorage.clear(); });
+    });
+    await etape('installation sur l’écran d’accueil : proposée sur Android, jamais si déjà faite', async () => {
+      if (!(await p.isHidden('#inst'))) throw new Error('bandeau montré sur ordinateur');
+      const ANDROID = 'Mozilla/5.0 (Linux; Android 13; SM-A135F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Mobile Safari/537.36';
+      const ouvrir = async (ua, init) => {
+        const c = await b.newContext({ userAgent: ua, viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+        if (init) await c.addInitScript(init);
+        const q = await c.newPage(); q.on('pageerror', e => erreurs.push('page (installation) : ' + e.message));
+        await q.addInitScript(() => localStorage.setItem('faux-visiteur', '1'));
+        await q.goto('http://localhost:8765/#accueil'); await q.waitForTimeout(600); return { c, q };
+      };
+      const evt = q => q.evaluate(() => { const e = new Event('beforeinstallprompt'); e.prompt = async () => { window.PROMPT_APPELE = true; }; e.userChoice = Promise.resolve({ outcome: 'accepted' }); window.dispatchEvent(e); });
+      // 1. Chrome sur Android, le navigateur n'a pas encore annoncé l'installation : chemin par le menu après 4 s.
+      let { c, q } = await ouvrir(ANDROID);
+      if (!(await q.isHidden('#inst'))) throw new Error('chemin du menu montré trop tôt');
+      await q.waitForTimeout(4200);
+      let t = await q.textContent('#inst'); if (!/Installer l’application/.test(t) || !/⋮/.test(t)) throw new Error('menu : ' + t);
+      // 2. Le navigateur annonce l'installation : un seul bouton « Installer ».
+      await evt(q); await q.waitForTimeout(100);
+      t = await q.textContent('#inst'); if (!/Installer/.test(t) || !(await q.isVisible('[data-act="inst-installer"]'))) throw new Error('bouton : ' + t);
+      await q.screenshot({ path: path.join(ICI, 'installation-android.png'), fullPage: false });
+      if (await q.evaluate(() => document.documentElement.scrollWidth > window.innerWidth + 1)) throw new Error('la page déborde');
+      await q.click('[data-act="inst-installer"]'); await q.waitForTimeout(200);
+      if (!(await q.evaluate(() => window.PROMPT_APPELE))) throw new Error('fenêtre d’installation non ouverte');
+      if (!(await q.isHidden('#inst'))) throw new Error('bandeau resté après l’installation');
+      // 3. Installé : plus rien proposé à la réouverture, ni bandeau ni bouton du bas de page.
+      await q.reload(); await q.waitForTimeout(4500);
+      if (!(await q.isHidden('#inst')) || !(await q.isHidden('#inst-pied'))) throw new Error('proposé alors que c’est déjà installé');
+      // 4. « Plus tard » : plus proposé à la réouverture, bouton du bas de page gardé.
+      await q.evaluate(() => localStorage.removeItem('dfmm-installation')); await q.reload(); await q.waitForTimeout(300); await evt(q); await q.waitForTimeout(100);
+      await q.click('[data-act="inst-plus-tard"]');
+      await q.reload(); await q.waitForTimeout(4500);
+      if (!(await q.isHidden('#inst'))) throw new Error('proposé malgré « Plus tard »');
+      if (!(await q.isVisible('#inst-pied'))) throw new Error('bouton du bas de page absent');
+      await q.click('#inst-pied'); if (!/⋮/.test(await q.textContent('#inst'))) throw new Error('bouton du bas de page sans effet');
+      await c.close();
+      // 5. Navigateur de Facebook sur Android : « Ouvrir dans Chrome ».
+      ({ c, q } = await ouvrir(ANDROID + ' [FB_IAB/FB4A;FBAV/450.0.0.0;]'));
+      const lien = await q.getAttribute('#inst a.btn', 'href');
+      if (!lien || !lien.startsWith('intent://localhost:8765/#Intent;scheme=https;package=com.android.chrome;')) throw new Error('lien : ' + lien);
+      await c.close();
+      // 6. Ouvert depuis l'icône (application installée) : jamais proposé, même si le navigateur l'annonce.
+      ({ c, q } = await ouvrir(ANDROID, () => { const mm = window.matchMedia.bind(window); window.matchMedia = s => /display-mode: standalone/.test(s) ? { matches: true, media: s, addEventListener() {}, removeEventListener() {} } : mm(s); }));
+      await q.waitForTimeout(4200);
+      if (!(await q.isHidden('#inst')) || !(await q.isHidden('#inst-pied'))) throw new Error('proposé dans l’application installée');
+      await c.close();
     });
   } catch (e) { process.exitCode = 1; }
   if (erreurs.length) process.exitCode = 1;

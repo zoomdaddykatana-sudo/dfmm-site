@@ -270,6 +270,14 @@ input[type=radio]{accent-color:var(--green);width:18px;height:18px}
 @media(min-width:700px){.modal{align-items:center;padding:20px}}
 .toast{position:fixed;left:50%;bottom:18px;transform:translateX(-50%);z-index:60;background:var(--panel2);border:1px solid var(--green);padding:10px 16px;max-width:min(92vw,560px);font-size:15px}
 .toast.err{border-color:var(--red)}
+/* Installer le site sur l'écran d'accueil (demande de Katana du 25/11/2026) */
+.inst{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);z-index:45;width:min(calc(100vw - 24px),520px);background:var(--panel2);border:1px solid var(--green);padding:12px 14px;display:grid;grid-template-columns:48px 1fr;gap:4px 12px;align-items:start;box-shadow:0 8px 28px rgba(0,0,0,.55)}
+.inst img{width:48px;height:48px;grid-row:span 2}
+.inst b{font-size:16px;line-height:1.3}
+.inst p{margin:0;font-size:14px;color:var(--mute)}
+.inst .row-btns{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.inst .row-btns .btn{flex:1 1 auto}
+.foot .btn{justify-self:start;margin-top:4px}
 
 .foot{border-top:1px solid var(--line);padding:22px max(4vw,16px) 30px;color:var(--dim);font-size:14px;display:grid;gap:6px}
 .foot b{color:var(--mute)}
@@ -893,6 +901,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   <div><b>DFMM</b> — DELTA FORCE MOBILE MADAGASCAR · LEAGUE UV</div>
   <div>Équité · Transparence · Intégrité</div>
   <div>Compétition communautaire indépendante, non affiliée à l’éditeur de Delta Force.</div>
+  <button class="btn sm ghost" type="button" id="inst-pied" data-act="inst-montrer" hidden>📲 Installer l’application sur ce téléphone</button>
 </footer>
 
 <div id="modal" class="modal" hidden role="dialog" aria-modal="true" aria-labelledby="modal-t">
@@ -903,6 +912,7 @@ input[type=password]{width:100%;min-height:44px;background:#090D0C;border:1px so
   </div>
 </div>
 <div id="toast" class="toast" role="status" hidden></div>
+<div id="inst" class="inst" role="region" aria-label="Installer l’application" hidden></div>
 </template>
 <script src="config.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js" integrity="sha384-BWcjm9OdFth9TbhCxZPdm+gAOUMAzQy9nmTs12ioXdCcbVnJaPMn+fMUoQCLt60R" crossorigin="anonymous"></script>
@@ -2416,7 +2426,7 @@ function afficherMembres() {
 }
 
 /* ----- Administration : sauvegarde hebdomadaire ----- */
-const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages', 'creneaux', 'inscription_essais', 'declarations_pseudo', 'jours_match', 'salles', 'participations', 'evenements'];
+const TABLES_SAUVEGARDE = ['parametres', 'parametres_historique', 'saisons', 'membres', 'membres_prives', 'periodes', 'comptes_jeu', 'comptes_periodes', 'pseudos_historique', 'matricules_anciens', 'journal', 'publications', 'admins', 'demandes', 'notifications', 'volsever_appels', 'matchs', 'match_lignes', 'captures', 'registre', 'sanctions', 'dossiers', 'convocations', 'messages_litige', 'lots', 'actualites', 'messages', 'creneaux', 'inscription_essais', 'declarations_pseudo', 'jours_match', 'salles', 'participations', 'evenements', 'abonnements_push', 'rappels_envoyes', 'rappels_essais'];
 TAB.sauvegarde = {
   shell: () => '<div class="panel"><h3>Sauvegarde hebdomadaire</h3><p>Le forfait gratuit de Supabase ne fait aucune sauvegarde automatique. Téléchargez une sauvegarde complète chaque semaine et gardez-la dans votre Google Drive (dossier DFMM).</p>' + note('Ce fichier contient des données personnelles : ne le partagez jamais. Les images (captures) ne sont pas dedans : elles restent dans Supabase.', 'r') + '<p id="sv-derniere"></p><div class="row-btns"><button class="btn" type="button" data-act="sv2-json">Télécharger la sauvegarde complète</button></div><p id="sv-etat" class="mute small"></p></div>',
   body: () => '',
@@ -3745,6 +3755,7 @@ async function rendreEvenements() {
   if (n !== EVT_SEQ || !z.isConnected) return;
   if (error) { z.innerHTML = note(esc(erreurRpc(error)) + (/membres/.test(error.message || '') ? ' Votre inscription doit être approuvée.' : ''), 'a'); return; }
   EVT = data; z.innerHTML = htmlEvenements(data);
+  majRappels();
 }
 function blocSalle(code, mdp, voit, saisie, ouverture) {
   if (!voit) return '<p class="mute small">Code et mot de passe de la salle : réservés aux membres actifs non suspendus.</p>';
@@ -3769,7 +3780,7 @@ function htmlEvenements(d) {
   }
   if (autres.length) h += '<h3>Dates suivantes</h3><div class="scroll"><table id="ev-dates"><thead><tr><th>Date</th><th>Carte</th><th>État</th></tr></thead><tbody>' + autres.map(j => '<tr><td>' + esc(jourTxt(j.debut)) + '</td><td>' + esc(j.statut === 'annule' ? '—' : (j.carte || '—')) + '</td><td>' + esc(ST_JOUR[j.statut] || j.statut) + (j.motif ? ' <span class="dim">(' + esc(j.motif) + ')</span>' : '') + '</td></tr>').join('') + '</tbody></table></div>';
   if ((d.rotation || []).length) h += '<p class="small mute">Rotation des cartes des matchs de Katana, en boucle : ' + d.rotation.map(esc).join(' → ') + '. Chaque mercredi et samedi, début à ' + esc(heureLoc('0000-00-00T' + (d.heure || ''))) + '.</p>';
-  h += '</div><div class="panel" id="ev-libres"><h2 style="margin-top:0">Matchs libres annoncés</h2>';
+  h += '</div><div class="panel" id="ev-rappels">' + (RAP.html || '<p class="mute">Chargement…</p>') + '</div><div class="panel" id="ev-libres"><h2 style="margin-top:0">Matchs libres annoncés</h2>';
   const lib = d.libres || [];
   if (!lib.length) h += '<p class="mute">Aucun match libre annoncé.' + (PARAM.matchs_libres_ouverts === true ? '' : ' Les matchs libres ouvriront au lancement de la LEAGUE UV.') + '</p>';
   lib.forEach(c => {
@@ -3800,10 +3811,120 @@ ACTIONS['ev-salle-libre'] = async b => {
   toast('Code de la salle enregistré : les membres actifs non suspendus le voient.'); rendreEvenements();
 };
 
+/* ----- Rappels sur le téléphone (migration 0020, demande de Katana du 25/11/2026 : choix A, 1b, 2a, 3a) -----
+   Notifications envoyées par la fonction « rappels », même site fermé ; jamais le code ni le mot de passe de la salle.
+   Agenda du téléphone (.ics) : rappel qui sonne même sans Internet. */
+const RAP = { etat: null, html: '' };
+const estIOS = () => /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const estInstalle = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+const pushPossible = () => 'serviceWorker' in navigator && 'PushManager' in window && 'Notification' in window && location.protocol === 'https:';
+function b64uVersOctets(t) { const s = String(t).replace(/-/g, '+').replace(/_/g, '/'); return Uint8Array.from(atob(s + '='.repeat((4 - s.length % 4) % 4)), c => c.charCodeAt(0)); }
+function memeCle(sub, cle) {
+  const k = sub && sub.options && sub.options.applicationServerKey; if (!k) return true;
+  const a = new Uint8Array(k); return a.length === cle.length && a.every((x, i) => x === cle[i]);
+}
+async function abonnementTel() { if (!pushPossible()) return null; const reg = await navigator.serviceWorker.getRegistration(); return reg ? reg.pushManager.getSubscription() : null; }
+function envoyerAbonnement(sub) { const j = sub.toJSON(); return SB.rpc('abonner_rappels', { p: { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth } }); }
+const JOURS_COURTS = ['dim.', 'lun.', 'mar.', 'mer.', 'jeu.', 'ven.', 'sam.'];
+const jourCourt = iso => { const l = isoLoc(iso); return l ? JOURS_COURTS[L.dow(l.slice(0, 10))] + ' ' + l.slice(8, 10) + '/' + l.slice(5, 7) : '—'; };
+const optsAgenda = () => ({ avantMin: Number(PARAM.rappel_avant_katana_min || 35), heureMatin: PARAM.rappel_matin_heure || '10:00',
+  ouvertureMin: Number((EVT && EVT.salle_ouverture_min) || PARAM.salle_ouverture_min || 15), plageMin: Number(PARAM.plage_fin_h || 1) * 60, url: location.origin + location.pathname });
+async function majRappels() {
+  const z = $('#ev-rappels'); if (!z || !SB || !SESSION) return;
+  const { data: r, error } = await SB.rpc('rappels_moi');
+  if (!z.isConnected) return;
+  if (error || !r) { z.innerHTML = RAP.html = ''; z.hidden = true; return; }
+  RAP.etat = r;
+  let sub = null;
+  try { sub = await abonnementTel(); } catch (e) { sub = null; }
+  if (!z.isConnected) return;
+  // Téléphone déjà inscrit : renvoyé sans bruit (adresse renouvelée par le téléphone, ou autre membre connecté ici).
+  if (sub && r.peut && r.actifs && Notification.permission === 'granted') envoyerAbonnement(sub).then(() => {}, () => {});
+  z.hidden = false; z.innerHTML = RAP.html = htmlRappels(r, sub);
+}
+function htmlRappels(r, sub) {
+  let h = '<h2 style="margin-top:0">Rappels sur ce téléphone</h2>';
+  const horaires = 'le jour du match à ' + esc(heureLoc('0000-00-00T' + (PARAM.rappel_matin_heure || '10:00'))) + ', ' + Number(PARAM.rappel_avant_katana_min || 35)
+    + ' min avant un match du mercredi ou du samedi, ' + Number(PARAM.rappel_avant_libre_min || 30) + ' min avant un match libre, et quand le code de la salle est disponible';
+  const actifIci = sub && pushPossible() && Notification.permission === 'granted';
+  if (!r.peut) h += note('Les rappels sont réservés aux membres actifs.');
+  else if (!r.actifs) h += note('Les rappels sont arrêtés pour le moment par Katana.');
+  else if (!pushPossible()) h += note(estIOS() && !estInstalle() ? 'Sur iPhone : installez d’abord le site sur l’écran d’accueil (bouton <b>Partager</b>, puis <b>Sur l’écran d’accueil</b>), ouvrez-le depuis la nouvelle icône, puis revenez ici.' : 'Ce navigateur ne permet pas les notifications. Sur Android, ouvrez le site avec <b>Chrome</b>.', 'a');
+  else if (Notification.permission === 'denied') h += note('Les notifications sont bloquées pour ce site. Pour les autoriser : touchez le cadenas à gauche de l’adresse du site (ou ouvrez les réglages de l’application), puis <b>Notifications</b> &gt; <b>Autoriser</b>. Revenez ensuite ici.', 'a');
+  else if (!r.cle_publique) h += note('Les rappels seront prêts dans quelques minutes : revenez plus tard.');
+  else if (actifIci) h += '<p><span class="res auto">✓ Rappels activés sur ce téléphone</span></p><p class="small">Vous recevez une notification ' + horaires + '. Le code lui-même n’est jamais dans la notification : il reste sur le site.</p>'
+    + '<div class="row-btns"><button class="btn sm ghost" type="button" data-act="rap-essai">Envoyer un essai</button><button class="btn sm ghost" type="button" data-act="rap-arreter">Arrêter les rappels</button></div>';
+  else h += '<p class="small">Recevez une notification ' + horaires + ', même quand le site est fermé.</p><div class="row-btns"><button class="btn" type="button" data-act="rap-activer">Recevoir les rappels</button></div><p class="dim small">Le téléphone vous demande l’autorisation : touchez <b>Autoriser</b>.</p>';
+  h += '<p class="dim small">Une notification a besoin d’Internet pour arriver : sans connexion, elle arrive au retour de la connexion. Pour un rappel qui sonne même sans Internet, ajoutez les matchs à l’agenda du téléphone.</p>';
+  const jours = ((EVT && EVT.jours) || []).filter(j => j.statut === 'prevu' && new Date(j.debut) > new Date());
+  if (jours.length) h += '<h3>Agenda du téléphone (rappel même sans Internet)</h3><div class="row-btns"><button class="btn sm" type="button" data-act="rap-agenda">Ajouter ' + (jours.length > 1 ? 'les ' + jours.length + ' prochains matchs' : 'le prochain match') + ' à mon agenda</button></div>'
+    + '<p class="small">Ou un match à la fois dans Google Agenda : ' + jours.map(j => '<a href="' + esc(L.lienGoogleAgenda(j, optsAgenda())) + '" target="_blank" rel="noopener">' + esc(jourCourt(j.debut)) + ' (' + esc(j.carte || '—') + ')</a>').join(' · ') + '</p>'
+    + '<p class="dim small">L’agenda garde l’heure et la carte prévues au moment de l’ajout : en cas de report ou d’annulation, il ne change pas tout seul (le site et les notifications, oui). Revenez ajouter les dates suivantes de temps en temps.</p>';
+  return h;
+}
+ACTIONS['rap-activer'] = async b => {
+  b.disabled = true;
+  try {
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { toast('Notifications non autorisées : les rappels ne peuvent pas arriver sur ce téléphone.', true); return; }
+    const reg = await navigator.serviceWorker.ready, cle = b64uVersOctets(RAP.etat.cle_publique);
+    let sub = await reg.pushManager.getSubscription();
+    if (sub && !memeCle(sub, cle)) { await sub.unsubscribe(); sub = null; }
+    if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: cle });
+    const { error } = await envoyerAbonnement(sub);
+    if (error) { toast(erreurRpc(error), true); return; }
+    reg.showNotification('LEAGUE UV — rappels activés', { body: 'Vous recevrez les rappels des matchs sur ce téléphone.', icon: 'icons/icone-192.png', badge: 'icons/badge-96.png', tag: 'league-uv-active', lang: 'fr' }).catch(() => {});
+    toast('Rappels activés sur ce téléphone.');
+  } catch (e) { toast('Activation impossible : ' + ((e && e.message) || e), true); }
+  finally { majRappels(); }
+};
+ACTIONS['rap-arreter'] = async b => {
+  if (!confirm('Arrêter les rappels sur ce téléphone ?')) return;
+  b.disabled = true;
+  try {
+    const sub = await abonnementTel();
+    if (sub) { const ep = sub.endpoint; await sub.unsubscribe().catch(() => {}); await SB.rpc('desabonner_rappels', { p_endpoint: ep }); }
+    toast('Rappels arrêtés sur ce téléphone.');
+  } catch (e) { toast('Impossible : ' + ((e && e.message) || e), true); }
+  majRappels();
+};
+ACTIONS['rap-essai'] = async b => {
+  b.disabled = true;
+  const { error } = await SB.rpc('essai_rappel');
+  if (error) { toast(erreurRpc(error), true); b.disabled = false; return; }
+  toast('Essai demandé : la notification arrive dans 1 à 2 minutes.');
+};
+ACTIONS['rap-agenda'] = () => {
+  const ics = L.agendaIcs((EVT && EVT.jours) || [], Object.assign({ maintenant: new Date().toISOString() }, optsAgenda()));
+  const url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
+  const a = document.createElement('a'); a.href = url; a.download = 'league-uv-matchs.ics'; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  toast('Fichier agenda téléchargé : ouvrez-le et choisissez votre agenda pour ajouter les matchs.');
+};
+// Katana : état des rappels (Administration > Calendrier).
+async function afficherRappelsAdmin() {
+  const z = $('#cal-rappels'); if (!z) return;
+  const { data: r, error } = await SB.rpc('rappels_admin');
+  if (!z.isConnected) return;
+  if (error || !r) { z.innerHTML = note('Rappels : ' + (error ? esc(erreurRpc(error)) : 'état illisible') + ' (migration 0020 pas encore exécutée ?).', 'a'); return; }
+  const b = r.dernier_bilan || {}, quand = x => x ? dateLoc(x) : 'jamais';
+  let alerte = '';
+  if (!r.actifs) alerte = 'Rappels arrêtés (Paramètres > Rappels).';
+  else if (!r.tache) alerte = 'La tâche de chaque minute (« dfmm-rappels ») est absente : les rappels ne partent pas.';
+  else if (!r.cle_prete) alerte = 'Clé des notifications pas encore créée : la fonction « rappels » est-elle installée (Verify JWT désactivé) ?';
+  z.innerHTML = '<div class="panel" id="cal-rappels-etat"><h3 style="margin-top:0">Rappels sur les téléphones</h3>' + (alerte ? note(esc(alerte), 'a') : '')
+    + '<dl class="kv"><dt>État</dt><dd>' + (r.actifs ? badge('Activés', 'g') : badge('Arrêtés', 'o')) + '</dd>'
+    + '<dt>Téléphones inscrits</dt><dd>' + Number(r.telephones || 0) + ' (' + Number(r.personnes || 0) + ' personne(s)' + (r.en_echec ? ', ' + Number(r.en_echec) + ' en échec' : '') + ')</dd>'
+    + '<dt>Dernier envoi</dt><dd>' + esc(quand(r.dernier_envoi)) + (r.dernier_envoi ? ' — ' + Number(b.envoyes || 0) + ' reçu(s), ' + Number(b.echecs || 0) + ' échec(s)' : '') + '</dd>'
+    + '<dt>Rappels envoyés (7 jours)</dt><dd>' + Number(r.envoyes_7j || 0) + '</dd></dl>'
+    + '<p class="dim small">Envoyés tout seuls : le jour du match à ' + esc(heureLoc('0000-00-00T' + (PARAM.rappel_matin_heure || '10:00'))) + ', ' + Number(PARAM.rappel_avant_katana_min || 35) + ' min avant (mercredi et samedi), ' + Number(PARAM.rappel_avant_libre_min || 30)
+    + ' min avant un match libre, « code disponible » 1 min après l’enregistrement du code, et un avis si la date est reportée ou annulée. Pour essayer sur votre téléphone : Prochains événements > Rappels > Envoyer un essai.</p></div>';
+}
+
 /* Administration : calendrier des matchs de Katana et événements communautaires */
 TAB.calendrier = {
   shell: () => note('Calendrier automatique : chaque mercredi et samedi, début à 16 h 05 (réglages dans Paramètres > Calendrier). Carte manquante : « Reporter » (la date suivante garde la carte). « Annuler la date » : pas de carte, la rotation continue.')
-    + '<div id="cal-liste"><p class="mute">Chargement…</p></div>'
+    + '<div id="cal-rappels"></div><div id="cal-liste"><p class="mute">Chargement…</p></div>'
     + '<div class="panel" style="margin-top:16px"><h3>Nouvel événement communautaire</h3><p class="mute small">Visible seulement par les membres connectés, dans « Prochains événements », jusqu’à sa fin (ou jusqu’au lendemain s’il n’a pas de fin).</p>'
     + '<label class="lab" for="evc-titre">Titre</label><input type="text" id="evc-titre" maxlength="100">'
     + '<div class="grid-f"><div><label class="lab" for="evc-debut">Début (heure de Madagascar)</label><input type="datetime-local" id="evc-debut"></div><div><label class="lab" for="evc-fin">Fin (facultative)</label><input type="datetime-local" id="evc-fin"></div></div>'
@@ -3815,6 +3936,7 @@ TAB.calendrier = {
 let CAL = [];
 async function afficherCalendrierAdmin() {
   const z = $('#cal-liste'); if (!z) return;
+  afficherRappelsAdmin();
   const [r, e] = await Promise.all([SB.rpc('calendrier_admin'), SB.from('evenements').select('*').order('debut', { ascending: false })]);
   if (!z.isConnected) return;
   if (r.error) { z.innerHTML = note('Lecture impossible : ' + esc(erreurRpc(r.error)), 'r'); return; }
@@ -3895,11 +4017,101 @@ ACTIONS['evc-retirer'] = async b => {
   toast('Événement retiré.'); afficherCalendrierAdmin();
 };
 
+/* ----- Installer le site sur l'écran d'accueil (demande de Katana du 25/11/2026) -----
+   Proposé dès l'ouverture sur téléphone, jamais quand le site est déjà installé :
+   ouvert depuis l'icône, installation notée sur ce téléphone, ou application trouvée par Chrome.
+   Android (Chrome, Samsung Internet…) : un seul bouton « Installer » (fenêtre du navigateur).
+   Navigateur de Facebook ou Messenger : bouton « Ouvrir dans Chrome ». Sinon : chemin dans le menu.
+   « Plus tard » : plus proposé pendant INSTALL_PLUS_TARD_JOURS ; le bouton du bas de page reste. */
+const INSTALL_PLUS_TARD_JOURS = 7, INSTALL_CLE = 'dfmm-installation';
+const INST = { evt: null, mode: null, pret: false };
+const estAndroid = () => /android/i.test(navigator.userAgent);
+const navIntegre = () => /FBAN|FBAV|FB_IAB|FB4A|FBIOS|Instagram|Messenger/i.test(navigator.userAgent);
+function lireInst() { try { return JSON.parse(localStorage.getItem(INSTALL_CLE) || '{}') || {}; } catch (e) { return {}; } }
+function noterInst(o) { try { localStorage.setItem(INSTALL_CLE, JSON.stringify(Object.assign(lireInst(), o))); } catch (e) { /* stockage indisponible : sans conséquence */ } }
+async function siteInstalle() {
+  if (estInstalle()) { noterInst({ installe: true }); return true; }
+  if (lireInst().installe) return true;
+  try {
+    if (navigator.getInstalledRelatedApps) { const l = await navigator.getInstalledRelatedApps(); if (l && l.length) { noterInst({ installe: true }); return true; } }
+  } catch (e) { /* question impossible : on continue */ }
+  return false;
+}
+const plusTardEnCours = () => { const t = lireInst().plus_tard; return !!t && Date.now() - t < INSTALL_PLUS_TARD_JOURS * 864e5; };
+function modeInstallation() {
+  if (estInstalle()) return null;
+  if (INST.evt) return 'bouton';
+  if (lireInst().installe) return null;
+  if (navIntegre()) return estAndroid() ? 'chrome' : 'safari';
+  if (estAndroid()) return 'menu';
+  if (estIOS()) return 'ios';
+  return null;
+}
+function lienChrome() {
+  const ici = location.origin + location.pathname;
+  return 'intent://' + location.host + location.pathname + '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' + encodeURIComponent(ici) + ';end';
+}
+function htmlInstallation(mode) {
+  const tete = '<img src="icons/icone-192.png" alt=""><b>Installez LEAGUE UV sur votre téléphone</b>';
+  const tard = '<button class="btn sm ghost" type="button" data-act="inst-plus-tard">Plus tard</button>';
+  const fait = '<button class="btn sm ghost" type="button" data-act="inst-fait">C’est déjà fait</button>';
+  if (mode === 'bouton') return tete + '<p>Une icône sur l’écran d’accueil, comme une application : le site s’ouvre en un geste.</p><div class="row-btns"><button class="btn" type="button" data-act="inst-installer">Installer</button>' + tard + '</div>';
+  if (mode === 'chrome') return tete + '<p>Vous êtes dans Facebook ou Messenger, qui ne peut pas installer le site. Ouvrez-le dans Chrome, puis touchez <b>Installer</b>.</p><div class="row-btns"><a class="btn" href="' + esc(lienChrome()) + '">Ouvrir dans Chrome</a>' + fait + tard + '</div>';
+  if (mode === 'safari') return tete + '<p>Vous êtes dans Facebook ou Messenger : touchez <b>⋯</b> (en haut ou en bas), puis <b>Ouvrir dans le navigateur</b>. Ensuite : bouton <b>Partager</b>, puis <b>Sur l’écran d’accueil</b>.</p><div class="row-btns">' + fait + tard + '</div>';
+  if (mode === 'menu') return tete + '<p>Touchez <b>⋮</b> en haut à droite du navigateur, puis <b>Installer l’application</b> ou <b>Ajouter à l’écran d’accueil</b>, puis <b>Installer</b>.</p><div class="row-btns">' + fait + tard + '</div>';
+  if (mode === 'ios') return tete + '<p>Touchez le bouton <b>Partager</b> (carré avec une flèche vers le haut), puis <b>Sur l’écran d’accueil</b>, puis <b>Ajouter</b>.</p><div class="row-btns">' + fait + tard + '</div>';
+  return '';
+}
+function montrerInstallation(mode) {
+  const z = $('#inst'); if (!z) return;
+  INST.mode = mode; z.innerHTML = htmlInstallation(mode); z.hidden = !mode;
+}
+function cacherInstallation() { const z = $('#inst'); if (z) { z.hidden = true; z.innerHTML = ''; } INST.mode = null; }
+function majBoutonPied() { const b = $('#inst-pied'); if (b) b.hidden = !INST.pret || !modeInstallation(); }
+async function proposerInstallation() {
+  const deja = await siteInstalle() && !INST.evt;
+  INST.pret = true; majBoutonPied();
+  if (deja) return;
+  const telephone = estAndroid() || estIOS();
+  if (!telephone || plusTardEnCours()) return;
+  // Chrome peut annoncer l'installation un peu après l'ouverture : petite attente avant le chemin par le menu.
+  const mode = modeInstallation();
+  if (mode === 'menu' && !INST.evt) { setTimeout(() => { if (!INST.mode && !plusTardEnCours()) montrerInstallation(modeInstallation()); }, 4000); return; }
+  if (mode) montrerInstallation(mode);
+}
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); INST.evt = e;
+  noterInst({ installe: false });   // le navigateur ne le propose que si le site n'est pas installé
+  majBoutonPied();
+  if ((estAndroid() || estIOS()) && !plusTardEnCours() && INST.pret) montrerInstallation('bouton');
+  else if (INST.mode) montrerInstallation('bouton');
+});
+window.addEventListener('appinstalled', () => {
+  noterInst({ installe: true }); INST.evt = null; cacherInstallation(); majBoutonPied();
+  toast('LEAGUE UV est installé : l’icône est sur l’écran d’accueil.');
+});
+ACTIONS['inst-installer'] = async b => {
+  const e = INST.evt;
+  if (!e) { montrerInstallation(modeInstallation()); return; }
+  b.disabled = true; INST.evt = null;
+  try {
+    await e.prompt();
+    const r = await e.userChoice;
+    if (r && r.outcome === 'accepted') { noterInst({ installe: true }); cacherInstallation(); toast('Installation en cours : l’icône LEAGUE UV arrive sur l’écran d’accueil.'); }
+    else { noterInst({ plus_tard: Date.now() }); cacherInstallation(); }
+  } catch (err) { montrerInstallation(estAndroid() ? 'menu' : null); }
+  majBoutonPied();
+};
+ACTIONS['inst-plus-tard'] = () => { noterInst({ plus_tard: Date.now() }); cacherInstallation(); };
+ACTIONS['inst-fait'] = () => { noterInst({ installe: true }); cacherInstallation(); majBoutonPied(); };
+ACTIONS['inst-montrer'] = () => { const m = modeInstallation() || (estAndroid() ? 'menu' : null); if (m) montrerInstallation(m); };
+
 async function demarrer() {
   $('#app').replaceChildren($('#tpl').content.cloneNode(true));
   try { PUB = JSON.parse($('#pub-data').textContent || 'null'); } catch (e) { PUB = null; }
   lierEvenements();
   router();
+  proposerInstallation();
   if ('serviceWorker' in navigator && location.protocol === 'https:') navigator.serviceWorker.register('sw.js').catch(() => {});
   if (SB) {
     const { data } = await SB.auth.getSession();
