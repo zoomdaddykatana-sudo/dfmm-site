@@ -1,6 +1,6 @@
 -- =====================================================================
--- LEAGUE UV — DFMM · Test de la migration 0020 (membre hors concours)
--- À exécuter APRÈS la migration 0020. Faux membres seulement (anciens matricules fictifs 99071 et
+-- LEAGUE UV — DFMM · Test de la migration 0021 (membre hors concours)
+-- À exécuter APRÈS la migration 0021. Faux membres seulement (anciens matricules fictifs 99071 et
 -- 99072, adresses @test.invalid), fausse saison, faux classement final, faux lots. Tout est annulé à la fin.
 -- =====================================================================
 begin;

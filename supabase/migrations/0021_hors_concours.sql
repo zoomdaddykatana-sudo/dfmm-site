@@ -1,5 +1,5 @@
 -- =====================================================================
--- LEAGUE UV — DFMM · Membre « hors concours » · migration 0020
+-- LEAGUE UV — DFMM · Membre « hors concours » · migration 0021
 -- Décisions de Katana du 25/11/2026 : Katana (DFMM-6, relié à sa connexion administrateur) joue aussi.
 -- Un membre déclaré hors concours figure au classement à titre indicatif (« HC » à la place du rang),
 -- n'est jamais lauréat, ne reçoit aucun lot, et ses statistiques n'entrent pas dans le calcul du seuil
