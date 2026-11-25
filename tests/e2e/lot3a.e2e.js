@@ -22,7 +22,7 @@ const base = { parametres: Object.values(PARAMS), membres: [], periodes: [], com
     .map(([jour, carte], i) => ({ id: 800 + i, jour, debut: jour + 'T13:05:00Z', carte, statut: 'prevu', motif: null })),
   salles: [], participations: [], evenements: [] };
 for (let i = 1; i <= 8; i++) {
-  base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', date_approbation: '2026-11-18T00:00:00+03:00' });
+  base.membres.push({ id: i, matricule: i, nom_gamer: 'Faux ' + i, statut: 'actif', hors_concours: false, date_approbation: '2026-11-18T00:00:00+03:00' });
   base.periodes.push({ id: 100 + i, membre_id: i, debut: '2026-11-17T21:00:00Z', fin: null });
   base.comptes_jeu.push({ id: 10 + i, membre_id: i, uid: '99' + i, pseudo: (i === 1 ? 'PKL¬Un' : 'Joueur' + i), statut: 'actif' });
   base.comptes_periodes.push({ id: 200 + i, compte_id: 10 + i, debut: '2026-11-17T21:00:00Z', fin: null });
@@ -235,6 +235,47 @@ srv.listen(8765, async () => {
       if (!/au plus un lot \(1 lot\(s\) attribué/.test(t)) throw new Error('contrôle : ' + t.slice(-300));
       if (await p.$('[data-act="lo-attribuer"]')) throw new Error('bouton d’enregistrement visible sans classement final');
       await p.goto('http://localhost:8765/#admin-matchs'); await p.waitForTimeout(600);
+    });
+    await etape('hors concours : DFMM-8 déclaré depuis sa fiche, « HC » sans rang, lauréat d’aucun titre, aucun lot, publication et page publique', async () => {
+      await p.goto('http://localhost:8765/#admin-membres'); await p.waitForTimeout(700);
+      await p.click('[data-act="fiche-ouvrir"][data-id="8"]'); await p.waitForTimeout(500);
+      await p.check('#fi-hc'); await p.click('[data-act="fiche-hc"]'); await p.waitForTimeout(300);
+      if (!/motif est obligatoire/.test(await p.textContent('#fi-hc-err'))) throw new Error('motif non exigé');
+      await p.fill('#fi-hc-motif', 'Administrateur joueur'); await p.click('[data-act="fiche-hc"]'); await p.waitForTimeout(600);
+      if (!(await p.evaluate(() => window.FAUSSE_BASE.membres.find(m => m.id === 8).hors_concours === true))) throw new Error('statut non enregistré');
+      if (!/Statut actuel : hors concours/.test(await p.textContent('#modal-b'))) throw new Error('fiche');
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(300);
+      { const t = (await p.textContent('#mb2-liste')).replace(/\s+/g, ''); if (!/Faux8Horsconcours/.test(t)) throw new Error('liste des membres ' + t.slice(0, 300)); }
+      // Le provisoire n° 1 (même coupure) est mis de côté pour pouvoir publier celui-ci, puis remis.
+      await p.evaluate(() => { window.PUB_MISES_DE_COTE = window.FAUSSE_BASE.publications.splice(0); });
+      await p.goto('http://localhost:8765/#admin-classements'); await p.waitForTimeout(600);
+      await p.fill('#cl-date', '2026-11-22'); await p.dispatchEvent('#cl-date', 'change'); await p.click('[data-act="cl-calculer"]'); await p.waitForTimeout(800);
+      const r = await p.evaluate(() => ({ kpi: document.querySelector('#cl-res .kpis').textContent, chk: document.querySelector('#cl-res .chk').textContent,
+        hc: Array.from(document.querySelectorAll('#cl-res tr.hc')).map(tr => tr.textContent), lead: Array.from(document.querySelectorAll('#cl-res tr.lead1')).map(tr => tr.textContent) }));
+      if (!/7 \+ 1 HC/.test(r.kpi) || !/hors concours/.test(r.kpi)) throw new Error('kpi ' + r.kpi);
+      if (!r.hc.length || !r.hc.every(t => /^HCFaux8/.test(t.replace(/\s+/g, '')))) throw new Error('lignes HC ' + r.hc.join(' | ').slice(0, 200));
+      if (!r.lead.length || r.lead.some(t => /Faux 8/.test(t))) throw new Error('DFMM-8 lauréat');
+      if (!/lauréat d’aucun titre/.test(r.chk) || !/Calculés sans les joueurs hors concours/.test(r.chk)) throw new Error('contrôle ' + r.chk.slice(-300));
+      await p.click('[data-act="cl-facebook"]'); await p.waitForTimeout(300);
+      if (/Faux 8/.test(await p.inputValue('#cp-txt'))) throw new Error('Facebook cite DFMM-8');
+      await p.click('#modal-f button:has-text("Fermer")'); await p.waitForTimeout(200);
+      await p.screenshot({ path: path.join(ICI, 'apercu-hors-concours.png'), fullPage: false });
+      for (const c of ['#cl-v1', '#cl-v2', '#cl-v3']) await p.check(c);
+      await p.click('[data-act="cl-publier"]'); await p.waitForTimeout(800);
+      const pc = await p.evaluate(() => { const x = window.FAUSSE_BASE.publications[0]; if (!x) return null; window.PUB_HC = x.id;
+        return { nb_hc: x.contenu.nb_hc, nb: x.contenu.nb_joueurs, hc: x.contenu.categories.flatMap(c => c.lignes.filter(l => l.hc).map(l => l.mat + ':' + l.rang)), laur: x.contenu.categories.flatMap(c => c.laureats.map(l => l.mat)) }; });
+      if (!pc || pc.nb_hc !== 1 || pc.nb !== 7 || !pc.hc.length || pc.hc.some(h => h !== 'DFMM-8:null') || pc.laur.includes('DFMM-8')) throw new Error('publication ' + JSON.stringify(pc).slice(0, 300));
+      // Lots (prévision) : jamais pour DFMM-8.
+      await p.goto('http://localhost:8765/#admin-lots'); await p.waitForTimeout(800);
+      const benef = await p.$$eval('#lo-attr tbody tr', l => l.map(tr => tr.children[4].textContent));
+      if (!benef.some(t => /Faux/.test(t)) || benef.some(t => /Faux 8/.test(t))) throw new Error('lots ' + benef.join(' | '));
+      // Page publique.
+      await p.goto('http://localhost:8765/#classements'); await p.waitForTimeout(900);
+      const pub = await p.evaluate(() => ({ meta: document.getElementById('cl-meta').textContent, hc: document.querySelectorAll('#cl-body .rk.hc').length, lead: Array.from(document.querySelectorAll('#cl-body tr.lead1')).map(tr => tr.textContent).join('|') }));
+      if (!/7 joueur\(s\) classé\(s\) \+ 1 hors concours/.test(pub.meta) || !pub.hc || /Faux 8/.test(pub.lead)) throw new Error(JSON.stringify(pub).slice(0, 300));
+      await p.screenshot({ path: path.join(ICI, 'classements-hors-concours.png'), fullPage: false });
+      // Ancienne publication sans « hc » : même affichage que l'étape « page publique : classement visible » (et test node).
+      await p.evaluate(() => { window.FAUSSE_BASE.membres.find(x => x.id === 8).hors_concours = false; window.FAUSSE_BASE.publications = window.PUB_MISES_DE_COTE; });
     });
     await etape('actualités : publier, visible sur l’accueil, retirer', async () => {
       await p.goto('http://localhost:8765/#admin-actualites'); await p.waitForTimeout(600);

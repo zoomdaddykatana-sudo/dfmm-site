@@ -437,46 +437,58 @@ var L = (function () {
   function valeur(c, j) { return c.kind === 'MOST' ? j[c.fam] : j[c.fam] / j.n; }
 
   // Classement des 11 titres. Retirés, exclus et suspendus (à la date « aInstant ») : hors médiane, hors Q1, non candidats.
+  // Membre hors concours (membres[mat].hc, décision de Katana du 25/11/2026) : hors médiane et hors Q1 ; il figure
+  // dans une liste s'il remplit les conditions (seuil, Q1, total > 0 calculés sans lui), sans rang (« HC ») ;
+  // les autres sont numérotés et départagés comme s'il n'existait pas ; il n'est jamais lauréat.
   function classer(agg, membres, aInstant) {
-    var pop = agg.joueurs.filter(function (j) {
+    var tous = agg.joueurs.filter(function (j) {
       var m = membres[j.mat];
       if (!m || m.statut === 'Retiré' || m.statut === 'Exclu' || j.n < 1) return false;
       return !(aInstant && suspendedAt(m, aInstant));
     });
+    var estHC = function (j) { return !!(membres[j.mat] && membres[j.mat].hc); };
+    var pop = tous.filter(function (j) { return !estHC(j); });
+    var hc = tous.filter(estHC);
     var ns = pop.map(function (j) { return j.n; }).sort(function (a, b) { return a - b; });
     var seuil = ns.length ? Math.ceil(quantile(ns, 0.5) - 1e-9) : 0;
     var moyS = pop.map(function (j) { return j.score / j.n; }).sort(function (a, b) { return a - b; });
     var q1 = moyS.length ? quantile(moyS, 0.25) : 0;
     var cats = CATS.map(function (c) {
       var cand;
-      if (c.kind === 'MOST') cand = pop.filter(function (j) { return j[c.fam] > 0; });
-      else if (c.kind === 'BEST') cand = pop.filter(function (j) { return j.n >= seuil && j[c.fam] > 0; });
-      else cand = pop.filter(function (j) { return j.n >= seuil && j.score / j.n >= q1 - 1e-9; });
+      if (c.kind === 'MOST') cand = tous.filter(function (j) { return j[c.fam] > 0; });
+      else if (c.kind === 'BEST') cand = tous.filter(function (j) { return j.n >= seuil && j[c.fam] > 0; });
+      else cand = tous.filter(function (j) { return j.n >= seuil && j.score / j.n >= q1 - 1e-9; });
       var cmp = comparateur(c.kind, c.fam);
       var tri = cand.slice().sort(function (a, b) { return cmp(a, b) || (a.mat < b.mat ? -1 : a.mat > b.mat ? 1 : 0); });
-      var rang = 0;
-      var lignes = tri.map(function (j, i) {
-        if (i === 0 || cmp(tri[i - 1], j) !== 0) rang = i + 1;
-        return { j: j, rang: rang, val: valeur(c, j), egal: false };
+      var rang = 0, k = 0, prec = null;
+      var lignes = tri.map(function (j) {
+        if (estHC(j)) return { j: j, rang: null, val: valeur(c, j), egal: false, hc: true };
+        k++;
+        if (!prec || cmp(prec, j) !== 0) rang = k;
+        prec = j;
+        return { j: j, rang: rang, val: valeur(c, j), egal: false, hc: false };
       });
-      lignes.forEach(function (r, i) {
-        if ((i > 0 && lignes[i - 1].rang === r.rang) || (i < lignes.length - 1 && lignes[i + 1].rang === r.rang)) r.egal = true;
+      var classes = lignes.filter(function (l) { return !l.hc; });
+      classes.forEach(function (r, i) {
+        if ((i > 0 && classes[i - 1].rang === r.rang) || (i < classes.length - 1 && classes[i + 1].rang === r.rang)) r.egal = true;
       });
-      // Égalité parfaite en tête après les 3 critères : co-lauréats.
-      var laureats = lignes.filter(function (l) { return l.rang === 1; }).map(function (l) { return l.j; });
+      // Égalité parfaite en tête après les 3 critères : co-lauréats (jamais un membre hors concours).
+      var laureats = classes.filter(function (l) { return l.rang === 1; }).map(function (l) { return l.j; });
       var statut = !laureats.length ? 'Aucun candidat' : laureats.length > 1 ? 'Co-lauréats' : 'Attribué';
       return { key: c.key, kind: c.kind, fam: c.fam, label: c.label, prio: c.prio, lignes: lignes, laureats: laureats, statut: statut };
     });
-    return { pop: pop, seuil: seuil, q1: q1, cats: cats };
+    return { pop: pop, hc: hc, seuil: seuil, q1: q1, cats: cats };
   }
 
   // Classement figé d'une publication (contenu enregistré) → même forme que classer(), pour attribuerLots.
+  // Publication sans « hc » (avant le 25/11/2026) : personne n'est hors concours.
   function classementDepuisPublication(contenu) {
     var cats = ((contenu && contenu.categories) || []).map(function (c) {
       var def = CATS.filter(function (x) { return x.key === c.key; })[0] || {};
+      var horsC = (c.lignes || []).filter(function (l) { return l.hc; }).map(function (l) { return l.mat; });
       return { key: c.key, kind: c.kind || def.kind, fam: def.fam, label: c.label || def.label, prio: def.prio, statut: c.statut,
-        laureats: (c.laureats || []).map(function (x) { return { mat: x.mat }; }),
-        lignes: (c.lignes || []).map(function (l) { return { j: { mat: l.mat }, rang: l.rang, val: l.val, egal: !!l.egal }; }) };
+        laureats: (c.laureats || []).filter(function (x) { return horsC.indexOf(x.mat) < 0; }).map(function (x) { return { mat: x.mat }; }),
+        lignes: (c.lignes || []).map(function (l) { return { j: { mat: l.mat }, rang: l.hc ? null : l.rang, val: l.val, egal: !l.hc && !!l.egal, hc: !!l.hc }; }) };
     });
     return { cats: cats, seuil: contenu && contenu.seuil, q1: contenu && contenu.q1 };
   }
@@ -494,6 +506,7 @@ var L = (function () {
       if (!r.dejaLoti) { r.beneficiaire = laureat; loti[laureat] = 1; r.statut = 'Attribué'; r.explication = 'Lot remis au lauréat sportif.'; res.push(r); return; }
       var groupes = [];
       c.lignes.forEach(function (l) {
+        if (l.hc) return; // hors concours : jamais bénéficiaire d'un lot
         var gr = groupes[groupes.length - 1];
         if (gr && gr.rang === l.rang) gr.items.push(l.j); else groupes.push({ rang: l.rang, items: [l.j] });
       });

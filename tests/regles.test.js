@@ -211,6 +211,68 @@ test('lots depuis un classement publié : même attribution que depuis le calcul
   assert.equal(publie.find(r => r.key === 'most_med').statut, 'Non attribué');
 });
 
+// ---------- Membre hors concours (décision de Katana du 25/11/2026) ----------
+const MHC = Object.assign({}, MEMBRES, { H: membre('H', { hc: true }) });
+const rangs = c => c.lignes.map(l => [l.j.mat, l.hc ? 'HC' : l.egal ? l.rang + '=' : l.rang]);
+test('hors concours qui serait premier : figure « HC », le titre passe au premier joueur classé', () => {
+  const cl = L.classer(agg([{ mat: 'H', n: 4, elim: 50, score: 900 }, { mat: 'A', n: 4, elim: 30, score: 900 }, { mat: 'B', n: 4, elim: 20, score: 900 }]), MHC);
+  const c = cl.cats.find(x => x.key === 'most_elim');
+  assert.deepEqual(rangs(c), [['H', 'HC'], ['A', 1], ['B', 2]]);
+  assert.deepEqual(c.laureats.map(j => j.mat), ['A']); assert.equal(c.statut, 'Attribué');
+  assert.deepEqual(cl.pop.map(j => j.mat).sort(), ['A', 'B']); assert.deepEqual(cl.hc.map(j => j.mat), ['H']);
+});
+test('hors concours : exclu de la médiane (seuil BEST) et du Q1, mais soumis aux mêmes conditions', () => {
+  // Sans H : matchs 2, 4, 6 → médiane 4 ; scores moyens 100, 200, 300 → Q1 = 100 + 0,5 × 100 = 150.
+  // Avec H (20 matchs, score moyen 1000) on aurait eu : médiane 5 et Q1 175.
+  const j = [{ mat: 'A', n: 2, elim: 2, score: 200 }, { mat: 'B', n: 4, elim: 4, score: 800 }, { mat: 'C', n: 6, elim: 6, score: 1800 }, { mat: 'H', n: 20, elim: 40, score: 20000 }];
+  const cl = L.classer(agg(j), MHC);
+  assert.equal(cl.seuil, 4); assert.equal(cl.q1, 150);
+  // BEST Eliminator : H (2 par match) sans rang ; C et B à 1 par match, C devant (plus de matchs joués).
+  assert.deepEqual(rangs(cl.cats.find(x => x.key === 'best_elim')), [['H', 'HC'], ['C', 1], ['B', 2]]);
+  // H sous le seuil (calculé sans lui) : absent des listes BEST, présent dans les MOST.
+  const bas = L.classer(agg([j[0], j[1], j[2], { mat: 'H', n: 1, elim: 40, score: 1000 }]), MHC);
+  assert.equal(bas.seuil, 4);
+  assert.ok(!bas.cats.find(x => x.key === 'best_elim').lignes.some(l => l.j.mat === 'H'));
+  assert.ok(bas.cats.find(x => x.key === 'most_elim').lignes.some(l => l.j.mat === 'H' && l.hc));
+  // Score moyen sous le Q1 (calculé sans lui) : absent de BEST Survivor.
+  const q = L.classer(agg([j[0], j[1], j[2], { mat: 'H', n: 6, elim: 6, score: 600 }]), MHC);
+  assert.equal(q.q1, 150);
+  assert.ok(!q.cats.find(x => x.key === 'best_surv').lignes.some(l => l.j.mat === 'H'));
+});
+test('hors concours à égalité parfaite avec un joueur : pas de co-lauréat', () => {
+  const cl = L.classer(agg([{ mat: 'H', n: 4, elim: 30, score: 900 }, { mat: 'A', n: 4, elim: 30, score: 900 }, { mat: 'B', n: 4, elim: 10, score: 900 }]), MHC);
+  const c = cl.cats.find(x => x.key === 'most_elim');
+  assert.equal(c.statut, 'Attribué'); assert.deepEqual(c.laureats.map(j => j.mat), ['A']);
+  assert.deepEqual(rangs(c), [['A', 1], ['H', 'HC'], ['B', 2]]);
+});
+test('hors concours : les autres sont numérotés et départagés comme s’il n’existait pas', () => {
+  const cl = L.classer(agg([{ mat: 'H', n: 4, elim: 40, score: 900 }, { mat: 'A', n: 4, elim: 30, score: 900 }, { mat: 'B', n: 4, elim: 20, score: 900 },
+    { mat: 'C', n: 4, elim: 20, score: 900 }, { mat: 'D', n: 4, elim: 5, score: 900 }]), MHC);
+  assert.deepEqual(rangs(cl.cats.find(x => x.key === 'most_elim')), [['H', 'HC'], ['A', 1], ['B', '2='], ['C', '2='], ['D', 4]]);
+});
+test('hors concours : aucun lot, ni comme lauréat ni par redistribution', () => {
+  const cl = L.classer(agg([{ mat: 'H', n: 4, elim: 90, med: 90, score: 900 }, { mat: 'A', n: 4, elim: 30, med: 9, score: 900 }, { mat: 'B', n: 4, elim: 10, med: 5, score: 900 }]), MHC);
+  const r = L.attribuerLots(cl, { most_elim: true, most_med: true });
+  assert.equal(r.find(x => x.key === 'most_elim').beneficiaire, 'A');
+  const med = r.find(x => x.key === 'most_med');
+  assert.deepEqual(med.laureats, ['A']); assert.equal(med.beneficiaire, 'B'); assert.equal(med.statut, 'Attribué (redistribution)');
+  assert.ok(!r.some(x => x.beneficiaire === 'H' || x.laureats.includes('H')));
+});
+test('publication : indicateur « hc » relu ; ancienne publication sans « hc » = personne hors concours', () => {
+  const cl = L.classer(agg([{ mat: 'H', n: 4, elim: 90, med: 90, score: 900 }, { mat: 'A', n: 4, elim: 30, med: 9, score: 900 }, { mat: 'B', n: 4, elim: 10, med: 5, score: 900 }]), MHC);
+  const pub = avecHc => ({ seuil: cl.seuil, q1: cl.q1, categories: cl.cats.map(c => ({ key: c.key, label: c.label, kind: c.kind, statut: c.statut,
+    laureats: c.laureats.map(j => ({ mat: j.mat })), lignes: c.lignes.map(l => Object.assign({ rang: l.rang, egal: l.egal, mat: l.j.mat, n: l.j.n, val: l.val }, avecHc && l.hc ? { hc: true } : {})) })) });
+  const dispo = { most_elim: true, most_med: true };
+  const relu = L.classementDepuisPublication(pub(true));
+  assert.deepEqual(rangs(relu.cats.find(x => x.key === 'most_elim')), [['H', 'HC'], ['A', 1], ['B', 2]]);
+  assert.deepEqual(L.attribuerLots(relu, dispo).map(r => [r.key, r.beneficiaire, r.statut]), L.attribuerLots(cl, dispo).map(r => [r.key, r.beneficiaire, r.statut]));
+  // Ancienne publication (avant le 25/11/2026) : aucune ligne « hc », rangs et lauréats inchangés.
+  const ancien = L.classementDepuisPublication({ seuil: 4, q1: 100, categories: [{ key: 'most_elim', statut: 'Attribué', laureats: [{ mat: 'A' }],
+    lignes: [{ rang: 1, egal: false, mat: 'A', val: 30, n: 4 }, { rang: 2, egal: false, mat: 'B', val: 10, n: 4 }] }] });
+  assert.deepEqual(rangs(ancien.cats[0]), [['A', 1], ['B', 2]]); assert.ok(ancien.cats[0].lignes.every(l => l.hc === false));
+  assert.deepEqual(ancien.cats[0].laureats.map(j => j.mat), ['A']);
+});
+
 // ---------- Alertes ----------
 test('alertes de performance : seuils réglables, jamais bloquantes', () => {
   const ctx = ctxAvec(16);
