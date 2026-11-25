@@ -2537,7 +2537,7 @@ ACTIONS['sa-modifier'] = b => modifierSaisonSB(b.dataset.id);
 ACTIONS['sa-activer'] = b => activerSaisonSB(b.dataset.id);
 
 /* Contexte des règles : membres, comptes et matchs de la saison, en heure de Madagascar */
-// Membres pour le calcul. Repli sans « hors_concours » tant que la migration 0020 n'est pas exécutée.
+// Membres pour le calcul. Repli sans « hors_concours » tant que la migration 0021 n'est pas exécutée.
 async function lireMembresCalcul() {
   const r = await SB.from('membres').select('id, matricule, nom_gamer, statut, hors_concours, periodes(debut, fin)').not('matricule', 'is', null);
   if (!r.error || !/hors_concours/.test(r.error.message || '')) return r;
